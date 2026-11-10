@@ -470,6 +470,8 @@ void app.whenReady().then(async () => {
     clientConfiguration: JSON.stringify({ mcpServers: { leaflogue: {
       command: app.isPackaged && process.platform === "linux" && process.env.APPIMAGE ? process.env.APPIMAGE : process.execPath,
       args: [...(app.isPackaged ? [] : [join(applicationDirectory, "index.js")]), "--mcp", `--user-data-dir=${desktopPaths.legacyUserDataDirectory}`],
+      // Keep the client's stdio pipes instead of attaching to its console.
+      ...(process.platform === "win32" ? { env: { ELECTRON_NO_ATTACH_CONSOLE: "1" } } : {}),
       ...(process.platform === "linux" ? { env: {
         XDG_CONFIG_HOME: dirname(desktopPaths.configDirectory), XDG_DATA_HOME: dirname(desktopPaths.dataDirectory),
         XDG_CACHE_HOME: dirname(desktopPaths.cacheDirectory), XDG_STATE_HOME: dirname(desktopPaths.stateDirectory),

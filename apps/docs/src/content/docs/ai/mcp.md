@@ -96,3 +96,6 @@ separate: MCP does not enable sync, contact a remote database, or upload files.
   `nextOffset` and `hasMore` for further pages.
 - **The client expects an HTTP URL:** configure a local stdio server instead.
   This release does not provide a hosted or remotely accessible MCP endpoint.
+- **Windows closes the connection:** retain the generated
+  `ELECTRON_NO_ATTACH_CONSOLE` environment setting so Electron uses the client's
+  input/output pipes. Recopy the complete configuration after updating.
