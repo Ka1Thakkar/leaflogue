@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync 
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { _electron, expect, type ElectronApplication, type Page } from "@playwright/test";
 
 const repositoryRoot = resolve(__dirname, "../..");
@@ -121,7 +122,7 @@ export async function launch(profile: Profile): Promise<Session> {
     const allowed = (url: string) => {
       if (/^(leaflogue|data|blob|devtools):/u.test(url)) return true;
       if (!url.startsWith("file://")) return false;
-      return decodeURIComponent(new URL(url).pathname).startsWith(allowedFileRoot);
+      return new URL(url).href.startsWith(allowedFileRoot);
     };
     session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
       if (allowed(details.url)) return callback({});
@@ -144,7 +145,7 @@ export async function launch(profile: Profile): Promise<Session> {
       },
       showErrorBox: (heading: string) => { state.unexpectedDialogs.push(`error: ${heading}`); },
     });
-  }, `${rendererRoot}${sep}`);
+  }, pathToFileURL(`${rendererRoot}${sep}`).href);
 
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");

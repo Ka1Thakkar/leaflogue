@@ -34,7 +34,10 @@ test(`${packaged ? "packaged" : "source"} MCP returns citations and revokes acce
     const settings = JSON.parse(await session.page.getByRole("textbox", { name: "MCP client configuration" }).inputValue()) as { mcpServers: { leaflogue: { command: string; args: string[]; env?: Record<string, string> } } };
     const configuration = settings.mcpServers.leaflogue;
     transport = new StdioClientTransport({ ...configuration, args: [...configuration.args, ...(process.env.LEAFLOGUE_E2E_NO_SANDBOX === "1" ? ["--no-sandbox"] : [])], env: { ...isolatedProfileEnvironment(profile), ...configuration.env }, stderr: "pipe" });
-    await client.connect(transport);
+    let stderr = "";
+    transport.stderr?.on("data", (chunk: Buffer) => { stderr = `${stderr}${chunk.toString("utf8")}`.slice(-4000); });
+    try { await client.connect(transport); }
+    catch (error) { throw new Error(`MCP client could not connect. Child stderr: ${stderr}`, { cause: error }); }
     const tools = await client.listTools();
     expect(tools.tools).toHaveLength(5);
     const answer = await client.callTool({ name: "search_passages", arguments: { query: "tide" } });

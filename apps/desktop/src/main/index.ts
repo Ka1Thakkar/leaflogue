@@ -469,7 +469,7 @@ void app.whenReady().then(async () => {
     enabled: mcpAccessEnabled(mcpAccessFile(desktopPaths.configDirectory)),
     clientConfiguration: JSON.stringify({ mcpServers: { leaflogue: {
       command: app.isPackaged && process.platform === "linux" && process.env.APPIMAGE ? process.env.APPIMAGE : process.execPath,
-      args: [...(app.isPackaged ? [] : [app.getAppPath()]), "--mcp", `--user-data-dir=${desktopPaths.legacyUserDataDirectory}`],
+      args: [...(app.isPackaged ? [] : [join(applicationDirectory, "index.js")]), "--mcp", `--user-data-dir=${desktopPaths.legacyUserDataDirectory}`],
       ...(process.platform === "linux" ? { env: {
         XDG_CONFIG_HOME: dirname(desktopPaths.configDirectory), XDG_DATA_HOME: dirname(desktopPaths.dataDirectory),
         XDG_CACHE_HOME: dirname(desktopPaths.cacheDirectory), XDG_STATE_HOME: dirname(desktopPaths.stateDirectory),
@@ -935,7 +935,7 @@ async function runExclusiveFileOperation<Result>(operation: () => Promise<Result
 }
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (!mcpMode && process.platform !== "darwin") app.quit();
 });
 
 let shutdownReady = false;
