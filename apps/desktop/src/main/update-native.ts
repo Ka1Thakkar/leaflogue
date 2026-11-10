@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants, existsSync } from "node:fs";
-import { access, lstat, writeFile } from "node:fs/promises";
+import { access, lstat, open, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { UpdateManifest } from "./update-manifest";
 
@@ -50,6 +50,9 @@ function Quote-Argument([string]$value) {
   $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
   return '"' + $escaped + '"'
 }
+function Write-State([string]$phase) {
+  Set-Content -LiteralPath (Join-Path $cfg.work 'state.txt') -Value $phase -Encoding UTF8
+}
 function Restart-Leaflogue {
   if (@($cfg.args).Count -gt 0) {
     $arguments = (@($cfg.args) | ForEach-Object { Quote-Argument $_ }) -join ' '
@@ -59,26 +62,37 @@ function Restart-Leaflogue {
   }
 }
 try {
+  Write-State 'waiting-for-app-exit'
   Wait-Process -Id $cfg.parent -Timeout 60 -ErrorAction SilentlyContinue
   if (Get-Process -Id $cfg.parent -ErrorAction SilentlyContinue) { exit 1 }
   # NSIS /D consumes everything after it, including spaces, without quotes.
-  $install = Start-Process -FilePath $cfg.installer -ArgumentList ('/S --updated /D=' + $cfg.directory) -PassThru -Wait -WindowStyle Hidden
+  Write-State 'installing'
+  $install = Start-Process -FilePath $cfg.installer -ArgumentList ('/S /currentuser --updated /D=' + $cfg.directory) -PassThru -WindowStyle Hidden
+  # -Wait waits for the entire descendant tree. Wait for the installer itself,
+  # not unrelated long-lived processes started by Windows shell integration.
+  $null = $install.Handle
+  $install.WaitForExit()
   if ($install.ExitCode -ne 0) { throw 'Leaflogue upgrade failed' }
+  Write-State 'restarting'
   Restart-Leaflogue
+  Write-State 'complete'
   Remove-Item -LiteralPath $cfg.work -Recurse -Force -ErrorAction SilentlyContinue
 } catch {
-  'The update could not be installed; restart the existing copy.' | Set-Content -LiteralPath (Join-Path $cfg.work 'failure.txt')
+  $_.Exception.Message | Set-Content -LiteralPath (Join-Path $cfg.work 'failure.txt') -Encoding UTF8
   if (Test-Path -LiteralPath $cfg.executable) { Restart-Leaflogue }
   exit 1
 }
 `;
 
-function detached(command: string, args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true });
-    child.once("error", reject);
-    child.once("spawn", () => { child.unref(); resolve(); });
-  });
+async function detached(command: string, args: string[], logFile?: string): Promise<void> {
+  const log = logFile ? await open(logFile, "wx", 0o600) : undefined;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(command, args, { detached: true, stdio: ["ignore", log?.fd ?? "ignore", log?.fd ?? "ignore"], windowsHide: true });
+      child.once("error", reject);
+      child.once("spawn", () => { child.unref(); resolve(); });
+    });
+  } finally { await log?.close(); }
 }
 
 export interface NativeUpdateOptions {
@@ -113,7 +127,7 @@ export async function installNativeUpdate(download: string, manifest: UpdateMani
     await writeFile(helper, WINDOWS_UPDATE_HELPER, { mode: 0o600, flag: "wx" });
     await writeFile(config, JSON.stringify({ parent: options.pid ?? process.pid, installer: download, executable: options.executable, directory: dirname(options.executable), args: options.args ?? [], work }), { mode: 0o600, flag: "wx" });
     const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    await detached(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper, config]);
+    await detached(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper, config], join(work, "helper.log"));
     options.quit();
     return;
   }

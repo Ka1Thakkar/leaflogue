@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import { flipFuses, FuseVersion, FuseV1Options } from "@electron/fuses";
-import { Arch } from "electron-builder";
 
 /** The file the fuses live in: a bundle on macOS, an .exe on Windows. */
 export function packagedExecutable(context) {
@@ -11,13 +10,13 @@ export function packagedExecutable(context) {
 }
 
 // afterPack runs before electron-builder signs, so a later signature covers
-// the flipped fuses. Unsigned Apple-silicon builds still need the ad-hoc
-// signature Electron ships with renewed, or the edited binary will not launch.
+// the flipped fuses. Both Mac architectures receive an ad-hoc signature here,
+// including PR builds where electron-builder skips certificate signing.
 export default async function hardenElectron(context) {
   await flipFuses(packagedExecutable(context), {
     version: FuseVersion.V1,
     strictlyRequireAllFuses: true,
-    resetAdHocDarwinSignature: context.electronPlatformName === "darwin" && context.arch === Arch.arm64,
+    resetAdHocDarwinSignature: context.electronPlatformName === "darwin",
     [FuseV1Options.RunAsNode]: false,
     [FuseV1Options.EnableCookieEncryption]: true,
     [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
