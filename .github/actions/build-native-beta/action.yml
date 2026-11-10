@@ -41,14 +41,20 @@ runs:
         NATIVE_ARCHITECTURE: ${{ inputs.architecture }}
       run: |
         node --input-type=module <<'JS'
-        import { appendFileSync } from 'node:fs';
+        import { appendFileSync, readFileSync } from 'node:fs';
         import { resolve } from 'node:path';
         const platform = process.env.NATIVE_PLATFORM, arch = process.env.NATIVE_ARCHITECTURE;
         const relative = platform === 'mac'
           ? `${arch === 'arm64' ? 'mac-arm64' : 'mac'}/Leaflogue.app/Contents/MacOS/Leaflogue`
           : 'win-unpacked/Leaflogue.exe';
+        const { version } = JSON.parse(readFileSync('apps/desktop/package.json', 'utf8'));
+        const archive = resolve('apps/desktop/dist', `beta-${platform}-${arch}`, `Leaflogue-${version}-${platform}-${arch}.${platform === 'mac' ? 'zip' : 'exe'}`);
+        appendFileSync(process.env.GITHUB_ENV, `LEAFLOGUE_NATIVE_UPDATE_TEST_ARCHIVE=${archive}\n`);
         appendFileSync(process.env.GITHUB_ENV, `LEAFLOGUE_PACKAGED_EXECUTABLE=${resolve('apps/desktop/dist', `beta-${platform}-${arch}`, relative)}\n`);
         JS
     - name: Exercise the hardened packaged boundary
       shell: bash
       run: npx playwright test --config tests/e2e/playwright.config.ts packaged.spec.ts mcp.spec.ts
+    - name: Upgrade an isolated installation with the actual native installer
+      shell: bash
+      run: npx vitest run apps/desktop/src/main/update-native-smoke.test.ts

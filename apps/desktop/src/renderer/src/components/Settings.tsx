@@ -394,6 +394,7 @@ function updateMessage(status: UpdateStatus): string {
     case "unavailable":
       if (status.reason === "flatpak") return "Your software centre keeps Leaflogue up to date.";
       if (status.reason === "not-appimage") return "This copy cannot update itself. Download new versions from the releases page.";
+      if (status.reason === "unsupported-installation") return "For in-app updates, move Leaflogue to Applications on Mac or use the Windows installer. Portable archives use manual updates.";
       if (status.reason === "development") return "Updates are turned off in development builds.";
       return "This build cannot check for updates.";
   }
@@ -445,7 +446,7 @@ function UpdatesPanel({ currentVersion }: { readonly currentVersion: string }) {
             <button className="ll-button-secondary" disabled={pending} onClick={async () => {
               if (!await confirm({
                 title: `Install Leaflogue ${status.version}?`,
-                message: "Leaflogue downloads the update, checks that it was signed by Leaflogue, and restarts. Your library is not changed.",
+                message: "Leaflogue downloads the update, checks that it was signed by Leaflogue, and restarts. Your library stays in its data folder. A newer version may upgrade its format; back up first.",
                 confirmLabel: "Install and restart",
               })) return;
               setPending(true); setError("");

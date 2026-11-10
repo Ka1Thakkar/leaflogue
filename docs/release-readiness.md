@@ -1,4 +1,4 @@
-# 0.1.0-beta.1 release readiness
+# 0.1.0-beta.2 release readiness
 
 Status: experimental public beta authorized, 10 November 2026.
 This is a prerelease, with the manual checks below explicitly deferred.
@@ -36,7 +36,7 @@ must not be treated as evidence for later source changes or an untested target.
       Record observed Gatekeeper/SmartScreen prompts; claim no publisher trust.
 - [x] Maintainer approved experimental publication with the manual acceptance
       checks above still pending, disclosed in the release notes (10 November 2026).
-      This exception applies to 0.1.0-beta.1, not a stable release.
+      This exception applies to 0.1.0-beta.2, not a stable release.
 - [ ] Review final tagged CI, notes, checksums and publish the matching prerelease.
 
 The unchecked human checks are unperformed, not passed or replaced by CI.
@@ -46,3 +46,12 @@ for testing with backed-up data.
 See [beta validation](beta-desktop-validation.md) for the native checklist and
 [release process](release-process.md) for candidate preparation. Stable Linux
 update signing is a separate protected release path, not an unsigned beta feed.
+
+## Update-enabled candidate
+
+The first candidate remains unpublished. Beta.2 adds a separately keyed beta
+feed and in-app installation for Mac app bundles, Windows per-user NSIS
+installations, and Linux AppImages. Portable Windows ZIP/Linux tarballs remain
+manual installations. Native fixture upgrade checks must pass on each target
+before publishing this candidate. No human acceptance box is marked passed
+by those automated checks.

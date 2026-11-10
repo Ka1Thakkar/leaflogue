@@ -9,17 +9,19 @@ import { createHash, createPublicKey, verify, type KeyObject } from "node:crypto
  * builds them from the version, so a manifest cannot point anywhere else.
  */
 
-export type UpdateChannel = "stable";
+export type UpdateChannel = "stable" | "beta";
+export type UpdatePlatform = "linux" | "mac" | "windows";
 export type UpdateArchitecture = "x64" | "arm64";
 
 export interface UpdateManifest {
-  readonly format: 1;
+  readonly format: 1 | 2;
+  readonly platform: UpdatePlatform;
   readonly product: "leaflogue";
   readonly channel: UpdateChannel;
   readonly version: string;
   readonly architecture: UpdateArchitecture;
   readonly releasedAt: string;
-  readonly appImage: {
+  readonly artifact: {
     readonly name: string;
     readonly size: number;
     readonly sha512: string;
@@ -96,29 +98,38 @@ export function parseUpdateSignature(bytes: Uint8Array): UpdateSignature {
 function parseManifest(bytes: Uint8Array): UpdateManifest {
   const value = parseJson(bytes, MAX_UPDATE_MANIFEST_BYTES, "Update manifest");
   if (!isRecord(value)) throw new UpdateVerificationError("Update manifest is invalid", "format");
-  exactKeys(value, ["format", "product", "channel", "version", "architecture", "releasedAt", "appImage"], "Update manifest");
-  const { appImage } = value;
-  if (value.format !== 1 || value.product !== "leaflogue" || value.channel !== "stable" ||
+  const legacy = value.format === 1;
+  exactKeys(value, legacy
+    ? ["format", "product", "channel", "version", "architecture", "releasedAt", "appImage"]
+    : ["format", "product", "platform", "channel", "version", "architecture", "releasedAt", "artifact"], "Update manifest");
+  const platform = legacy ? "linux" : value.platform;
+  const artifact = legacy ? value.appImage : value.artifact;
+  if ((value.format !== 1 && value.format !== 2) || value.product !== "leaflogue" ||
+      (value.channel !== "stable" && value.channel !== "beta") ||
+      (platform !== "linux" && platform !== "mac" && platform !== "windows") ||
       typeof value.version !== "string" || !VERSION_PATTERN.test(value.version) ||
       (value.architecture !== "x64" && value.architecture !== "arm64") ||
-      typeof value.releasedAt !== "string" || Number.isNaN(Date.parse(value.releasedAt)) || !isRecord(appImage)) {
+      (platform === "windows" && value.architecture !== "x64") ||
+      typeof value.releasedAt !== "string" || Number.isNaN(Date.parse(value.releasedAt)) || !isRecord(artifact)) {
     throw new UpdateVerificationError("Update manifest is invalid", "format");
   }
-  exactKeys(appImage, ["name", "size", "sha512"], "Update manifest AppImage");
-  if (appImage.name !== expectedAppImageName(value.version, value.architecture) ||
-      typeof appImage.size !== "number" || !Number.isSafeInteger(appImage.size) || appImage.size <= 0 || appImage.size > MAX_APPIMAGE_BYTES ||
-      typeof appImage.sha512 !== "string" || !SHA512_BASE64.test(appImage.sha512)) {
-    throw new UpdateVerificationError("Update manifest AppImage is invalid", "format");
+  exactKeys(artifact, ["name", "size", "sha512"], "Update artifact");
+  if (artifact.name !== expectedUpdateName(value.version, value.architecture, platform) ||
+      typeof artifact.size !== "number" || !Number.isSafeInteger(artifact.size) || artifact.size <= 0 || artifact.size > MAX_APPIMAGE_BYTES ||
+      typeof artifact.sha512 !== "string" || !SHA512_BASE64.test(artifact.sha512)) {
+    throw new UpdateVerificationError("Update artifact is invalid", "format");
   }
   return {
-    format: 1,
-    product: "leaflogue",
-    channel: "stable",
-    version: value.version,
-    architecture: value.architecture,
-    releasedAt: value.releasedAt,
-    appImage: { name: appImage.name, size: appImage.size, sha512: appImage.sha512 },
+    format: value.format, product: "leaflogue", platform, channel: value.channel,
+    version: value.version, architecture: value.architecture, releasedAt: value.releasedAt,
+    artifact: { name: artifact.name as string, size: artifact.size, sha512: artifact.sha512 },
   };
+}
+
+export function expectedUpdateName(version: string, architecture: UpdateArchitecture, platform: UpdatePlatform): string {
+  if (platform === "mac") return `Leaflogue-${version}-mac-${architecture}.zip`;
+  if (platform === "windows") return `Leaflogue-${version}-windows-${architecture}.exe`;
+  return expectedAppImageName(version, architecture);
 }
 
 /** The AppImage name electron-builder produces for a version and architecture. */
@@ -127,8 +138,8 @@ export function expectedAppImageName(version: string, architecture: UpdateArchit
 }
 
 /** Release asset names for a channel's manifest and signature. */
-export function updateManifestAssetNames(channel: UpdateChannel, architecture: UpdateArchitecture) {
-  const manifest = `leaflogue-update-${channel}-${architecture}.json`;
+export function updateManifestAssetNames(channel: UpdateChannel, architecture: UpdateArchitecture, platform: UpdatePlatform = "linux") {
+  const manifest = `leaflogue-update-${channel}-${platform === "linux" ? "" : `${platform}-`}${architecture}.json`;
   return { manifest, signature: `${manifest}.sig` };
 }
 
@@ -185,6 +196,7 @@ export function verifyUpdateManifest(input: {
   readonly channel: UpdateChannel;
   readonly architecture: UpdateArchitecture;
   readonly currentVersion: string;
+  readonly platform?: UpdatePlatform;
 }): VerifiedUpdate {
   const signature = parseUpdateSignature(input.signatureBytes);
   const key = input.trustedKeys
@@ -197,6 +209,9 @@ export function verifyUpdateManifest(input: {
   const manifest = parseManifest(input.manifestBytes);
   if (manifest.channel !== input.channel) {
     throw new UpdateVerificationError("The update is for a different channel", "channel");
+  }
+  if (manifest.platform !== (input.platform ?? "linux")) {
+    throw new UpdateVerificationError("The update is for a different platform", "architecture");
   }
   if (manifest.architecture !== input.architecture) {
     throw new UpdateVerificationError("The update is for a different architecture", "architecture");

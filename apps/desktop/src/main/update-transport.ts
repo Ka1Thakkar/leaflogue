@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { request } from "node:https";
+import { BETA_RELEASES_API } from "./update-feed";
 import type { UpdateTransport } from "./update-service";
 
 /**
@@ -17,7 +18,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export function isAllowedUpdateUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && UPDATE_HOSTS.has(url.hostname) && !url.username && !url.password && (url.port === "" || url.port === "443");
+    return url.protocol === "https:" && (UPDATE_HOSTS.has(url.hostname) || url.toString() === BETA_RELEASES_API) && !url.username && !url.password && (url.port === "" || url.port === "443");
   } catch {
     return false;
   }

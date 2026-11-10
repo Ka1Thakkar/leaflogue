@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, open, rename, rm } from "node:fs/promises";
+import { chmod, mkdtemp, open, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { UpdateStatus } from "@leaflogue/contracts";
 import {
@@ -9,6 +9,8 @@ import {
   type TrustedUpdateKey,
   type UpdateArchitecture,
   type UpdateManifest,
+  type UpdatePlatform,
+  type UpdateChannel,
   MAX_UPDATE_MANIFEST_BYTES,
   MAX_UPDATE_SIGNATURE_BYTES,
 } from "./update-manifest";
@@ -22,6 +24,8 @@ import {
  * from the verified version, never read from the network.
  */
 
+import { discoverUpdateFeed } from "./update-feed";
+
 export const UPDATE_RELEASES_BASE = "https://github.com/Ka1Thakkar/leaflogue/releases";
 
 export interface UpdateTransport {
@@ -34,6 +38,13 @@ export interface UpdateTransport {
 export interface DesktopUpdaterOptions {
   readonly currentVersion: string;
   readonly architecture: string;
+  readonly platform?: UpdatePlatform;
+  readonly channel?: UpdateChannel;
+  /** Private per-user directory used only for verified native update downloads. */
+  readonly temporaryDirectory?: string;
+  readonly nativeUnavailableReason?: () => "unsupported-installation" | undefined;
+  /** Stage and launch the native installer; it must quit only after staging succeeds. */
+  readonly installNative?: (download: string, manifest: UpdateManifest) => Promise<void>;
   /** `process.env.APPIMAGE`: the AppImage file this process was started from. */
   readonly appImagePath: string | undefined;
   readonly packaged: boolean;
@@ -69,9 +80,13 @@ export class DesktopUpdater {
     const { packaged, flatpak, appImagePath, trustedKeys, architecture } = this.#options;
     if (flatpak) return "flatpak";
     if (!packaged) return "development";
-    if (!appImagePath) return "not-appimage";
-    if (!architectureOf(architecture)) return "not-appimage";
-    if (!trustedKeys.some(({ channel }) => channel === "stable")) return "unconfigured";
+    const platform = this.#options.platform ?? "linux";
+    if (platform === "linux" && !appImagePath) return "not-appimage";
+    if (platform !== "linux" && (!this.#options.installNative || !this.#options.temporaryDirectory)) return "unsupported-installation";
+    const nativeReason = this.#options.nativeUnavailableReason?.();
+    if (nativeReason) return nativeReason;
+    if (!architectureOf(architecture)) return "unsupported-installation";
+    if (!trustedKeys.some(({ channel }) => channel === (this.#options.channel ?? "stable"))) return "unconfigured";
     return undefined;
   }
 
@@ -79,12 +94,16 @@ export class DesktopUpdater {
     const reason = this.unavailableReason();
     if (reason) return { state: "unavailable", reason, currentVersion: this.#options.currentVersion };
     const architecture = architectureOf(this.#options.architecture)!;
-    const names = updateManifestAssetNames("stable", architecture);
-    // GitHub's "latest" release excludes drafts and pre-releases.
-    const latest = `${UPDATE_RELEASES_BASE}/latest/download`;
+    const channel = this.#options.channel ?? "stable";
+    const platform = this.#options.platform ?? "linux";
+    const names = updateManifestAssetNames(channel, architecture, platform);
+    let expectedVersion: string | undefined;
     let manifestBytes: Uint8Array;
     let signatureBytes: Uint8Array;
     try {
+      const feed = await discoverUpdateFeed(this.#options.transport, channel, architecture, platform, signal);
+      expectedVersion = feed.version;
+      const latest = feed.base;
       [manifestBytes, signatureBytes] = await Promise.all([
         this.#options.transport.getBytes(`${latest}/${names.manifest}`, MAX_UPDATE_MANIFEST_BYTES, signal),
         this.#options.transport.getBytes(`${latest}/${names.signature}`, MAX_UPDATE_SIGNATURE_BYTES, signal),
@@ -98,10 +117,12 @@ export class DesktopUpdater {
         manifestBytes,
         signatureBytes,
         trustedKeys: this.#options.trustedKeys,
-        channel: "stable",
+        channel,
+        platform,
         architecture,
         currentVersion: this.#options.currentVersion,
       });
+      if (expectedVersion && manifest.version !== expectedVersion) throw new UpdateVerificationError("Release and manifest versions differ", "version");
       this.#verified = newer ? manifest : undefined;
       return newer
         ? { state: "available", currentVersion: this.#options.currentVersion, version: manifest.version, releasedAt: manifest.releasedAt, notesUrl: `${UPDATE_RELEASES_BASE}/tag/v${manifest.version}` }
@@ -124,24 +145,28 @@ export class DesktopUpdater {
   async install(signal?: AbortSignal): Promise<void> {
     const manifest = this.#verified;
     const appImagePath = this.#options.appImagePath;
-    if (!manifest || !appImagePath || this.unavailableReason()) {
+    if (!manifest || this.unavailableReason()) {
       throw new UpdateInstallError("Check for updates first", "state");
     }
     if (this.#busy) throw new UpdateInstallError("An update is already being installed", "state");
     this.#busy = true;
-    const directory = dirname(appImagePath);
-    const temporaryPath = join(directory, `.${basename(appImagePath)}.${randomUUID()}.update`);
+    const native = (this.#options.platform ?? "linux") !== "linux";
+    let staging: string | undefined;
+    let temporaryPath: string | undefined;
     try {
+      staging = native ? await mkdtemp(join(this.#options.temporaryDirectory!, "leaflogue-update-")) : undefined;
+      const directory = staging ?? dirname(appImagePath!);
+      temporaryPath = native ? join(directory, manifest.artifact.name) : join(directory, `.${basename(appImagePath!)}.${randomUUID()}.update`);
       const file = await open(temporaryPath, "wx", 0o700).catch(() => {
         throw new UpdateInstallError("Leaflogue cannot write beside its AppImage", "write");
       });
       const hash = createHash("sha512");
       let size = 0;
       try {
-        const url = `${UPDATE_RELEASES_BASE}/download/v${manifest.version}/${manifest.appImage.name}`;
-        await this.#options.transport.download(url, manifest.appImage.size, async (chunk) => {
+        const url = `${UPDATE_RELEASES_BASE}/download/v${manifest.version}/${manifest.artifact.name}`;
+        await this.#options.transport.download(url, manifest.artifact.size, async (chunk) => {
           size += chunk.byteLength;
-          if (size > manifest.appImage.size) throw new UpdateInstallError("The update is larger than its signed size", "verification");
+          if (size > manifest.artifact.size) throw new UpdateInstallError("The update is larger than its signed size", "verification");
           hash.update(chunk);
           await file.writeFile(chunk);
         }, signal).catch((error: unknown) => {
@@ -152,20 +177,26 @@ export class DesktopUpdater {
       } finally {
         await file.close();
       }
-      if (size !== manifest.appImage.size || hash.digest("base64") !== manifest.appImage.sha512) {
+      if (size !== manifest.artifact.size || hash.digest("base64") !== manifest.artifact.sha512) {
         throw new UpdateInstallError("The downloaded update does not match its signed checksum", "verification");
       }
+      if (native) {
+        await this.#options.installNative!(temporaryPath, manifest);
+        this.#verified = undefined;
+        return;
+      }
       await chmod(temporaryPath, 0o755);
-      await rename(temporaryPath, appImagePath).catch(() => {
+      await rename(temporaryPath, appImagePath!).catch(() => {
         throw new UpdateInstallError("Leaflogue cannot replace its AppImage", "write");
       });
     } catch (error) {
-      await rm(temporaryPath, { force: true });
+      if (temporaryPath) await rm(temporaryPath, { force: true });
+      if (staging) await rm(staging, { recursive: true, force: true });
       throw error;
     } finally {
       this.#busy = false;
     }
     this.#verified = undefined;
-    this.#options.relaunch(appImagePath);
+    this.#options.relaunch(appImagePath!);
   }
 }
