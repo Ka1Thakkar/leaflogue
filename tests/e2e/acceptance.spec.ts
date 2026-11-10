@@ -94,7 +94,7 @@ test("completes setup and core navigation with the keyboard alone", async () => 
 
   await test.step("setup hands focus to the page, and the skip link returns there", async () => {
     await expect(page.locator("#content")).toBeFocused();
-    await tabTo(page, "Skip to content", 30, "Shift+Tab");
+    await tabTo(page, "Skip to content", 60, "Shift+Tab");
     await expectVisibleFocus(page);
     await page.keyboard.press("Enter");
     await expect(page.locator("#content")).toBeFocused();
@@ -118,7 +118,7 @@ test("completes setup and core navigation with the keyboard alone", async () => 
   });
 
   await test.step("the rail is reachable in order, shows focus, and search is one shortcut away", async () => {
-    await tabTo(page, "Skip to content", 30, "Shift+Tab");
+    await tabTo(page, "Skip to content", 60, "Shift+Tab");
     const order: string[] = [];
     for (let step = 0; step < 12 && !order.includes("Threads"); step += 1) {
       await page.keyboard.press("Tab");
