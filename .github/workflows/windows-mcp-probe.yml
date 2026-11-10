@@ -14,14 +14,6 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version-file: .nvmrc
-      - name: Install and build the desktop source
+      - name: Probe update helper startup without building an installer
         shell: bash
-        run: |
-          corepack enable npm
-          corepack install
-          npm ci
-          node node_modules/electron/install.js
-          npm run build --workspace @leaflogue/desktop
-      - name: Exercise the real MCP client
-        shell: bash
-        run: npx playwright test --config tests/e2e/playwright.config.ts mcp.spec.ts
+        run: node scripts/probe-windows-update-startup.mjs
