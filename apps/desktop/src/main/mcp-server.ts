@@ -1,5 +1,6 @@
 import process from "node:process";
 import { Buffer } from "node:buffer";
+import { createReadStream, createWriteStream } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -71,8 +72,12 @@ export function createLocalMcpServer(libraryFile: string, accessFile: string, ve
 export async function serveLocalMcp(libraryFile: string, accessFile: string, version: string, onClose: () => void) {
   if (!mcpAccessEnabled(accessFile)) throw new Error("Enable local MCP in Leaflogue Settings before connecting an agent");
   const server = createLocalMcpServer(libraryFile, accessFile, version);
-  await server.connect(new StdioServerTransport(process.stdin, process.stdout, { maxBufferSize: 64 * 1024 }));
+  // Electron's common/init.ts replaces process.stdin with an EOF-only stream
+  // on Windows. Use the inherited pipe descriptors, not that placeholder.
+  const input = process.platform === "win32" ? createReadStream("", { fd: 0, autoClose: false }) : process.stdin;
+  const output = process.platform === "win32" ? createWriteStream("", { fd: 1, autoClose: false }) : process.stdout;
+  await server.connect(new StdioServerTransport(input, output, { maxBufferSize: 64 * 1024 }));
   server.server.onclose = onClose;
-  process.stdin.once("end", () => { void server.close().finally(onClose); });
+  input.once("end", () => { void server.close().finally(onClose); });
   return server;
 }
