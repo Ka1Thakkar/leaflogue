@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, test } from "@playwright/test";
+import type { ChildProcess } from "node:child_process";
 import { launchPackagedApp } from "./packaged-process";
 import { createProfile, isolatedProfileEnvironment, launch, removeProfile } from "./harness";
 
@@ -35,9 +36,19 @@ test(`${packaged ? "packaged" : "source"} MCP returns citations and revokes acce
     const configuration = settings.mcpServers.leaflogue;
     transport = new StdioClientTransport({ ...configuration, args: [...configuration.args, ...(process.env.LEAFLOGUE_E2E_NO_SANDBOX === "1" ? ["--no-sandbox"] : [])], env: { ...isolatedProfileEnvironment(profile), ...configuration.env }, stderr: "pipe" });
     let stderr = "";
+    let exit = "not observed";
+    const errors: string[] = [];
+    client.onerror = error => { errors.push(error.message); };
     transport.stderr?.on("data", (chunk: Buffer) => { stderr = `${stderr}${chunk.toString("utf8")}`.slice(-4000); });
-    try { await client.connect(transport); }
-    catch (error) { throw new Error(`MCP client could not connect. Child stderr: ${stderr}`, { cause: error }); }
+    try {
+      const connection = client.connect(transport);
+      // Diagnostics only: capture Windows native exit codes before the SDK
+      // releases its child handle. Do not inspect or log a real user's profile.
+      const child = Reflect.get(transport, "_process") as ChildProcess | undefined;
+      child?.once("exit", (code, signal) => { exit = `${code}/${signal}`; });
+      await connection;
+    }
+    catch (error) { throw new Error(`MCP client could not connect. Command: ${JSON.stringify(configuration)}; exit: ${exit}; errors: ${errors.join("; ")}; child stderr: ${stderr}`, { cause: error }); }
     const tools = await client.listTools();
     expect(tools.tools).toHaveLength(5);
     const answer = await client.callTool({ name: "search_passages", arguments: { query: "tide" } });
