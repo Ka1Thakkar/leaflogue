@@ -134,7 +134,9 @@ export async function installNativeUpdate(download: string, manifest: UpdateMani
   ]);
   if (identifier.stdout.trim() !== "dev.leaflogue.desktop" || version.stdout.trim() !== manifest.version) throw new Error("Update bundle identity or version differs from its signed manifest");
   await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", staged]);
-  await run("/usr/bin/lipo", ["-verify_arch", manifest.architecture === "x64" ? "x86_64" : "arm64", join(staged, "Contents", "MacOS", "Leaflogue")]);
+  // -verify_arch takes a variable number of architectures; older Xcode
+  // versions require the input file before that option.
+  await run("/usr/bin/lipo", [join(staged, "Contents", "MacOS", "Leaflogue"), "-verify_arch", manifest.architecture === "x64" ? "x86_64" : "arm64"]);
   // Move onto the same filesystem first so the post-exit swap is atomic even
   // when the user's temporary folder and Applications are on different disks.
   const sibling = join(dirname(target), `.${basename(work)}.app`);
