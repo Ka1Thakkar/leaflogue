@@ -75,7 +75,7 @@ widgets to add, ready to put back.
 
 Choose **Export** on a custom widget and pick where to save it. You get a small
 file ending in `.leaflogue-widget.json` that you can send to a friend, keep
-with your notes, or [offer on the Plugins page](/widgets/plugins/).
+with your notes, or [offer on the widget gallery](/widgets/plugins/).
 
 To use a widget file, choose **Customise**, then **Import widgets**, and pick
 one or more files. Each widget joins the list of widgets to add, and you choose

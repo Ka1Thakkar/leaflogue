@@ -29,7 +29,7 @@ This prerelease is not a signed stable update feed.
   browser file import. Desktop-only features are listed in the
   [web guide](/web/overview/#what-is-different).
 
-## Agents in 0.1.0; reading in 0.1.1
+## Local agent access
 
 **0.1.0:** an opt-in local MCP server for agents to search passages, inspect
 books and notes, and explore threads with source details for citations. The
@@ -37,12 +37,8 @@ first version is read-only. Source and packaged-client automation passed on Mac,
 the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
-**0.1.1:** a desktop EPUB reader with highlights and notes shared with the rest
-of the library, reading position, “Read in context,” optional book-file sync,
-offline downloads, and reviewed matching of imported highlights. Files will
-remain local unless the user explicitly enables their sync. These are planned
-features, not capabilities of the current build. PDFs and external-reader
-write-back follow separately.
+The integrated book reader and book-file sync are not included. Future plans
+are tracked in the [development roadmap](https://github.com/Ka1Thakkar/leaflogue/blob/main/docs/roadmap.md).
 
 ## Downloads and compatibility
 
@@ -68,7 +64,7 @@ These checks remain required before stable publication.
 Mac packages are ad-hoc signed without Apple notarization; Windows packages
 are unsigned. OS trust prompts may block installation and have not yet been
 recorded on clean machines. The maintainer approved this experimental beta
-with those limitations. There is no Flathub listing yet.
+with those limitations.
 Additional reader formats are tested against format fixtures; real-device
 coverage varies. If an import does not match your reader's output, report the
 format and error without posting your private library or credentials.

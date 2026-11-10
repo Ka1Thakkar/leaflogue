@@ -61,7 +61,7 @@ the desktop app:
 | Exporting to Markdown or JSON | Export from the desktop app. |
 | Checking for and installing updates | Whoever hosts it updates the web app. |
 | The themes folder, and importing or exporting theme files | Choose any built-in theme. |
-| [Custom widgets](/widgets/custom-widgets/) and [plugins](/widgets/plugins/) | Arrange Leaflogue's own widgets. |
+| [Custom widgets](/widgets/custom-widgets/) and [widget recipes](/widgets/plugins/) | Arrange Leaflogue's own widgets. |
 | [Offline English dictionary](/library/dictionary/) | Use Leaflogue desktop for bundled word definitions and synonyms. |
 | Your AI key in Settings | Whoever hosts it sets the key where the web app runs. |
 

@@ -8,7 +8,7 @@ checks pass; clean-desktop installation and actual Orca, VoiceOver, and Narrator
 acceptance remain pending. Back up your library before testing. Downloads and
 their validation records are on the
 [GitHub Releases page](https://github.com/Ka1Thakkar/leaflogue/releases).
-Check the [0.1.0 release notes](/start/release-notes/) for the candidate's status
+Check the [0.1.0 release notes](/start/release-notes/) for the beta's status
 and known limitations before installing.
 
 You do not need a Leaflogue account, a sync database, or an AI key to use the
@@ -35,7 +35,7 @@ DMG, then open Leaflogue from Applications. Alternatively, extract the ZIP
 and move `Leaflogue.app` into Applications. First-run setup shows where your
 library and settings will live.
 
-The current candidate build uses an **ad-hoc signature, without Apple
+The experimental beta build uses an **ad-hoc signature, without Apple
 notarization**. It is not a Developer ID-signed download. Check the release's
 signing status before installing. Gatekeeper may block this download; actual
 clean-machine prompts have not yet been recorded. No notarization is claimed.
@@ -47,7 +47,7 @@ provides a ZIP: extract all its files into one folder and run `Leaflogue.exe`.
 Keep the extracted files together. The ZIP does not move your library into
 that folder; first-run setup shows the normal per-user data location.
 
-The current candidate build is **unsigned**. Do not treat it as a verified
+The experimental beta build is **unsigned**. Do not treat it as a verified
 publisher installer. Windows native CI passed; clean-machine acceptance and
 actual SmartScreen prompts remain unrecorded. This signing status is approved
 for the experimental beta.
@@ -82,7 +82,7 @@ not replace your library.
 
 ## Check a download
 
-Each candidate provides a platform-specific checksum file: Linux uses
+Each beta release provides a platform-specific checksum file: Linux uses
 `SHA256SUMS-x64.txt` or `SHA256SUMS-arm64.txt`; Mac uses
 `SHA256SUMS-mac-arm64.txt` / `SHA256SUMS-mac-x64.txt`; Windows uses
 `SHA256SUMS-windows-x64.txt`. Each build also includes
@@ -102,28 +102,14 @@ checks should say `OK`. Do not run a file whose checksum differs.
 
 ## Updates
 
-Mac, Windows, and ZIP/tarball beta builds update by downloading the next
-release and replacing the application. They do not install updates silently.
-Back up your library first.
+The experimental beta updates by downloading the next release and replacing
+the application. Back up your library first. This applies to Mac, Windows,
+Linux AppImage, and ZIP/tarball builds.
 
-
-In a packaged AppImage, open **Settings → Updates → Check for updates**.
-When a newer signed stable release is available, choose **Install and
-restart**. Leaflogue verifies the manifest signature and the downloaded file
-before replacing the AppImage.
-
-The optional **Check for updates automatically once a day** setting is off
-by default. It checks and notifies; it does not download or install an update
-without your choice. Drafts and prereleases are not stable update feeds.
-
-## Package managers
-
-Flathub is planned but has no published Leaflogue listing yet. Use the direct
-Linux download until a listing is linked here. A future Flatpak install will
-update through its software centre.
-
-There is no Homebrew cask, Windows Store listing, or winget package yet. Use
-the beta release downloads. See [Supported systems](/help/support/).
+**Settings → Updates** checks for signed stable releases. It does not offer
+experimental prereleases. Get beta updates from
+[GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases); this beta
+has no published signed stable update feed.
 
 ## In a browser
 

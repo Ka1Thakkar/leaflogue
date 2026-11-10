@@ -1,5 +1,5 @@
 ---
-title: Supported systems
+title: Beta platforms and support
 description: Where Leaflogue runs, how updates work, and how to report a security problem.
 ---
 
@@ -14,19 +14,22 @@ description: Where Leaflogue runs, how updates work, and how to report a securit
   Initial human acceptance targets Windows 11; other Windows versions need
   their own recorded checks. Native Windows ARM64 is not yet included.
 
-The beta is in preparation. Ad-hoc Mac and unsigned Windows candidates are
-validation builds, not notarized or verified-publisher downloads. Release
-notes must state the validation and signing status of the files offered.
+The experimental beta has automated source and native packaging checks.
+Clean-desktop installation and actual screen-reader acceptance remain pending
+on these targets. Mac downloads are ad-hoc signed without notarization; Windows
+downloads are unsigned. No verified publisher trust is claimed. Consult the
+[release notes](/start/release-notes/) before testing.
 
 For sync, Leaflogue works with [Convex](/sync/convex/) and
 [PostgreSQL](/sync/postgresql/) 16 or newer.
 
 ## Updates
 
-Leaflogue checks that every update comes from Leaflogue before installing it.
-There is no Flathub listing yet. Signed stable AppImages can update from
-**Settings → Updates**; Mac, Windows, and beta archive builds use manual downloads. Release notes say clearly when an update
-changes anything you need to know about, such as a sync database update.
+For this beta, download the next release from
+[GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases) and replace
+the application manually. Back up your library first. Prereleases are not
+offered by the app's signed-stable update checker. Read the release notes for
+any schema or sync compatibility changes before updating.
 
 ## Security problems
 
