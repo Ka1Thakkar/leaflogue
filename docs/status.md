@@ -1,6 +1,9 @@
 # Project status
 
-Leaflogue is preparing its first cross-platform desktop beta, 0.1.0-beta.1.
+Leaflogue 0.1.0-beta.1 is an experimental public desktop beta.
+Automated checks pass; clean-desktop and actual screen-reader acceptance remain
+pending. The maintainer explicitly approved experimental publication with
+these limitations disclosed on 10 November 2026.
 It includes local SQLite storage, reviewed e-reader imports, shared passages
 and notes, optional PostgreSQL/Convex sync, a self-hosted web client, an offline
 English dictionary, and opt-in read-only agent access through local MCP.

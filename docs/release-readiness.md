@@ -1,6 +1,7 @@
 # 0.1.0-beta.1 release readiness
 
-Status: beta preparation, 10 November 2026. No final public release is claimed.
+Status: experimental public beta authorized, 10 November 2026.
+This is a prerelease, with the manual checks below explicitly deferred.
 
 ## Scope
 
@@ -23,7 +24,7 @@ the self-hosted web client, and a matching Convex backend bundle.
 Retain the final candidate's own logs, hashes and audit reports. These records
 must not be treated as evidence for later source changes or an untested target.
 
-## Publication gates
+## Automated publication gates and outstanding manual acceptance
 
 - [ ] Pass full CI and native packaging/MCP checks for the exact public source.
 - [ ] Retain every target's checksums, SBOM, audit and build-input records.
@@ -33,8 +34,14 @@ must not be treated as evidence for later source changes or an untested target.
 - [ ] Record keyboard and screen-reader acceptance: Orca, VoiceOver and Narrator.
 - [x] Beta signing decision: ad-hoc Mac and unsigned Windows builds are permitted.
       Record observed Gatekeeper/SmartScreen prompts; claim no publisher trust.
-- [ ] Review final notes and publish the matching beta prerelease only after
-      the outstanding acceptance gates are resolved.
+- [x] Maintainer approved experimental publication with the manual acceptance
+      checks above still pending, disclosed in the release notes (10 November 2026).
+      This exception applies to 0.1.0-beta.1, not a stable release.
+- [ ] Review final tagged CI, notes, checksums and publish the matching prerelease.
+
+The unchecked human checks are unperformed, not passed or replaced by CI.
+Stable publication requires those checks; this experimental beta is intended
+for testing with backed-up data.
 
 See [beta validation](beta-desktop-validation.md) for the native checklist and
 [release process](release-process.md) for candidate preparation. Stable Linux

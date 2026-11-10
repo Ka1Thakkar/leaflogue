@@ -14,8 +14,12 @@
    A failed or incomplete candidate remains a draft and must not be promoted.
 6. Complete [native beta acceptance](beta-desktop-validation.md), including
    normal installation and screen-reader testing, and retain the actual results.
-7. Once all [release gates](release-readiness.md) are resolved, create the matching
-   beta tag from the exact verified source and publish its prerelease notes/assets.
+   For 0.1.0-beta.1 the maintainer approved experimental publication with these
+   human checks explicitly pending. Do not mark them passed.
+7. Create the matching beta tag from the reviewed source, dispatch the candidate
+   workflow on that tag so the backend version matches, and verify tagged CI and
+   all assets. Publish as a prerelease with the pending checks and signing limits
+   in its notes. A stable release still requires all manual acceptance gates.
 
 The beta uses ad-hoc Mac signing without notarization and unsigned Windows
 packages. Release notes must disclose that status and observed OS prompts.

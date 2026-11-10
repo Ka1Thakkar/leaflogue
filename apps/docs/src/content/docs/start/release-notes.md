@@ -3,11 +3,13 @@ title: 0.1.0 preview notes
 description: What the first preview includes, what is still being validated, and where to get it.
 ---
 
-**Release status: candidate preparation.** `0.1.0` is being prepared as the
-first public desktop beta for Linux, macOS, and Windows. A candidate build is not a completed support or
-security validation, and a draft GitHub release is not a stable update feed.
-The final download will be linked from the
-[Releases page](https://github.com/Ka1Thakkar/leaflogue/releases).
+**Release status: experimental public beta, `0.1.0-beta.1`.** Automated
+source, native package, and MCP checks pass. Clean-desktop installation,
+manual updates/uninstall, and actual Orca, VoiceOver, and Narrator checks
+remain pending. The maintainer approved experimental publication with these
+limitations disclosed. Back up your library before testing.
+Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.0-beta.1).
+This prerelease is not a signed stable update feed.
 
 ## Included
 
@@ -31,8 +33,8 @@ The final download will be linked from the
 
 **0.1.0:** an opt-in local MCP server for agents to search passages, inspect
 books and notes, and explore threads with source details for citations. The
-first version is read-only. It is implemented in the beta source; final native candidate validation
-remains required before release. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
+first version is read-only. Source and packaged-client automation passed on Mac, Windows, and Linux x64;
+the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
 **0.1.1:** a desktop EPUB reader with highlights and notes shared with the rest
@@ -48,7 +50,7 @@ Linux builds target x64 and arm64 as AppImage and tarball packages. Mac builds
 target Apple Silicon and Intel as DMG and ZIP; Windows builds target x64 as a
 per-user installer and ZIP.
 The release carries the matching Convex backend bundle, checksums, dependency
-audit, SBOM, and build metadata. The final AppImage release also carries its
+audit, SBOM, and build metadata. This experimental beta uses manual replacement updates; it does not publish
 signed stable update manifests.
 
 The first release uses local SQLite schema **17**, PostgreSQL schema **13**,
@@ -58,15 +60,15 @@ contracts **22–23**. Update desktops before updating a deployment to contract
 
 ## Validation still to complete
 
-The maintainer has not yet recorded the clean Linux desktop workflow,
-including an Orca screen-reader pass and ARM64 launch/import/backup/restore.
-These remain release gates. Automated tests and container runs are recorded
-separately and do not replace those checks.
+Clean-desktop installation, manual updates/uninstallation, and actual Orca,
+VoiceOver, and Narrator checks remain unperformed across the target matrix.
+Automated tests and container runs are separate evidence, not human acceptance.
+These checks remain required before stable publication.
 
-Mac and Windows are part of the beta target. Their native CI and clean-machine
-checks must pass before publication. Current Mac candidate packages are ad-hoc
-signed without notarization; Windows candidates are unsigned. The maintainer approved this signing status for the public beta;
-clean-machine checks must still record the resulting OS prompts. There is no Flathub listing yet.
+Mac packages are ad-hoc signed without Apple notarization; Windows packages
+are unsigned. OS trust prompts may block installation and have not yet been
+recorded on clean machines. The maintainer approved this experimental beta
+with those limitations. There is no Flathub listing yet.
 Additional reader formats are tested against format fixtures; real-device
 coverage varies. If an import does not match your reader's output, report the
 format and error without posting your private library or credentials.
@@ -81,5 +83,5 @@ Existing development builds may need one manual AppImage download before
 signed updates are available. An older build may refuse a library written by
 a newer schema. Keep a [backup](/library/backups/) before changing versions.
 
-The complete development history is in the
+The public development changelog is in the
 [changelog](https://github.com/Ka1Thakkar/leaflogue/blob/main/CHANGELOG.md).

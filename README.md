@@ -70,12 +70,12 @@ in [`tests/marketing`](tests/marketing/README.md); dictionary credits are in
 
 ## Get Leaflogue
 
-**The first beta is in preparation.** The desktop targets below have packaging
-and CI configured; a target is ready to download only when its release notes
-record validation and signing status. There is no published cross-platform
-beta yet.
+**0.1.0-beta.1 is an experimental public beta.** Automated source and native
+package checks pass, but clean-desktop installation, manual updates/uninstall,
+and actual Orca, VoiceOver, and Narrator acceptance are still pending.
+Back up your library before testing; keep another copy of irreplaceable data.
 
-| Platform | Beta architecture | Planned downloads |
+| Platform | Beta architecture | Downloads |
 | --- | --- | --- |
 | macOS 13+ | Apple Silicon, Intel | DMG, ZIP |
 | Windows | x64; initial desktop acceptance on Windows 11 | Per-user installer, ZIP |
@@ -84,9 +84,9 @@ beta yet.
 Use [GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases) for
 published downloads and checksums, and the
 [installation guide](https://leaflogue-docs.vercel.app/start/install/) for setup.
-The current Mac candidate is ad-hoc signed without Apple notarization;
-the Windows candidate is unsigned. Native acceptance, accessibility checks,
-and public signing decisions remain on the
+Mac builds are ad-hoc signed without Apple notarization; Windows builds are
+unsigned. OS trust prompts may block installation. Pending native and
+accessibility acceptance is tracked in the
 [beta release checklist](docs/beta-desktop-validation.md).
 
 ## Desktop and web, one library
