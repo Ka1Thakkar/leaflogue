@@ -1,0 +1,14 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "notes-by-month",
+    "version": 1,
+    "title": "Notes by month",
+    "description": "Which months of the year you write the most notes in",
+    "count": "notes",
+    "groupBy": "month",
+    "show": "bars",
+    "limit": 12,
+    "sort": "label"
+  }
+}

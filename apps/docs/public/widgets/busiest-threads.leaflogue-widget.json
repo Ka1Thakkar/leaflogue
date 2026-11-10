@@ -1,0 +1,14 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "busiest-threads",
+    "version": 1,
+    "title": "Your biggest threads",
+    "description": "The threads that gather the most passages",
+    "count": "passages",
+    "groupBy": "thread",
+    "show": "ranked",
+    "limit": 6,
+    "sort": "count"
+  }
+}

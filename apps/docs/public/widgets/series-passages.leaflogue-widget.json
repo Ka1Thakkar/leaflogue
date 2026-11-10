@@ -1,0 +1,14 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "series-passages",
+    "version": 1,
+    "title": "Series you highlight",
+    "description": "Passages from each series you read, most first",
+    "count": "passages",
+    "groupBy": "series",
+    "show": "ranked",
+    "limit": 6,
+    "sort": "count"
+  }
+}

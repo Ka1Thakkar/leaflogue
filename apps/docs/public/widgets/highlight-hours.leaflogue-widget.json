@@ -1,0 +1,14 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "highlight-hours",
+    "version": 1,
+    "title": "When you highlight",
+    "description": "Passages by the hour of the day, from readers that record the time",
+    "count": "passages",
+    "groupBy": "hour",
+    "show": "bars",
+    "limit": 24,
+    "sort": "label"
+  }
+}

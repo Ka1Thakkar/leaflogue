@@ -1,0 +1,13 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "to-read-shelf",
+    "version": 1,
+    "title": "Waiting to be read",
+    "description": "Books on your shelf you have not started",
+    "count": "books",
+    "where": [{ "field": "status", "is": "unread" }],
+    "show": "list",
+    "limit": 8
+  }
+}

@@ -1,0 +1,54 @@
+name: Build and validate native beta
+description: Package and exercise a macOS or Windows beta on its native runner; retain local evidence without Actions artifact storage.
+inputs:
+  platform:
+    description: mac or windows
+    required: true
+  architecture:
+    description: Native x64 or arm64 architecture
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+      with:
+        node-version-file: .nvmrc
+    - name: Install pinned tooling and locked dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        corepack enable npm
+        corepack install
+        test "$(npm --version)" = "12.0.2"
+        npm ci
+        node node_modules/electron/install.js
+    - name: Build and verify native beta packages
+      shell: bash
+      env:
+        NATIVE_PLATFORM: ${{ inputs.platform }}
+        NATIVE_ARCHITECTURE: ${{ inputs.architecture }}
+      run: |
+        set -euo pipefail
+        node -e 'if (process.arch !== process.env.NATIVE_ARCHITECTURE) throw Error("Runner architecture does not match the native test target")'
+        npm run "package:$NATIVE_PLATFORM:$NATIVE_ARCHITECTURE" --workspace @leaflogue/desktop
+    - name: Test the native desktop workflow and offline dictionary
+      shell: bash
+      run: npx playwright test --config tests/e2e/playwright.config.ts workflow.spec.ts dictionary.spec.ts mcp.spec.ts
+    - name: Select the packaged executable
+      shell: bash
+      env:
+        NATIVE_PLATFORM: ${{ inputs.platform }}
+        NATIVE_ARCHITECTURE: ${{ inputs.architecture }}
+      run: |
+        node --input-type=module <<'JS'
+        import { appendFileSync } from 'node:fs';
+        import { resolve } from 'node:path';
+        const platform = process.env.NATIVE_PLATFORM, arch = process.env.NATIVE_ARCHITECTURE;
+        const relative = platform === 'mac'
+          ? `${arch === 'arm64' ? 'mac-arm64' : 'mac'}/Leaflogue.app/Contents/MacOS/Leaflogue`
+          : 'win-unpacked/Leaflogue.exe';
+        appendFileSync(process.env.GITHUB_ENV, `LEAFLOGUE_PACKAGED_EXECUTABLE=${resolve('apps/desktop/dist', `beta-${platform}-${arch}`, relative)}\n`);
+        JS
+    - name: Exercise the hardened packaged boundary
+      shell: bash
+      run: npx playwright test --config tests/e2e/playwright.config.ts packaged.spec.ts mcp.spec.ts

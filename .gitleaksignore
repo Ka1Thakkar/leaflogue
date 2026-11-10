@@ -1,0 +1,6 @@
+# Reviewed synthetic credentials in IPC/AI privacy regression tests only.
+apps/desktop/src/preload/index.test.ts:generic-api-key:194
+apps/desktop/src/preload/index.test.ts:generic-api-key:267
+apps/desktop/src/renderer/src/App.test.tsx:generic-api-key:1617
+apps/desktop/src/renderer/src/App.test.tsx:generic-api-key:1635
+apps/desktop/src/renderer/src/App.test.tsx:generic-api-key:1873

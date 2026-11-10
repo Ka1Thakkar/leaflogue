@@ -1,0 +1,31 @@
+name: Build and validate release files
+description: Build both Linux formats and the Convex bundle, validate locally, and leave files for direct draft-release upload.
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+      with:
+        node-version-file: .nvmrc
+    - name: Activate pinned npm and install dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        corepack enable npm
+        corepack install
+        test "$(npm --version)" = "12.0.2"
+        npm ci
+    - name: Build both architectures and retain their evidence
+      shell: bash
+      run: bash scripts/build-release-files.sh
+    - name: Validate both architectures on the build runner
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install --yes --no-install-recommends squashfs-tools
+        for architecture in x64 arm64; do
+          bash scripts/validate-linux-release.sh "$architecture" "release-files/$architecture"
+        done
+        bash scripts/launch-linux-release.sh release-files/x64
+        bash scripts/validate-convex-release.sh release-files/convex

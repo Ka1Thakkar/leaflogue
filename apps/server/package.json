@@ -1,0 +1,31 @@
+{
+  "name": "@leaflogue/server",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "description": "The web client's API for a library synced through PostgreSQL.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node dist/server.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "dev:local": "node scripts/dev.mjs"
+  },
+  "dependencies": {
+    "@leaflogue/ai": "0.0.0",
+    "@leaflogue/catalog": "0.0.0",
+    "@leaflogue/contracts": "0.0.0",
+    "@leaflogue/domain": "0.0.0",
+    "@leaflogue/remote": "0.0.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/node": "^26.0.0",
+    "@types/pg": "^8.23.1",
+    "esbuild": "^0.25.12",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.0"
+  }
+}

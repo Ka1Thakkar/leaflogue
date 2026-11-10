@@ -1,0 +1,16 @@
+---
+const { entry } = Astro.locals.starlightRoute;
+const section = entry.id.split('/')[0];
+const sections: Record<string, string> = { start: 'Getting started', library: 'Your library', widgets: 'Widgets', sync: 'Sync', ai: 'Reading companion', web: 'The web app', help: 'Help' };
+const words = entry.body?.split(/\s+/).length ?? 0;
+const minutes = Math.max(1, Math.ceil(words / 220));
+---
+<div class="salon-guide-opening">
+  <div>
+    <nav class="salon-crumbs" aria-label="Breadcrumb"><a href="/start/install/">Guides</a><span>·</span><span>{sections[section] ?? 'Leaflogue'}</span></nav>
+    <h1 id="_top">{entry.data.title}</h1>
+    {entry.data.description && <p class="salon-dek">{entry.data.description}</p>}
+    <p class="salon-facts"><span><b>{minutes} min</b> read</span><span>Leaflogue companion guide</span><span>Preview 0.1.0</span></p>
+  </div>
+  <figure><div class="salon-engraving"><img src="/salon/martini-1785-wall.webp" width="1400" height="749" alt="Engraving of the end wall of the Salon of 1785, with paintings hung in rows from the dado to the cornice." /></div><figcaption>Pietro Antonio Martini, <i>View of the Salon of 1785</i></figcaption></figure>
+</div>

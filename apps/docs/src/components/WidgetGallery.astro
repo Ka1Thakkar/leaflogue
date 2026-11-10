@@ -1,0 +1,113 @@
+---
+/*
+ * Every widget file in public/widgets, as a card with a download link. Adding
+ * a file adds a card; nothing else needs changing.
+ */
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+interface Widget {
+  readonly title: string;
+  readonly description?: string;
+  readonly count: string;
+  readonly groupBy?: string;
+  readonly where?: readonly { readonly field: string; readonly is?: string; readonly isNot?: string }[];
+  readonly show: string;
+}
+
+const CHARTS: Record<string, string> = { number: "Number", bars: "Columns", ranked: "Ranked list", heatmap: "Calendar", list: "List" };
+const FIELDS: Record<string, string> = {
+  length: "length", hour: "hour of the day", weekday: "weekday", month: "month", year: "year", "has-note": "has a note",
+  tag: "tag", thread: "thread", book: "book", author: "author", series: "series", publisher: "publisher",
+  language: "language", status: "reading status", "finished-year": "year finished",
+};
+const VALUES: Record<string, string> = { "this-year": "this year", "last-year": "last year", longest: "over 600 characters", unread: "unread", yes: "yes", no: "no" };
+
+const folder = join(process.cwd(), "public", "widgets");
+const widgets = readdirSync(folder)
+  .filter((name) => name.endsWith(".leaflogue-widget.json"))
+  .map((name) => ({ name, widget: (JSON.parse(readFileSync(join(folder, name), "utf8")) as { widget: Widget }).widget }))
+  .sort((a, b) => a.widget.title.localeCompare(b.widget.title));
+
+function recipe(widget: Widget): string {
+  const parts = [`Counts ${widget.count}`];
+  if (widget.groupBy) parts.push(`by ${FIELDS[widget.groupBy] ?? widget.groupBy}`);
+  for (const filter of widget.where ?? []) {
+    const value = filter.is ?? filter.isNot ?? "";
+    parts.push(`where ${FIELDS[filter.field] ?? filter.field} ${filter.is !== undefined ? "is" : "is not"} ${VALUES[value] ?? value}`);
+  }
+  return parts.join(" ");
+}
+---
+
+<ul class="widget-gallery not-content">
+  {widgets.map(({ name, widget }) => (
+    <li class="widget-card">
+      <span class="widget-chart">{CHARTS[widget.show] ?? widget.show}</span>
+      <h3>{widget.title}</h3>
+      {widget.description && <p>{widget.description}</p>}
+      <p class="widget-recipe">{recipe(widget)}.</p>
+      <a class="widget-download" href={`/widgets/${name}`} download={name}>Download <span class="widget-file">{name}</span></a>
+    </li>
+  ))}
+</ul>
+
+<style>
+  .widget-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+    gap: 0.9rem;
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  .widget-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 1rem 1.05rem 0.95rem;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 6px;
+    background: var(--ruled);
+    box-shadow: none;
+  }
+  .widget-chart {
+    align-self: flex-start;
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--ui-radius-sm);
+    background: var(--muted);
+    color: var(--pencil);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .widget-card h3 {
+    margin: 0.15rem 0 0;
+    color: var(--ink);
+    font-family: var(--ui-font-condensed);
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+  .widget-card p { margin: 0; color: var(--ink); font-size: 0.92rem; line-height: 1.5; }
+  .widget-card .widget-recipe { color: var(--pencil); font-size: 0.82rem; }
+  .widget-download {
+    margin-top: auto;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--hairline);
+    color: var(--ui-text);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+  }
+  .widget-download:hover { text-decoration: underline; }
+  .widget-file {
+    display: block;
+    color: var(--pencil);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 400;
+    overflow-wrap: anywhere;
+  }
+</style>

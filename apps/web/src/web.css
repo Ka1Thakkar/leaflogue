@@ -1,0 +1,15 @@
+/* The sign-in and start-up pages, before the library opens. */
+.ll-web-gate {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 1rem;
+  min-height: 100dvh;
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: 2rem 1rem;
+}
+.ll-web-gate .ll-wordmark { margin: 0; }
+.ll-web-gate-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.ll-web-gate-form { display: grid; gap: 0.6rem; width: 100%; }
+.ll-web-gate-form .ll-button { justify-self: start; margin-top: 0.4rem; }

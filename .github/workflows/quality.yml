@@ -1,0 +1,421 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: true
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  quality:
+    name: Quality gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run full quality gate
+        # Typed ESLint loads the workspace projects; Node 22 defaults to a
+        # 2 GB heap on this runner, which is too small for the complete graph.
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm run check
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  package-smoke:
+    name: Linux package smoke
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build an unpacked Linux application
+        run: npm run package:dir --workspace @leaflogue/desktop
+
+  visual-regression:
+    name: Linux browser regression
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium and its Linux runtime libraries
+        run: npx playwright install --with-deps chromium
+
+      - name: Compare the reviewed Linux browser baselines
+        run: npm run test:visual
+
+  web-e2e:
+    name: Web app end-to-end
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium and its Linux runtime libraries
+        run: npx playwright install --with-deps chromium
+
+      # The built web app on apps/server with in-memory PostgreSQL, no sign-in.
+      - name: Drive the web app against a local server
+        run: npm run test:web
+
+      - name: Build the self-hosting container
+        run: docker build --file deploy/web/Dockerfile --tag leaflogue-web:ci .
+
+  desktop-e2e:
+    name: Linux desktop end-to-end
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # npm does not run Electron's install script, so fetch the runtime before
+      # the suite starts; the suite itself denies all network access.
+      - name: Download the Electron runtime
+        run: node node_modules/electron/install.js
+
+      # Hosted runners forbid the unprivileged user namespaces Chromium's
+      # sandbox needs, so this throwaway test run opts out of it explicitly.
+      - name: Walk the local workflow in the built desktop app
+        env:
+          LEAFLOGUE_E2E_NO_SANDBOX: "1"
+        run: xvfb-run -a npm run test:e2e
+
+      - name: Build and extract the verified x64 AppImage
+        run: |
+          npm run package:linux:x64 --workspace @leaflogue/desktop
+          app_image="$(find apps/desktop/dist -maxdepth 1 -type f -name 'Leaflogue-*-x86_64.AppImage' -print -quit)"
+          test -n "$app_image"
+          extraction_directory="$RUNNER_TEMP/leaflogue-e2e-appimage"
+          mkdir -p "$extraction_directory"
+          (
+            cd "$extraction_directory"
+            "$GITHUB_WORKSPACE/$app_image" --appimage-extract >/dev/null
+          )
+          test -x "$extraction_directory/squashfs-root/leaflogue"
+          echo "LEAFLOGUE_PACKAGED_EXECUTABLE=$extraction_directory/squashfs-root/leaflogue" >> "$GITHUB_ENV"
+
+      # The packaged file-dialog test answers the real GTK file chooser with
+      # xdotool, because production fuses block stubbing Electron's dialogs.
+      - name: Install the file-dialog driver
+        run: sudo apt-get install -y --no-install-recommends xdotool
+
+      - name: Exercise the packaged desktop boundary and file dialogs
+        env:
+          LEAFLOGUE_E2E_NO_SANDBOX: "1"
+        run: xvfb-run -a npm run test:e2e:packaged
+
+  native-beta:
+    name: Native beta (${{ matrix.platform }}, ${{ matrix.architecture }})
+    needs: quality
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: mac
+            architecture: arm64
+            runner: macos-15
+          - platform: mac
+            architecture: x64
+            runner: macos-15-intel
+          - platform: windows
+            architecture: x64
+            runner: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/build-native-beta
+        with:
+          platform: ${{ matrix.platform }}
+          architecture: ${{ matrix.architecture }}
+
+  release-version:
+    name: Release version contract
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Require tagged releases to match the desktop version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/verify-release-version.mjs "$GITHUB_REF_NAME"
+
+  release-packages:
+    name: Linux release packages (${{ matrix.architecture }})
+    if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    needs: [quality, release-version]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x64, arm64]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build verified release packages
+        run: npm run package:linux:${{ matrix.architecture }} --workspace @leaflogue/desktop
+
+  convex-backend-package:
+    name: Versioned Convex backend package
+    if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    needs: [quality, release-version]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Select the backend artifact version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            backend_version="${GITHUB_REF_NAME#v}"
+          else
+            backend_version="0.0.0-ci.${GITHUB_SHA::12}"
+          fi
+          echo "LEAFLOGUE_BACKEND_VERSION=$backend_version" >> "$GITHUB_ENV"
+
+      - name: Build the release-matched backend bundle
+        run: node scripts/package-convex-backend.mjs --version "$LEAFLOGUE_BACKEND_VERSION"
+
+      - name: Verify checksums, contents, and deploy command
+        run: bash scripts/validate-convex-release.sh release/convex
+
+  candidate-release:
+    name: Build and retain validation candidate
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      [
+        quality,
+        package-smoke,
+        visual-regression,
+        web-e2e,
+        desktop-e2e,
+        release-version,
+        native-beta,
+      ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and validate release files without Actions artifact storage
+        uses: ./.github/actions/build-release-files
+      - name: Retain candidate downloads in a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          candidate_tag="candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mapfile -t assets < <(find release-files -type f -print | sort)
+          gh release create "$candidate_tag" --draft --prerelease --target "$GITHUB_SHA" \
+            --title "Leaflogue validation candidate ${GITHUB_SHA::12}" \
+            --notes "Automated candidate from $GITHUB_SHA. Checksums, architecture checks, and isolated x64 launch passed. Human Linux desktop and Orca checks remain required. This is not a signed stable update feed. Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            "${assets[@]}"
+
+  publish-tagged-release:
+    name: Publish tagged release assets
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    needs:
+      [
+        quality,
+        package-smoke,
+        visual-regression,
+        web-e2e,
+        desktop-e2e,
+        release-version,
+        native-beta,
+      ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The release environment is the only place the update-signing key exists
+    # (ADR 0007); protect it with required reviewers in the repository settings.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and validate release files without Actions artifact storage
+        uses: ./.github/actions/build-release-files
+
+      # Signed update manifests let installed AppImages verify and install this
+      # release. The script refuses a key the app's update-keys.ts does not list.
+      - name: Sign the stable update manifests
+        env:
+          LEAFLOGUE_UPDATE_SIGNING_KEY: ${{ secrets.LEAFLOGUE_UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          released_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for architecture in x64 arm64; do
+            node apps/desktop/scripts/update-manifest.mjs --architecture "$architecture" \
+              --directory "release-files/$architecture" --released-at "$released_at"
+          done
+
+      # Build provenance lets anyone confirm a download came from this workflow.
+      - name: Attest the desktop packages
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release-files/*/Leaflogue-*.AppImage
+            release-files/*/Leaflogue-*.tar.gz
+
+      - name: Attach immutable release assets (new releases remain drafts)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release-files -type f -print | sort)
+          test "${#assets[@]}" -gt 0
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # Existing assets are immutable. A name collision fails the job;
+            # only a missing asset may be added by a tagged rerun.
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes \
+              --title "Leaflogue $GITHUB_REF_NAME" "${assets[@]}"
+          fi

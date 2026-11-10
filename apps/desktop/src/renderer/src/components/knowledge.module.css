@@ -1,0 +1,749 @@
+.knowledgePage {
+  min-width: 0;
+}
+/* Without an already-loaded cover to sample, the book accent falls back to
+   the active theme's placeholder-cover colour. */
+.bookWorkspace {
+  --book-accent: var(--kraft);
+  position: relative;
+  isolation: isolate;
+}
+.knowledgePage .toolbar {
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.knowledgePage .toolbar label {
+  flex: 1 1 10rem;
+  min-width: 10rem;
+}
+.knowledgePage .toolbar .ll-filter-panel > label,
+.knowledgePage .toolbar .ll-filter-panel > label:first-child { flex: none; min-width: 0; }
+.knowledgePage .toolbar label:first-child {
+  flex: 2 1 18rem;
+}
+.knowledgePage .toolbar select {
+  width: 100%;
+  max-width: 100%;
+}
+.filterHint {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  margin: 0;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  padding: 0 0 12px;
+  margin-bottom: 4px;
+}
+.toolbar label:first-child {
+  flex: 1 1 16rem;
+}
+.toolbar label {
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1.5rem 1rem;
+  padding: 0.5rem 0 2rem;
+}
+.bookLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.bookLink:hover h2 { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.bookLink h2 {
+  font: 600 var(--text-base)/1.3 var(--font-sans);
+  margin: 0.6rem 0 0.2rem;
+  overflow-wrap: anywhere;
+}
+.bookLink p {
+  font-size: var(--text-sm);
+  margin: 0.25rem 0;
+}
+.readingBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-top: 0.4rem !important;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--foreground);
+  font: 600 var(--text-xs) var(--font-condensed) !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cover {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  max-width: 230px;
+  overflow: hidden;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px -8px var(--drop);
+}
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* No cover art: bound in kraft, with the spine darker where it is creased. */
+.cloth {
+  height: 100%;
+  padding: 12% 10% 10% 14%;
+  border-left: 4px solid var(--shade-strong);
+  background: var(--kraft);
+  color: var(--kraft-ink);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.cloth span {
+  font: 600 clamp(0.6rem, 1.4vw, 1.1rem)/1.25 var(--font-condensed);
+  overflow: hidden;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.cloth small {
+  opacity: 0.8;
+  overflow: hidden;
+}
+.emptyBook {
+  width: 76px;
+  height: 102px;
+  background: var(--kraft);
+  border-left: 4px solid var(--shade-strong);
+  border-radius: 3px;
+  margin-bottom: 1.25rem;
+  box-shadow: 3px 5px 12px -6px var(--drop);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+/* A passage's controls float over its top-right corner and appear only while
+   the passage is hovered or holds keyboard focus, so the text can use the
+   whole width. Touch screens and narrow windows keep them underneath. */
+.record > .actions {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 2;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-panel);
+  box-shadow: 0 6px 16px -10px var(--drop);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.annotation:hover .record > .actions,
+.annotation:focus-within .record > .actions,
+.record > .actions:has(dialog[open], details[open]) {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .record > .actions {
+    position: static;
+    justify-self: start;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    opacity: 0.8;
+    pointer-events: auto;
+  }
+}
+.descriptionDetails summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.danger {
+  color: var(--destructive);
+}
+.dialog:not(:global(.ui-companion)) {
+  width: min(600px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 3rem);
+  overflow: auto;
+}
+.dialogHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.dialogHeading h2 {
+  font-size: var(--text-xl);
+}
+.form,
+.fields {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.fields label {
+  display: grid;
+  gap: 0.4rem;
+}
+.fields textarea {
+  resize: vertical;
+}
+.fields label > span {
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+.formColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 0;
+}
+.sidebar {
+  min-width: 0;
+  align-self: start;
+}
+/* Keep the book itself in view beside its passages. Long metadata scrolls below
+   the cover, so a scrollbar never crowds the cover's edge or clips its shadow. */
+@media (min-width: 761px) and (min-height: 800px) {
+  .sidebar {
+    position: sticky;
+    top: calc(var(--header-height) + 1.25rem);
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - var(--header-height) - 2.25rem);
+    margin-inline: -0.5rem;
+    padding: 0.25rem 0.5rem 0;
+  }
+  .sidebarBook { flex: none; }
+  .sidebarDetails {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.5rem;
+    padding-bottom: 1rem;
+  }
+}
+/* On its own page the book sits straight; the hand-placed tilt is for the
+   shelf, where books are stacked rather than presented. */
+.sidebar .cover {
+  max-width: 120px;
+}
+/* One row for everything you can do to this book — the count anchors the left
+   and the controls sit together at the right. Nothing is left dangling at the
+   bottom of the column. */
+.sidebar .actions {
+  gap: 0.2rem;
+  margin-top: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--ui-line);
+}
+.sidebar .count {
+  margin-right: auto;
+  font-weight: 600;
+  font-size: var(--text-md);
+  color: var(--foreground);
+}
+/* The book's own record: labels tracked and quiet so the values carry it. */
+.sidebar dl {
+  font-size: var(--text-sm);
+  margin: 1.25rem 0 0;
+}
+.sidebar dt {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-top: 1.1rem;
+}
+.sidebar dl > dt:first-of-type {
+  margin-top: 0;
+}
+.sidebar dd {
+  overflow-wrap: anywhere;
+  margin: 0.25rem 0 0;
+  line-height: 1.45;
+}
+.readingStatus {
+  width: 100%;
+  margin-top: 0.15rem;
+}
+/* Suggestions about likely duplicates: a quiet ruled note, never an alarm. */
+.repeats, .duplicates { padding: 10px 14px; border: 1px solid var(--ui-line); border-left: 3px solid var(--accent); border-radius: var(--ui-radius); background: var(--ruled); font-size: var(--text-sm); }
+.repeats p, .duplicates p { margin: 0 0 0.5rem; }
+.repeats ul, .duplicates ul { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.repeats li, .duplicates li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.85rem; }
+.repeats li > span, .duplicates li > span { flex: 1 1 14rem; min-width: 0; color: var(--muted-foreground); overflow-wrap: anywhere; }
+
+.mergeDetails {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ui-line);
+}
+.mergeDetails summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.mergeDetails p { margin: 0.7rem 0 0.25rem; font-size: var(--text-sm); }
+.mergeForm { display: grid; gap: 0.75rem; margin-top: 0.8rem; }
+.collectionManager { display: grid; gap: 1.25rem; }
+.collectionManager > form { display: flex; align-items: end; gap: 0.75rem; }
+.collectionManager > form label { flex: 1; margin: 0; }
+.collectionList { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--border); }
+.collectionList .collectionEditRow { display: block; }
+.collectionEditRow form { display: flex; gap: 0.5rem; }
+.collectionEditRow form input { flex: 1; }
+.collectionList li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.7rem 0; border-bottom: 1px solid var(--border); }
+.collectionList li span { display: grid; }
+.collectionList small { color: var(--muted-foreground); }
+.collectionActions { display: flex; gap: 0.25rem; }
+.collectionChecks { display: grid; gap: 0.55rem; padding-top: 0.5rem; }
+.collectionChecks label { display: flex; align-items: center; gap: 0.55rem; }
+.tagPicker { display: grid; gap: 1rem; }
+.inlineCreate { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 0.65rem; padding-top: 0.85rem; border-top: 1px solid var(--border); }
+.inlineCreate label { margin: 0; }
+.multiSelect { min-width: min(26rem, 80vw); }
+.multiSelect details { position: relative; }
+.multiSelect summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 30px; padding: 4px 10px; border: 1px solid var(--control-border); border-radius: var(--ui-radius-sm); background: var(--paper); cursor: pointer; list-style: none; }
+.multiSelect summary::-webkit-details-marker { display: none; }
+.multiSelect summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multiSelect details[open] summary svg { rotate: 180deg; }
+.multiSelectPanel { position: absolute; z-index: 12; top: calc(100% + 0.3rem); left: 0; right: 0; display: grid; gap: 0.55rem; max-height: 20rem; padding: 0.6rem; overflow-y: auto; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius); background: var(--ruled); box-shadow: 0 12px 30px -18px var(--drop); }
+.multiSelectInline { min-width: 0; }
+.multiSelectInline .multiSelectPanel { position: static; max-height: 14rem; padding: 0.5rem 0 0.25rem; overflow-y: auto; border: 0; box-shadow: none; }
+.multiSelectInline .multiSelectSearch { position: static; }
+.multiSelectSearch { position: sticky; top: -0.6rem; z-index: 1; display: flex; align-items: center; gap: 0.45rem; padding: 4px 8px; border: 1px solid var(--control-border); border-radius: var(--ui-radius-sm); background: var(--paper); }
+.multiSelectSearch input { min-width: 0; width: 100%; border: 0; outline: 0; color: inherit; background: transparent; }
+.multiSelectPanel ul { display: grid; gap: 0.1rem; padding: 0; margin: 0; list-style: none; }
+.multiSelectPanel li label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.55rem; min-height: 30px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+.multiSelectPanel li label:hover { background: var(--muted); }
+.multiSelectClear { min-height: 32px; justify-self: start; display: inline-flex; align-items: center; gap: 0.35rem; border: 0; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+@media (max-width: 520px) { .inlineCreate { grid-template-columns: 1fr; } }
+.tagChips { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; padding: 0; margin: 0.8rem 0 0; }
+.tagChips li::before { content: ""; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: var(--ui-chart); }
+.tagChips li { padding: 0 7px; height: 20px; display: inline-flex; align-items: center; border-radius: 4px; background: var(--muted); color: var(--foreground); font: 600 var(--text-xs) var(--font-condensed); letter-spacing: 0.06em; text-transform: uppercase; }
+.description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  font-size: var(--text-sm);
+  margin-top: 1.25rem;
+  color: var(--muted-foreground);
+}
+.descriptionDetails {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ui-line);
+  font-size: var(--text-sm);
+}
+.descriptionDetails summary {
+  cursor: pointer;
+  padding: 0.55rem 0;
+  font-weight: 600;
+}
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.sectionHeading h2 {
+  font-size: var(--text-xl);
+}
+/* Each passage is one row of the list panel, with a hairline between rows. */
+.annotation {
+  position: relative;
+  padding: 12px 14px;
+  scroll-margin-top: 5.5rem;
+  border-bottom: 1px solid var(--ui-line);
+  min-width: 0;
+}
+.annotation:hover { background: color-mix(in srgb, var(--muted) 40%, transparent); box-shadow: inset 2px 0 var(--ui-chart); }
+.annotation[data-focused] {
+  background: color-mix(in srgb, var(--ui-tone-mark) 14%, transparent);
+  box-shadow: inset 3px 0 var(--ui-tone-mark);
+  outline: none;
+  animation: focused-passage 1.6s ease-out 1;
+}
+.annotation[data-focused]:focus-visible { outline: 2px solid var(--ui-tone-mark); outline-offset: -2px; }
+@keyframes focused-passage {
+  0%, 35% { background: color-mix(in srgb, var(--ui-tone-mark) 34%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .annotation[data-focused] { animation: none; } }
+.passageList { overflow: hidden; }
+.passageMeta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 4px; color: var(--muted-foreground); font-size: var(--text-xs); }
+.passageMeta a { color: var(--foreground); font-weight: 600; text-decoration: none; }
+.passageMeta time { color: var(--ui-tone-chart-text, var(--muted-foreground)); }
+.passageMeta a:hover { text-decoration: underline; }
+.passageList > .annotation:last-child { border-bottom: 0; }
+.record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem;
+}
+.passage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+  margin: 0.35rem 0;
+}
+.quote {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Never strand the last word of a passage on a line of its own. */
+  text-wrap: pretty;
+  font-family: var(--font-reader);
+  font-size: 15.5px;
+  line-height: 1.5;
+  margin: 0;
+}
+.quote > :first-child,
+.noteText > :first-child,
+.quote > :last-child,
+.noteText > :last-child { margin-block: 0; }
+.quote :is(h1, h2, h3, h4, h5, h6),
+.noteText :is(h1, h2, h3, h4, h5, h6) { font: inherit; font-weight: 700; letter-spacing: inherit; }
+.quote a,
+.noteText a { color: inherit; text-decoration: underline; text-underline-offset: 0.16em; }
+.quote :is(ul, ol),
+.noteText :is(ul, ol) { padding-left: 1.35rem; }
+.quote code,
+.noteText code { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 0.88em; }
+.compactHighlights .annotation {
+  padding-block: 10px;
+}
+.compactHighlights .passage {
+  gap: 0.55rem;
+  margin-block: 0.2rem;
+}
+.compactHighlights .quote {
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.compactHighlights .note {
+  padding-block: 0.55rem;
+}
+.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+/* Continues the passage above it, so it sits tight under the text at the same
+   left edge — not floated off as a control in its own right. */
+.expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  min-height: 1.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.expand:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.expand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.note .expand {
+  color: var(--muted-foreground);
+  opacity: 0.85;
+}
+.note .expand:hover {
+  opacity: 1;
+  color: inherit;
+}
+.quoteBody {
+  min-width: 0;
+}
+/* Notes are calm marginal annotations, not simulated handwriting. A complete
+   edge and a label distinguish them without a coloured rule competing with
+   the book accent beside the passage. */
+.note {
+  width: 100%;
+  max-width: none;
+  padding: 8px 12px;
+  border-left: 2px solid var(--highlighter);
+  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+  background: var(--muted);
+  color: var(--foreground);
+}
+.noteLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.45rem;
+  color: var(--ui-tone-mark-text, var(--muted-foreground));
+  font: 600 var(--text-xs)/1.2 var(--font-condensed);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.noteText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.62;
+  margin: 0;
+}
+.generatedNoteText {
+  color: inherit;
+}
+.checkRow { display: flex; align-items: flex-start; gap: 0.65rem; line-height: 1.45; }
+.sentDescription { font-size: var(--text-sm); color: var(--muted-foreground); }
+.sentDescription summary { cursor: pointer; width: fit-content; }
+.sentDescription[open] summary { margin-bottom: 0.4rem; }
+.checkRow input { margin-top: 0.22rem; accent-color: var(--accent); }
+.shareLinks { display: flex; flex-wrap: wrap; gap: 0.6rem; padding-top: 0.75rem; border-top: 1px solid var(--hairline); }
+.embedOptions { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: end; gap: 0.75rem 1rem; padding: 0.8rem; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); }
+.embedOptions legend { padding-inline: 0.3rem; font-size: var(--text-xs); font-weight: 700; }
+.embedOptions label { display: flex; align-items: center; gap: 0.45rem; font-size: var(--text-sm); }
+.embedOptions label:has(select) { align-items: flex-start; flex-direction: column; }
+.embedOptions input { accent-color: var(--accent); }
+.localNoteRecord {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.35rem;
+}
+.localNoteRecord > .note { width: 100%; }
+.localNoteActions {
+  display: flex;
+  opacity: 0.5;
+}
+.localNoteRecord:hover .localNoteActions,
+.localNoteActions:focus-within { opacity: 1; }
+.localNoteEditor { max-width: 72ch; }
+/* What the device sent: graph paper. Never the same surface as your note.
+   It carries a line of provenance, so it is sized for one — a full slab of
+   grid behind two words reads as a panel, not as a receipt. */
+.source {
+  padding: 6px 10px;
+  margin-top: 0.75rem;
+  width: fit-content;
+  max-width: 72ch;
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ui-line-strong);
+  border-radius: var(--ui-radius-sm);
+}
+.source p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0.3rem 0;
+}
+.sourceChanged {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  margin: 0.5rem 0;
+}
+.loadMore {
+  margin: 2rem 0;
+}
+/* Today's highlight: a panel like any other, the passage set large. */
+.daily { min-width: 0; display: flex; flex-direction: column; }
+.daily h2 { display: flex; align-items: center; gap: 6px; }
+.dailyBody { display: grid; gap: 8px; padding: 14px; }
+.daily .quote { max-width: none; font-size: 17px; line-height: 1.45; }
+.daily blockquote.quote { margin: 0; }
+.dailySource { color: var(--muted-foreground); font-size: var(--ui-text-sm); text-decoration: none; }
+.dailySource:hover { color: var(--foreground); text-decoration: underline; }
+.dailyNotes { display: grid; gap: 0.75rem; margin-top: 0.75rem; }
+.overflow { position: relative; width: fit-content; }
+/* The book's menu sits at the column's right edge, so it opens back over the column. */
+.sidebar .overflowPanel { left: auto; right: 0; }
+/* Against the right margin the panel has to open inwards or it leaves the page. */
+.record .overflowPanel {
+  left: auto;
+  right: 0;
+}
+.overflowPanel {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ruled);
+  box-shadow: 0 8px 20px -10px var(--drop);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.iconField { position: relative; display: flex; align-items: center; min-width: 0; }
+.iconField > svg { position: absolute; left: 0.65rem; pointer-events: none; color: var(--muted-foreground); }
+.iconField :global(.ll-field) { padding-left: 2.15rem; min-width: 0; width: 100%; font-size: var(--text-sm); }
+.count { display: inline-flex; align-items: center; gap: 0.4rem; font-size: var(--text-sm); color: var(--muted-foreground); }
+.searchInput { flex: 1; }
+.searchResults { list-style: none; padding: 0; margin: 0; }
+.searchResult { display: grid; grid-template-columns: 48px minmax(0, 1fr) 38px; gap: 0.85rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+.searchResult h3 { font-size: var(--text-base); line-height: 1.4; overflow-wrap: anywhere; }
+.searchResult p { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.searchResult .cloth { padding: 0.3rem; border-left-width: 3px; }
+.searchResult .cloth span { font-size: 0.55rem; }
+.searchResult .cloth small { display: none; }
+@media (max-width: 480px) {
+  .knowledgePage .toolbar label:first-child { flex-basis: 100%; }
+}
+@media (max-width: 760px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .sidebar {
+    position: static;
+  }
+  .sidebar .cover {
+    width: 135px;
+  }
+  .passage {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  /* No room for a margin at this width: the controls go back underneath. */
+  .record {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .record > .actions {
+    position: static;
+    justify-self: start;
+    flex-wrap: wrap;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .grid {
+    gap: 2rem 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  }
+  .formColumns {
+    grid-template-columns: 1fr;
+  }
+}
+.aiNoteLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.35rem;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.readingHistory { display: grid; gap: 0.65rem; padding: 0; margin: 0.75rem 0 0; list-style: none; }
+.readingHistory li { display: grid; grid-template-columns: 1fr auto; gap: 0.1rem 0.75rem; font-size: var(--text-sm); }
+.readingHistory time, .readingHistory small { color: var(--muted-foreground); }
+.readingHistory small { grid-column: 1 / -1; }
+.readingHistory :global(.ui-chip) { justify-self: start; }
+.publicationPreview { display: grid; gap: 0.6rem; margin: 0.35rem 0; }
+.previewTabs { display: flex; gap: 0.35rem; }
+.previewTabs button { border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); padding: 0.4rem 0.7rem; cursor: pointer; }
+.previewTabs button[aria-pressed="true"] { background: var(--foreground); color: var(--background); }
+.pagePreview, .embedPreview { display: grid; gap: 0.5rem; padding: 1.25rem; border: 1px solid var(--border); background: var(--paper); color: var(--foreground); }
+.embedPreview { max-width: 620px; }
+.embedPreview[data-background="transparent"] { background: transparent; }
+.embedPreview[data-theme="dark"] { background: #1d1a16; color: #eee7da; border-color: #4b443a; }
+.embedPreview[data-theme="light"] { background: #f4efe5; color: #29251f; border-color: #c9beac; }
+.publicationPreview h3 { font-family: var(--font-condensed); font-size: var(--text-lg); }
+.publicationPreview blockquote { border-left: 2px solid var(--accent); padding-left: 0.9rem; font-family: var(--font-reader); line-height: 1.65; }
+.publicationPreview aside { color: inherit; opacity: 0.78; padding: 0.65rem 0.8rem; background: color-mix(in srgb, currentColor 7%, transparent); }
+.previewEyebrow { color: inherit; opacity: 0.65; font: 700 0.68rem/1 var(--font-sans); letter-spacing: 0.09em; text-transform: uppercase; }
+.previewAuthor { color: inherit; opacity: 0.68; font-size: var(--text-sm); }
+
+/* Desktop additions: shapes the hosted app does not need, drawn from the
+   same materials. */
+.archivedNotice { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--ui-line); border-left: 3px solid var(--stamp); border-radius: var(--ui-radius); background: var(--ruled); font-size: var(--text-sm); }
+.standaloneNotes { display: grid; gap: 0.75rem; margin-top: 2rem; }
+.standaloneNotes > h2 { font-size: var(--text-lg); }
+.overflowPanel .menuAction { display: flex; align-items: center; gap: 0.5rem; min-height: 30px; padding: 4px 10px; border-radius: 4px; white-space: nowrap; font-size: var(--text-sm); font-weight: 600; }
+.overflowPanel .menuAction:hover:not(:disabled) { background: var(--muted); }
+.overflowPanel .menuAction:disabled { opacity: 0.45; cursor: wait; }
+.importedOriginal { display: grid; gap: 1rem; max-width: 42rem; }
+.importedOriginal blockquote { padding-left: 1rem; border-left: 3px solid var(--accent); font-family: var(--font-reader); }
+.importedOriginal aside { display: grid; gap: 0.4rem; padding: 0.85rem 1rem; background: var(--surface); }
+.importedOriginal aside strong { font-size: var(--text-xs); }
+.exportStatus { display: block; font-size: var(--text-sm); }
+.exportDetails { font-size: var(--text-sm); }
+.exportDetails > summary { padding-block: 0.5rem; cursor: pointer; }
+.exportDetails > p { margin-top: 0.75rem; }
+.export { display: grid; justify-items: start; gap: 0.75rem; }
+.exportChoices { display: grid; gap: 0.65rem; margin: 0; padding: 0; border: 0; }
+.exportChoice { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0.8rem; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: var(--ui-radius); cursor: pointer; }
+.exportChoice:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.exportChoice input { margin-top: 0.2rem; accent-color: var(--accent); }
+.exportChoice span { display: grid; gap: 0.15rem; }
+.exportChoice strong { font-weight: 600; }
+.exportChoice small { color: var(--muted-foreground); font-size: var(--text-sm); line-height: 1.5; }
+.explain { display: grid; align-content: start; gap: 1rem; min-width: 0; overflow-wrap: anywhere; }
+
+/* The reading companion: the same conversation as the web app. The composer
+   stays pinned while the answers scroll inside the sidebar. */
+.companion { display: flex; flex-direction: column; min-height: 100%; min-width: 0; overflow-wrap: anywhere; }
+.conversation { flex: 1; display: grid; align-content: start; gap: 12px; min-width: 0; }
+.companionQuestion { min-width: 0; padding: 12px 14px; background: var(--ui-raised); border: 1px solid var(--ui-line); border-radius: var(--ui-radius); }
+.companionSave { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 4px 0; border: 0; background: transparent; color: var(--ui-text); font: 600 var(--ui-text-sm)/1.4 var(--ui-font); cursor: pointer; }
+.companionSave:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.companionSave:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.companionSave:disabled { color: var(--ui-dim); cursor: default; }
+.companionThinking { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--ui-dim); font-size: var(--ui-text-sm); }
+.companionError { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-block: 10px; }
+.companionComposer { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin-top: 12px; padding: 12px 0 0; border-top: 1px solid var(--ui-line); background: var(--ui-panel); }
+.companionComposer textarea { min-width: 0; max-height: 8rem; resize: vertical; padding: 8px 10px; color: var(--ui-text); background: var(--ui-bg); border: 1px solid var(--ui-control); border-radius: var(--ui-radius-sm); font: inherit; }
+.companionComposer textarea:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.companionFooter { margin: 8px 0 0; color: var(--ui-dim); font: var(--ui-text-xs)/1.4 var(--ui-font); }

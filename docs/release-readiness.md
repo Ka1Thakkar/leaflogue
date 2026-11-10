@@ -1,0 +1,41 @@
+# 0.1.0-beta.1 release readiness
+
+Status: beta preparation, 10 November 2026. No final public release is claimed.
+
+## Scope
+
+Linux x64/ARM64, Mac Apple Silicon/Intel (macOS 13+), and Windows x64.
+Includes the offline dictionary, opt-in read-only MCP, optional sync and AI,
+the self-hosted web client, and a matching Convex backend bundle.
+
+## Validation recorded during preparation
+
+- Source quality gate: formatting, lint, types, unit tests and all builds passed.
+- Desktop source workflows, including real stdio MCP client/revocation, passed
+  locally on Apple Silicon with isolated sample libraries.
+- Apple Silicon DMG/ZIP packages passed architecture, signature-integrity,
+  archive-integrity and packaged-app/MCP tests. These checks do not establish
+  notarization, clean-machine installation or screen-reader acceptance.
+- Documentation browser checks passed at desktop, mobile and narrow widths.
+- Production dependency audit has no high or critical vulnerabilities.
+- Linux browser baselines were reviewed in an Ubuntu Playwright container.
+
+Retain the final candidate's own logs, hashes and audit reports. These records
+must not be treated as evidence for later source changes or an untested target.
+
+## Publication gates
+
+- [ ] Pass full CI and native packaging/MCP checks for the exact public source.
+- [ ] Retain every target's checksums, SBOM, audit and build-input records.
+- [ ] Rescan the final public source and extracted release artifacts.
+- [ ] Record clean Linux x64/ARM64, Mac ARM64/Intel and Windows x64 installation,
+      import, backup/restore, restart, manual update and uninstall acceptance.
+- [ ] Record keyboard and screen-reader acceptance: Orca, VoiceOver and Narrator.
+- [x] Beta signing decision: ad-hoc Mac and unsigned Windows builds are permitted.
+      Record observed Gatekeeper/SmartScreen prompts; claim no publisher trust.
+- [ ] Review final notes and publish the matching beta prerelease only after
+      the outstanding acceptance gates are resolved.
+
+See [beta validation](beta-desktop-validation.md) for the native checklist and
+[release process](release-process.md) for candidate preparation. Stable Linux
+update signing is a separate protected release path, not an unsigned beta feed.

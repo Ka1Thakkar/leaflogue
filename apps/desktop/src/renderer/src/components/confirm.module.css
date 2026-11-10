@@ -1,0 +1,5 @@
+.dialog { width: min(440px, calc(100vw - 2rem)); }
+.dialog h2 { font-size: var(--text-lg); }
+.dialog p { margin-top: 0.75rem; color: var(--muted-foreground); line-height: 1.6; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+.dialog .destructive { background: var(--destructive); }

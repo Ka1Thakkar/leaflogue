@@ -1,0 +1,12 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "favourite-passages",
+    "version": 1,
+    "title": "Favourite passages",
+    "description": "How many passages you have tagged favourite",
+    "count": "passages",
+    "where": [{ "field": "tag", "is": "favourite" }],
+    "show": "number"
+  }
+}

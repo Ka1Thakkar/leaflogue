@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in Leaflogue does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems must be reported privately; see SECURITY.md.
+        Never attach real reading libraries, Kobo databases, Kindle clippings, credentials, or keys.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open Settings\n2. …"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Leaflogue version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Linux x64, Linux arm64, Windows, macOS, Self-hosted web]
+    validations:
+      required: true
+  - type: input
+    id: distribution
+    attributes:
+      label: Distribution and desktop environment
+      placeholder: Ubuntu 24.04, GNOME
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages
+      description: Copy any message shown in the app. Remove paths, names, and passage text first.
+      render: text

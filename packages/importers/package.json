@@ -1,0 +1,23 @@
+{
+  "name": "@leaflogue/importers",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@leaflogue/contracts": "0.0.0",
+    "@leaflogue/domain": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.0"
+  }
+}

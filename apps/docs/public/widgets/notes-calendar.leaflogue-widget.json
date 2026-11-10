@@ -1,0 +1,11 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "notes-calendar",
+    "version": 1,
+    "title": "Days you wrote notes",
+    "description": "A calendar of the notes you have written",
+    "count": "notes",
+    "show": "heatmap"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "name": "leaflogue",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "description": "A local-first home for books, passages, and reading notes.",
+  "packageManager": "npm@12.0.2+sha1.788d93dc8869000b1078e0395c60748a0aadc4f1",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run check:format && npm run lint && npm run typecheck && npm test && npm run build",
+    "check:format": "node scripts/check-format.mjs",
+    "dev": "npm run dev --workspace @leaflogue/desktop",
+    "lint": "eslint . --max-warnings 0",
+    "package:convex-backend": "node scripts/package-convex-backend.mjs",
+    "export:convex-host": "node scripts/export-convex-host.mjs",
+    "test": "node --test scripts/*.test.mjs && npm run test:convex && npm run test --workspaces --if-present",
+    "test:convex": "vitest run --dir convex",
+    "typecheck": "tsc -p convex/tsconfig.json && tsc -p tests/docs/tsconfig.json && tsc -p tests/visual/tsconfig.json && tsc -p tests/web/tsconfig.json && tsc -p tests/e2e/tsconfig.json && tsc -p tests/live/tsconfig.json && npm run typecheck --workspaces --if-present",
+    "test:visual": "playwright test --config tests/visual/playwright.config.ts",
+    "test:web": "playwright test --config tests/web/playwright.config.ts",
+    "test:e2e": "npm run build --workspace @leaflogue/desktop && npm run test:e2e:built",
+    "test:e2e:built": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:e2e:packaged": "playwright test --config tests/e2e/playwright.config.ts packaged mcp.spec.ts",
+    "test:convex:live": "node --env-file=.env --env-file-if-exists=.env.local ./node_modules/vitest/vitest.mjs run tests/live/convex-sync.test.ts",
+    "test:convex:packaged:live": "node --env-file=.env --env-file-if-exists=.env.local ./node_modules/playwright/cli.js test --config tests/live/playwright.config.ts",
+    "test:docs": "npm run build --workspace @leaflogue/docs && playwright test --config tests/docs/playwright.config.ts",
+    "capture:marketing": "node scripts/capture-marketing.mjs"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "7zip-bin": "^5.2.0",
+    "convex": "^1.45.0",
+    "convex-test": "^0.0.58",
+    "esbuild": "^0.27.7",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@auth/core": "^0.41.3",
+    "@convex-dev/auth": "^0.0.95"
+  }
+}

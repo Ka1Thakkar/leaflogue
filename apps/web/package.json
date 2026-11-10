@@ -1,0 +1,39 @@
+{
+  "name": "@leaflogue/web",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "description": "Leaflogue in the browser, over a library hosted with PostgreSQL or Convex.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@convex-dev/auth": "^0.0.95",
+    "@leaflogue/appearance": "0.0.0",
+    "@leaflogue/contracts": "0.0.0",
+    "@leaflogue/domain": "0.0.0",
+    "@leaflogue/importers": "0.0.0",
+    "@leaflogue/ui": "0.0.0",
+    "convex": "^1.45.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "^1.4.11",
+    "@vitejs/plugin-react": "^5.1.4",
+    "happy-dom": "^21.0.4",
+    "typescript": "^6.0.2",
+    "vite": "^7.1.0",
+    "vitest": "^4.1.0"
+  }
+}

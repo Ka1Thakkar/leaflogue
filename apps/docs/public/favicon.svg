@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Vector source for icon.png and icon.ico: the established leaf on its dark disc, traced on a 256 grid. -->
+  <circle cx="512" cy="512" r="512" fill="#262626"/>
+  <g transform="scale(4)" fill="none" stroke="#ac8887" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M193 64V92C191 152 158 192 118 191C100 190 88 184 80 176C70 165 65 150 65 134C65 90 110 64 165 64Z"/>
+    <path d="M60 196L152 105"/>
+  </g>
+</svg>

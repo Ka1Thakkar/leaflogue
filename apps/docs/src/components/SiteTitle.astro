@@ -1,0 +1,9 @@
+---
+import Wordmark from "./Wordmark.astro";
+
+const { siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="site-title" aria-label="Leaflogue home">
+  <Wordmark />
+</a>

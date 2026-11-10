@@ -1,0 +1,132 @@
+/*
+ * One twelve-column grid for every widget. A tile takes two columns (six to a
+ * row); panels take a third, half, two thirds, or the full row. A tall panel
+ * spans two rows so two shorter panels can stack beside it.
+ */
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.slot { grid-column: span 4; min-width: 0; display: flex; flex-direction: column; }
+.slot[data-width="tile"] { grid-column: span 2; }
+.slot[data-width="half"] { grid-column: span 6; }
+.slot[data-width="two-thirds"] { grid-column: span 8; }
+.slot[data-width="full"] { grid-column: 1 / -1; }
+.slot[data-tall] { grid-row: span 2; }
+/* Each such panel keeps its own height: a short quote is not stretched to a long list. */
+.slot[data-natural] { align-self: start; }
+.content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.content > * { flex: 1; }
+.empty { grid-column: 1 / -1; margin: 0; }
+
+/* Customising */
+.grid[data-editing] .slot {
+  padding: 6px;
+  border: 1px dashed var(--ui-line-strong);
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--ui-raised) 35%, transparent);
+  cursor: grab;
+}
+.grid[data-editing] .slot[data-dragging] { opacity: 0.4; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 6px; }
+.toolbar > :last-child { margin-left: auto; }
+.grip { display: inline-flex; padding: 0 2px; color: var(--ui-dim); }
+/* Small enough that a tile's toolbar, with a custom widget's tools, stays on one line. */
+.toolbar :global(.ui-icon-btn) { width: 26px; height: 26px; }
+.width, .toggle {
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-panel);
+  color: var(--ui-text);
+  font: 500 var(--ui-text-xs) var(--ui-font);
+}
+.toggle { padding: 0 8px; color: var(--ui-dim); }
+.toggle[aria-pressed="true"] { border-color: var(--ui-tone-chart); color: var(--ui-tone-chart-text); background: var(--ui-raised); }
+.tray {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-panel);
+}
+.tray p { margin: 0; }
+.catalogue { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 10px 0 7px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-text);
+  font: 500 var(--ui-text-sm) var(--ui-font);
+}
+.addButton:hover { background: var(--ui-raised); }
+.addButton svg { color: var(--ui-tone-chart-text); }
+/* The reader's own widgets are marked, so they read apart from the built-in ones. */
+.addButton[data-custom] { border-style: dashed; }
+.newButton { border-color: var(--ui-tone-chart, var(--ui-line-strong)); font-weight: 600; }
+.divider { align-self: stretch; width: 1px; margin: 3px 4px; background: var(--ui-line-strong); }
+.customTools { display: inline-flex; gap: 2px; margin-left: 4px; padding-left: 4px; border-left: 1px solid var(--ui-line); }
+.itemTitle { font-weight: 600; color: var(--ui-text); }
+
+/* Widget contents */
+.caption { margin-left: 8px; font: 400 var(--ui-text-sm) var(--ui-font); letter-spacing: 0; text-transform: none; color: var(--ui-dim); }
+.coverageList { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.coverage { display: grid; gap: 6px; }
+.coverage > div:first-child { display: flex; justify-content: space-between; gap: 10px; }
+.note { margin: 10px 0 0; }
+.series { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.series li { display: grid; gap: 6px; }
+.series li > div:first-child { display: flex; justify-content: space-between; gap: 10px; }
+.seriesBooks { display: flex; gap: 4px; }
+.seriesBooks i { flex: 1; height: 4px; border-radius: 2px; background: var(--ui-raised); }
+.seriesBooks i[data-finished] { background: var(--ui-chart); }
+.series li[data-tone="good"] .seriesBooks i[data-finished] { background: var(--ui-accent); }
+
+@media (max-width: 1180px) {
+  .slot[data-width="tile"] { grid-column: span 4; }
+  .slot, .slot[data-width="half"] { grid-column: span 6; }
+  .slot[data-width="two-thirds"] { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .slot[data-width="tile"] { grid-column: span 6; }
+  .slot, .slot[data-width="half"], .slot[data-width="two-thirds"] { grid-column: 1 / -1; }
+  .slot[data-tall] { grid-row: auto; }
+}
+
+/* Passages and books in progress */
+.passages, .progress { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.passages li, .progress li { display: grid; gap: 4px; min-width: 0; }
+.passages blockquote, .progress blockquote {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--ui-tone-mark);
+  font: 400 var(--ui-text-md)/1.5 var(--ui-font-reading);
+  color: var(--ui-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.progress blockquote { -webkit-line-clamp: 2; color: var(--ui-dim); }
+.progress li > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.progress li > div > a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--ui-text); }
+.passages a, .progress a { color: inherit; }
+.badge {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 999px;
+  font: 600 10.5px/1.4 var(--ui-font-condensed);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-dim);
+}
+
+/* The library's books, while the widgets are arranged around them */
+.grid[data-editing] .shelf { border-style: solid; border-color: var(--ui-tone-chart, var(--ui-line-strong)); background: var(--ui-panel); }
+.shelfLabel { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 8px; color: var(--ui-text); }
+.shelfLabel b { font-weight: 600; }

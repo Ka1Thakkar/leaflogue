@@ -1,0 +1,38 @@
+[
+  {
+    "file": "covers/1342.jpg",
+    "source": "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg",
+    "localSha256": "09dac7bcaad56ad2229588acb9fc97ed32a4cf91da98677210f7de8800170091",
+    "matchesSource": true
+  },
+  {
+    "file": "covers/84.jpg",
+    "source": "https://www.gutenberg.org/cache/epub/84/pg84.cover.medium.jpg",
+    "localSha256": "b19e1fc08fc4e6f92507b8d685dff4514286c2764979b2e79ac4dcb1e266a195",
+    "matchesSource": true
+  },
+  {
+    "file": "covers/205.jpg",
+    "source": "https://www.gutenberg.org/cache/epub/205/pg205.cover.medium.jpg",
+    "localSha256": "ce320c790c273ea3042256fdbb680dc89faf9aef659318fb6a7781a0497ab85e",
+    "matchesSource": true
+  },
+  {
+    "file": "covers/1661.jpg",
+    "source": "https://www.gutenberg.org/cache/epub/1661/pg1661.cover.medium.jpg",
+    "localSha256": "d0e7b2fcd71818c49ca06ade9e143ac55371b05d4449e242f66d7875d5c2d052",
+    "matchesSource": true
+  },
+  {
+    "file": "covers/174.jpg",
+    "source": "https://www.gutenberg.org/cache/epub/174/pg174.cover.medium.jpg",
+    "localSha256": "b0751725538f1ebc7e5eec990d02976f35ae35e3833994d4002d926c00b7c1e7",
+    "matchesSource": true
+  },
+  {
+    "file": "covers/64317.jpg",
+    "source": "https://www.gutenberg.org/cache/epub/64317/pg64317.cover.medium.jpg",
+    "localSha256": "712eda0765dc342c5673238e28e94776b3c22c42f56901556bc517c6c6f032f4",
+    "matchesSource": true
+  }
+]

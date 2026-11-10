@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "ai": {
+    "enabled": false,
+    "selectedProvider": "openai",
+    "providers": {
+      "openai": {
+        "apiKeyEnv": "OPENAI_API_KEY",
+        "defaultModel": "replace-with-openai-model-id",
+        "models": ["replace-with-openai-model-id"],
+        "capabilities": ["chat", "structured-output"]
+      },
+      "anthropic": {
+        "apiKeyEnv": "ANTHROPIC_API_KEY",
+        "defaultModel": "replace-with-anthropic-model-id",
+        "models": ["replace-with-anthropic-model-id"],
+        "capabilities": ["chat"]
+      },
+      "gemini": {
+        "apiKeyEnv": "GEMINI_API_KEY"
+      },
+      "mistral": {
+        "apiKeyEnv": "MISTRAL_API_KEY",
+        "defaultModel": "replace-with-mistral-model-id",
+        "models": ["replace-with-mistral-model-id"],
+        "capabilities": ["chat"]
+      },
+      "xai": {
+        "apiKeyEnv": "XAI_API_KEY",
+        "defaultModel": "replace-with-xai-model-id",
+        "models": ["replace-with-xai-model-id"],
+        "capabilities": ["chat"]
+      },
+      "deepseek": {
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "defaultModel": "replace-with-deepseek-model-id",
+        "models": ["replace-with-deepseek-model-id"],
+        "capabilities": ["chat"]
+      },
+      "openai-compatible": {
+        "endpoint": "https://replace-with-compatible-endpoint.example/v1",
+        "apiKeyEnv": "LEAFLOGUE_COMPATIBLE_API_KEY",
+        "defaultModel": "replace-with-compatible-model-id",
+        "models": ["replace-with-compatible-model-id"],
+        "capabilities": ["chat"]
+      }
+    }
+  }
+}

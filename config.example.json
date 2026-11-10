@@ -1,0 +1,6 @@
+{
+  "sync": {
+    "provider": "postgres",
+    "databaseUrlEnv": "LEAFLOGUE_DATABASE_URL"
+  }
+}

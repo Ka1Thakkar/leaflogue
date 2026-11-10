@@ -1,0 +1,13 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "long-passages",
+    "version": 1,
+    "title": "Long passages",
+    "description": "The latest passages over 600 characters, worth a slow reread",
+    "count": "passages",
+    "where": [{ "field": "length", "is": "longest" }],
+    "show": "list",
+    "limit": 3
+  }
+}

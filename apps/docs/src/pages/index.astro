@@ -1,0 +1,289 @@
+---
+import "../styles/tokens.css";
+import "../styles/landing.css";
+import ThemePicker from "../components/ThemePicker";
+---
+<!doctype html>
+<html lang="en-GB"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Leaflogue | A gallery for your reading</title><meta name="description" content="A free, open-source home for book highlights and notes. Collect your passages, follow your thoughts, and keep your library on your own computer." /><link rel="icon" href="/favicon.svg" />
+<script is:inline>try { const theme = localStorage.getItem("starlight-theme"); if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme; } catch {}</script>
+</head><body><div class="salon"><a class="skip" href="#main">Skip to content</a>
+
+<main id="main">
+<!-- ——— Room I: the red room. The hang. ——— -->
+<section class="room room-red hang" aria-labelledby="title">
+  <div class="wrap">
+    <header class="top">
+      <a class="mark" href="/"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M5 19C5 10 10 5 20 5c0 10-5 15-14 15M5 19l8-8" />
+  </svg><span translate="no">Leaflogue</span></a>
+      <nav aria-label="Main"><a href="#catalogue">Features</a><a href="/start/install/">Guides</a><a href="https://github.com/Ka1Thakkar/leaflogue" target="_blank" rel="noopener noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub"><svg class="salon-nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+  <path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z" />
+</svg></a></nav>
+      <a class="btn btn-quiet salon-icon-link" href="#download" aria-label="Download Leaflogue" title="Download Leaflogue"><svg class="salon-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5"/></svg></a>
+      <ThemePicker client:load compact />
+    </header>
+  </div>
+
+  <div class="wrap">
+    <div class="wall" id="wall">
+      <figure class="piece skied" data-a style="--area:a">
+        <div class="mount text big dark"><blockquote>Call me Ishmael.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 1</span><span><i>Moby-Dick</i>, Herman Melville · ch. 1</span></figcaption>
+      </figure>
+      <figure class="piece skied desk-only" data-a style="--area:b">
+        <div class="mount text"><blockquote>A thing of beauty is a joy for ever:<br>Its loveliness increases; it will never<br>Pass into nothingness</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 2</span><span><i>Endymion</i>, John Keats · book I, lines 1–3</span></figcaption>
+      </figure>
+      <figure class="piece skied" data-a style="--area:c" data-words="statistics reading days books passages">
+        <div class="mount stat dark">
+          <dl>
+            <div><dt>Passages</dt><dd>115</dd></div>
+            <div><dt>Books</dt><dd>6</dd></div>
+            <div><dt>Days</dt><dd>63</dd></div>
+            <div><dt>Best run</dt><dd>4d</dd></div>
+          </dl>
+        </div>
+        <figcaption class="cartel"><span class="no">No. 3</span><span>From the Statistics page</span></figcaption>
+      </figure>
+      <figure class="piece skied" data-a style="--area:d">
+        <div class="mount text small"><blockquote>You pierce my soul. I am half agony, half hope.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 4</span><span><i>Persuasion</i>, Jane Austen · ch. 23</span></figcaption>
+      </figure>
+
+      <div class="stack" style="grid-area:e">
+      <figure class="piece wide">
+        <div class="mount text">
+          <blockquote>I went to the woods because I wished to live deliberately, to front only the essential facts of life, and see if I could not learn what it had to teach, and not, when I came to die, discover that I had not lived.</blockquote>
+          <p class="note"><b>Your note</b>Read this again before deciding about the move.</p>
+        </div>
+        <figcaption class="cartel"><span class="no">No. 5</span><span><i>Walden</i>, Henry David Thoreau · ch. 2</span></figcaption>
+      </figure>
+      <figure class="piece desk-only">
+        <div class="mount text small dark"><blockquote>The person, be it gentleman or lady, who has not pleasure in a good novel, must be intolerably stupid.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 5a</span><span><i>Northanger Abbey</i>, Jane Austen · ch. 14</span></figcaption>
+      </figure>
+      </div>
+
+      <div class="lede-panel">
+        <p class="eyebrow">A library for your book highlights</p>
+        <h1 id="title">Every line you kept, <em>hung where you can see it.</em></h1>
+        <p class="sub">Leaflogue gathers the passages you highlighted on your e-reader and the notes you wrote beside them, keeps them on your own computer, and helps you find any of them again.</p>
+        <div class="ctas">
+          <a class="btn btn-primary" href="#download">Get the desktop beta <span aria-hidden="true">↓</span></a>
+          <a class="btn btn-quiet" href="/start/install/">Read the guide</a>
+        </div>
+        <p class="fine">Free and open source · No account · Linux, Mac &amp; Windows beta</p>
+        <div class="finder">
+          <label for="q">Try it on this wall</label>
+          <div class="field">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="q" type="search" placeholder="Find a word you kept…" autocomplete="off" spellcheck="false">
+            <output id="count" for="q" aria-live="polite"></output>
+          </div>
+          <div class="chips" role="group" aria-label="Example searches">
+            <button type="button" aria-pressed="false">life</button>
+            <button type="button" aria-pressed="false">soul</button>
+            <button type="button" aria-pressed="false">free</button>
+            <button type="button" aria-pressed="false">beauty</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack" style="grid-area:f">
+      <figure class="piece">
+        <div class="mount text dark"><blockquote>I am no bird; and no net ensnares me: I am a free human being with an independent will.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 6</span><span><i>Jane Eyre</i>, Charlotte Brontë · ch. 23</span></figcaption>
+      </figure>
+      <figure class="piece">
+        <div class="mount text big"><blockquote>The only way to get rid of a temptation is to yield to it.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 7</span><span><i>The Picture of Dorian Gray</i>, Oscar Wilde · ch. 2</span></figcaption>
+      </figure>
+      <figure class="piece wide desk-only">
+        <div class="mount text small"><blockquote>For the growing good of the world is partly dependent on unhistoric acts.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 7a</span><span><i>Middlemarch</i>, George Eliot · finale</span></figcaption>
+      </figure>
+      </div>
+
+      <div class="stack" style="grid-area:i">
+      <figure class="piece wide">
+        <div class="mount text"><blockquote>Make it not any longer a matter of dispute or discourse, what are the signs and proprieties of a good man, but really and actually to be such.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 8</span><span><i>Meditations</i>, Marcus Aurelius · book X</span></figcaption>
+      </figure>
+      <figure class="piece wide">
+        <div class="mount text big dark"><blockquote>Simplify, simplify.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 8a</span><span><i>Walden</i>, Henry David Thoreau · ch. 2</span></figcaption>
+      </figure>
+      </div>
+      <figure class="piece" data-a style="--area:j" data-words="pride prejudice darcy elizabeth walden life live earth note impressions">
+        <div class="mount shot"><img src="/salon/hero-note-light.webp" width="1184" height="644" alt="Leaflogue showing a passage from Pride and Prejudice with the reader's note beneath it, and a passage from Walden below."></div>
+        <figcaption class="cartel"><span class="no">No. 9</span><span>A passage and the note you left on it, as Leaflogue shows them</span></figcaption>
+      </figure>
+      <div class="stack" style="grid-area:k">
+      <figure class="piece wide">
+        <div class="mount text big dark"><blockquote>Beware; for I am fearless, and therefore powerful.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 10</span><span><i>Frankenstein</i>, Mary Shelley · ch. 20</span></figcaption>
+      </figure>
+      <figure class="piece wide">
+        <div class="mount text small"><blockquote>So we beat on, boats against the current, borne back ceaselessly into the past.</blockquote></div>
+        <figcaption class="cartel"><span class="no">No. 11</span><span><i>The Great Gatsby</i>, F. Scott Fitzgerald · ch. 9</span></figcaption>
+      </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——— Room II: the stone room. The livret. ——— -->
+<section class="room room-stone sect" id="catalogue" aria-labelledby="cat-title">
+  <div class="wrap">
+    <figure class="plate">
+      <div class="mount"><img src="/salon/martini-wall.webp" width="2400" height="978" alt="An engraving of the Salon of 1787 at the Louvre: paintings hung frame to frame from the floor to the ceiling." loading="lazy"></div>
+      <figcaption><i>Exposition au Salon du Louvre en 1787</i>, Pietro Antonio Martini. Every painting in the room had a number in the Salon's printed catalogue, so visitors could find what they were looking at.</figcaption>
+    </figure>
+  <div class="livret">
+
+    <div>
+      <p class="kicker"><span>II</span> The catalogue</p>
+      <h2 id="cat-title">Everything you read, numbered and easy to find.</h2>
+      <p class="intro">A crowded wall only works if you can find your way around it. Leaflogue keeps your passages in order: by book, by tag, by idea, by date, so the one you want is a search away.</p>
+    </div>
+    <div>
+      <ol class="entries">
+        <li><span class="n">1</span><div><h3>Import from your reader</h3><p>Plug it in and choose Import. Your reader is only read, never written to.</p><div class="readers"><span>Kobo</span><span>Kindle</span><span>PocketBook</span><span>Tolino</span><span>Boox</span><span>KOReader</span></div></div></li>
+        <li><span class="n">2</span><div><h3>Add paper books by hand</h3><p>Type in a passage from a printed book. It sits alongside everything you imported.</p></div></li>
+        <li><span class="n">3</span><div><h3>Notes beside the words</h3><p>Write in Markdown under any passage. Your thinking stays next to the line that started it.</p></div></li>
+        <li><span class="n">4</span><div><h3>Tags and collections</h3><p>Label passages with tags, and group books into collections.</p></div></li>
+        <li><span class="n">5</span><div><h3>Threads across books</h3><p>Follow one idea through several books, and read its passages together.</p></div></li>
+        <li><span class="n">6</span><div><h3>Search everything</h3><p>Find a passage from a half-remembered phrase, in the passages and in your notes.</p></div></li>
+        <li><span class="n">7</span><div><h3>One passage a day</h3><p>Something you once kept comes back each day, so good lines aren't forgotten.</p></div></li>
+        <li><span class="n">8</span><div><h3>Your reading, in numbers</h3><p>See the authors you keep underlining and your busy and quiet months. No streaks to keep up.</p></div></li>
+        <li><span class="n">9</span><div><h3>Ask about a passage</h3><p>Off until you turn it on. The first time, you see exactly what will be sent, then you can talk the passage through.</p></div></li>
+        <li><span class="n">10</span><div><h3>Open it in a browser</h3><p>Run the web app on your own server to reach the same library from anywhere.</p></div></li>
+        <li><span class="n">11</span><div><h3>Look up a word offline</h3><p>English definitions and synonyms, bundled with Leaflogue desktop. No internet, account, or AI key.</p></div></li>
+      </ol>
+    </div>
+  </div>
+  </div>
+</section>
+
+<!-- ——— Room III: the green room. On the line. ——— -->
+<section class="room room-green sect" aria-labelledby="line-title">
+  <div class="wrap">
+    <p class="kicker"><span>III</span> On the line</p>
+    <h2 id="line-title">The passage, and what you made of it.</h2>
+    <p class="intro">At the Salon, the best paintings were hung “on the line”, at eye level, where nobody could miss them. Leaflogue does the same for what you read: the words first, with your notes, tags and threads around them.</p>
+    <div class="line-hang">
+      <figure class="piece main">
+        <div class="mount shot">
+          <img class="shot-light" src="/salon/desktop-highlights-light.webp" width="1440" height="1000" alt="The Highlights page: totals across the top, filters by book on the left, and passages with notes in a long list." loading="lazy">
+          <img class="shot-dark" src="/salon/desktop-highlights-dark.webp" width="1440" height="1000" alt="The Highlights page in the dark theme." loading="lazy">
+          <img class="phone-shot" src="/salon/phone-passage-light.webp" width="780" height="1688" alt="Leaflogue on a phone: a passage with its note." loading="lazy">
+        </div>
+        <figcaption class="cartel"><span class="no">No. 12</span><span><strong>Highlights.</strong> Every passage and note in your library, with filters by book, notes and tags.</span></figcaption>
+      </figure>
+      <div class="line-side">
+      <figure class="piece side1">
+        <div class="mount shot"><img src="/salon/thread-panel-light.webp" width="1436" height="768" alt="A thread called How to live, joining a passage from Walden and one from Meditations." loading="lazy"></div>
+        <figcaption class="cartel"><span class="no">No. 13</span><span><strong>Threads.</strong> One idea, followed through two very different books.</span></figcaption>
+      </figure>
+      <figure class="piece side2">
+        <div class="mount shot"><img src="/salon/search-life-light.webp" width="1226" height="640" alt="Searching for the word life, with matching passages from Pride and Prejudice and Frankenstein." loading="lazy"></div>
+        <figcaption class="cartel"><span class="no">No. 14</span><span><strong>Search.</strong> Type a word you remember and the passage comes back.</span></figcaption>
+      </figure>
+      <figure class="piece side3">
+        <div class="mount shot"><img src="/salon/import-kobo-light.webp" width="1656" height="354" alt="The Import page noticing that a Kobo is plugged in, with an Import from Kobo button." loading="lazy"></div>
+        <figcaption class="cartel"><span class="no">No. 15</span><span><strong>Import.</strong> Leaflogue notices your reader as soon as it's plugged in.</span></figcaption>
+      </figure>
+      </div>
+      <figure class="piece under2">
+        <div class="mount shot">
+          <img class="shot-light" src="/salon/desktop-statistics-light.webp" width="1440" height="1000" alt="The Statistics page: totals, a calendar of reading days, and charts by month and weekday." loading="lazy" style="aspect-ratio: 1440/445; object-fit: cover; object-position: top;">
+          <img class="shot-dark" src="/salon/desktop-statistics-dark.webp" width="1440" height="1000" alt="The Statistics page in the dark theme." loading="lazy" style="aspect-ratio: 1440/445; object-fit: cover; object-position: top;">
+        </div>
+        <figcaption class="cartel"><span class="no">No. 16</span><span><strong>Statistics.</strong> Drawn only from what's already in your library.</span></figcaption>
+      </figure>
+    </div>
+
+    <div class="dictionary-feature" id="offline-dictionary">
+      <div class="dictionary-copy">
+        <p class="kicker">A word, without a detour</p>
+        <h3>Stay with the passage.<br><em>Find the meaning.</em></h3>
+        <p>Select a word and choose Define. English definitions, parts of speech, and synonyms are already on your computer, ready even when the internet is not.</p>
+        <p class="dictionary-detail">Included in Leaflogue desktop · No account, AI key, or separate download</p>
+        <a class="dictionary-guide" href="/library/dictionary/">Meet the offline dictionary ↗</a>
+      </div>
+      <figure>
+        <div class="mount shot dictionary-shot">
+          <img class="shot-light" src="/salon/dictionary-light.webp" width="1280" height="856" alt="The offline dictionary in Leaflogue desktop defining deliberately, with English meanings, parts of speech, and synonyms." loading="lazy">
+          <img class="shot-dark" src="/salon/dictionary-dark.webp" width="1280" height="856" alt="The same offline dictionary in Leaflogue desktop’s dark theme." loading="lazy">
+        </div>
+        <figcaption class="cartel"><span class="no">No. 17</span><span>A real lookup in Leaflogue desktop · WordNet 3.1</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ——— Room IV: the blue room. A room of your own. ——— -->
+<section class="room room-blue sect" aria-labelledby="own-title">
+  <div class="wrap">
+    <p class="kicker"><span>IV</span> A room of your own</p>
+    <h2 id="own-title">A private collection, not a public gallery.</h2>
+    <p class="intro">What you underline says a lot about you. Leaflogue keeps it on your computer, and anything more is your choice.</p>
+    <div class="pillars">
+      <article class="pillar"><span class="n">i.</span><h3>It lives on your computer</h3><p>Your books, passages and notes are saved in one SQLite file in your data folder. There's no account to create, and it works offline.</p></article>
+      <article class="pillar"><span class="n">ii.</span><h3>You run the sync</h3><p>Sync is optional. It goes to a Convex or PostgreSQL database that you set up, and it catches up whenever Leaflogue opens.</p></article>
+      <article class="pillar"><span class="n">iii.</span><h3>AI only when you ask</h3><p>AI is off until you turn it on. The first time, Leaflogue shows you exactly what would leave your computer before anything is sent.</p></article>
+    </div>
+    <div class="faq">
+      <details><summary>Can I look up words without the internet?</summary><p>Yes. Leaflogue desktop includes an English dictionary. Select a word in a passage and choose Define, or use the dictionary button in the header. The data is bundled with the app; no text is sent to a server. <a href="/library/dictionary/">Read the dictionary guide.</a></p></details>
+      <details><summary>Does it change my e-reader?</summary><p>No. Leaflogue only reads your highlights and never writes anything back to the device.</p></details>
+      <details><summary>What if I import the same file twice?</summary><p>Passages are matched to the ones you already have, so nothing is duplicated. If a passage changed in both places, you choose which version to keep.</p></details>
+      <details><summary>Which computers does it run on?</summary><p>The beta targets Linux x64 and ARM64, Apple Silicon and Intel Macs, and Windows x64. Check the release notes for each build’s validation and signing status.</p></details>
+      <details><summary>Do I need an account?</summary><p>No. Sync and AI are optional, and both use services you choose and set up yourself.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ——— Room V: back to red. The way out. ——— -->
+<section class="room room-red close" id="download" aria-labelledby="dl-title">
+  <div class="wrap close-grid">
+    <div>
+      <p class="kicker" style="color:inherit;opacity:.75"><span>V</span> The doors are open</p>
+      <h2 id="dl-title">Start hanging your own wall.</h2>
+      <p class="intro">Plug in your reader, choose Import, and see a year of reading on one page. It's free, open source and yours to keep.</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="https://github.com/Ka1Thakkar/leaflogue/releases" target="_blank" rel="noopener noreferrer">Get the desktop beta <span aria-hidden="true">↓</span></a>
+        <a class="btn btn-quiet" href="https://github.com/Ka1Thakkar/leaflogue" target="_blank" rel="noopener noreferrer">View the source</a>
+      </div>
+      <p class="fine">Beta targets: Linux · macOS · Windows</p>
+    </div>
+    <figure>
+      <div class="mount"><img src="/salon/panini-vista.webp" width="760" height="1090" alt="A detail of Panini's painted gallery: marble columns, a seated statue and paintings hung up to the ceiling." loading="lazy"></div>
+      <figcaption>Detail, <i>Modern Rome</i>, Giovanni Paolo Panini, 1757</figcaption>
+    </figure>
+  </div>
+</section>
+</main>
+
+<footer class="room room-stone">
+  <figure class="keeper">
+    <img src="/salon/vivarini-hands.jpg" alt="Detail of two hands holding a tooled leather book against a gold ground." loading="lazy" decoding="async">
+    <figcaption class="wrap">
+      <p class="keeper-line">Held close,<br><em>kept for good.</em></p>
+      <p class="cartel"><b>Detail</b> <span><i>A Saint (Mark?) Reading</i>, Bartolomeo Vivarini, about 1470</span></p>
+    </figcaption>
+  </figure>
+  <div class="wrap">
+    <div class="foot">
+      <div><a class="mark" href="/">Leaflogue</a><p style="max-width:34ch;margin:12px 0 0">A private place for the passages you want to keep.</p></div>
+      <div><h4>Guides</h4><ul><li><a href="/start/install/">Install</a></li><li><a href="/library/importing/">Import highlights</a></li><li><a href="/library/backups/">Backups</a></li><li><a href="/widgets/plugins/">Widget gallery</a></li></ul></div>
+      <div><h4>Project</h4><ul><li><a href="https://github.com/Ka1Thakkar/leaflogue" target="_blank" rel="noopener noreferrer">Source code</a></li><li><a href="https://github.com/Ka1Thakkar/leaflogue/releases" target="_blank" rel="noopener noreferrer">Releases</a></li><li><a href="/web/overview/">Web app</a></li><li><a href="/help/privacy/">Privacy</a></li></ul></div>
+      <div><h4>Help</h4><ul><li><a href="/help/troubleshooting/">Troubleshooting</a></li><li><a href="https://github.com/Ka1Thakkar/leaflogue/issues" target="_blank" rel="noopener noreferrer">Report a problem</a></li><li><a href="https://github.com/Ka1Thakkar/leaflogue/security/policy" target="_blank" rel="noopener noreferrer">Security</a></li></ul></div>
+    </div>
+    <p class="credits">Artworks: Bartolomeo Vivarini, <i>A Saint (Mark?) Reading</i> (about 1470), Pietro Antonio Martini, <i>Exposition au Salon du Louvre en 1787</i> (engraving, 1787) and Giovanni Paolo Panini, <i>Modern Rome</i> (oil on canvas, 1757), all The Metropolitan Museum of Art, Open Access, public domain (CC0). Quotations are from works in the public domain.</p>
+  </div>
+</footer></div>
+<script>
+import { initSalonWall } from "../scripts/salon-wall";
+const root = document.querySelector<HTMLElement>(".salon");
+if (root) initSalonWall(root);
+</script></body></html>

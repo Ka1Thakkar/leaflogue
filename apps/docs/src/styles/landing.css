@@ -1,0 +1,356 @@
+@import "@fontsource/gloock/latin-400.css";
+@import "@fontsource-variable/instrument-sans";
+/* Leaflogue — Salon direction.
+   The site is a walk through the rooms of a Salon: each section is a room
+   with its own wall colour, taken from Panini's Modern Rome (1757) and the
+   Louvre's Salon carré as Martini engraved it in 1787. Passages hang on the
+   walls like works on paper; real app captures hang beside them. */
+
+.salon {
+  color-scheme: light dark;
+  --display: "Gloock", "Bodoni Moda", Didot, serif;
+  --read: "Newsreader", Georgia, serif;
+  --sans: "Instrument Sans", system-ui, sans-serif;
+
+  /* Light: distempered plaster, the rooms by daylight. */
+  --red-wall: #e7cfc3;      /* rose distemper */
+  --red-ink: #3b1510;
+  --stone-wall: #ece6da;
+  --green-wall: #d6ddd0;
+  --blue-wall: #d3dae0;
+  --ink: #23170f;
+  --ink-2: #5a473a;
+  --ink-3: #695447;
+  --label: #4a3529;
+  --paper: #fbf7ef;
+  --paper-ink: #24170f;
+  --dark-mount: #2c1712;
+  --dark-mount-ink: #f2e6d6;
+  --accent: #9a2e1f;        /* Panini's drapery red */
+  --accent-ink: #fff6ec;
+  --verdigris: #3e6b55;
+  --line: color-mix(in srgb, var(--ink) 16%, transparent);
+  --shadow: 0 1px 1px rgb(60 25 15 / 0.08), 0 10px 24px -8px rgb(60 25 15 / 0.30), 0 30px 60px -30px rgb(60 25 15 / 0.35);
+  --shadow-lift: 0 2px 2px rgb(60 25 15 / 0.08), 0 18px 34px -10px rgb(60 25 15 / 0.38), 0 44px 80px -30px rgb(60 25 15 / 0.40);
+  --mark: color-mix(in srgb, #e9b949 55%, transparent);
+  --grain-opacity: 0.35;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) .salon {
+    /* Dark: the rooms by lamplight, saturated Salon walls. */
+    --red-wall: #4d1a14;
+    --red-ink: #f6e4d6;
+    --stone-wall: #241b16;
+    --green-wall: #1c2b23;
+    --blue-wall: #18222c;
+    --ink: #f3e7d8;
+    --ink-2: #d4c0ad;
+    --ink-3: #ad9682;
+    --label: #e4cfbc;
+    --paper: #f3eadb;
+    --paper-ink: #22150e;
+    --dark-mount: #1d0d0a;
+    --dark-mount-ink: #f1e3d2;
+    --accent: #e0704f;
+    --accent-ink: #2a0c06;
+    --verdigris: #8cc2a6;
+    --line: color-mix(in srgb, var(--ink) 18%, transparent);
+    --shadow: 0 1px 1px rgb(0 0 0 / 0.25), 0 12px 26px -8px rgb(0 0 0 / 0.55), 0 34px 70px -30px rgb(0 0 0 / 0.65);
+    --shadow-lift: 0 2px 2px rgb(0 0 0 / 0.25), 0 20px 36px -10px rgb(0 0 0 / 0.6), 0 48px 90px -30px rgb(0 0 0 / 0.7);
+    --mark: color-mix(in srgb, #e9b949 60%, transparent);
+    --grain-opacity: 0.5;
+  }
+}
+:root[data-theme="dark"] .salon, :root.dark .salon {
+  --red-wall: #4d1a14; --red-ink: #f6e4d6; --stone-wall: #241b16; --green-wall: #1c2b23; --blue-wall: #18222c;
+  --ink: #f3e7d8; --ink-2: #d4c0ad; --ink-3: #ad9682; --label: #e4cfbc; --paper: #f3eadb; --paper-ink: #22150e;
+  --dark-mount: #1d0d0a; --dark-mount-ink: #f1e3d2; --accent: #e0704f; --accent-ink: #2a0c06; --verdigris: #8cc2a6;
+  --line: color-mix(in srgb, var(--ink) 18%, transparent);
+  --shadow: 0 1px 1px rgb(0 0 0 / 0.25), 0 12px 26px -8px rgb(0 0 0 / 0.55), 0 34px 70px -30px rgb(0 0 0 / 0.65);
+  --shadow-lift: 0 2px 2px rgb(0 0 0 / 0.25), 0 20px 36px -10px rgb(0 0 0 / 0.6), 0 48px 90px -30px rgb(0 0 0 / 0.7);
+  --mark: color-mix(in srgb, #e9b949 60%, transparent); --grain-opacity: 0.5;
+}
+
+
+@scope (.salon) {
+*, *::before, *::after { box-sizing: border-box; }
+:scope { -webkit-text-size-adjust: 100%; }
+:scope { margin: 0; background: var(--stone-wall); color: var(--ink); font: 400 16px/1.55 var(--sans); font-feature-settings: "ss01"; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+::selection { background: var(--mark); color: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 10; padding: 8px 12px; background: var(--paper); color: var(--paper-ink); border-radius: 8px; }
+.skip:focus { top: 12px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+/* A room: wall colour plus distemper grain. */
+.room { position: relative; isolation: isolate; }
+.room::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: var(--grain-opacity); pointer-events: none; mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .4 0 0 0 0 .35 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.room-red { background: var(--red-wall); color: var(--red-ink); }
+.room-stone { background: var(--stone-wall); }
+.room-green { background: var(--green-wall); }
+.room-blue { background: var(--blue-wall); }
+
+/* The dado and cornice: thin mouldings where one room meets the next. */
+.room + .room { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), inset 0 7px 0 -6px color-mix(in srgb, #000 20%, transparent); }
+
+.wrap { width: min(1344px, 100% - 96px); margin-inline: auto; }
+
+/* Header */
+.top { display: flex; align-items: center; gap: 28px; padding: 22px 0 30px; }
+.mark { display: inline-flex; align-items: baseline; gap: 10px; text-decoration: none; font: 400 24px/1 var(--display); letter-spacing: -0.01em; }
+.mark small { font: 600 10.5px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.7; }
+.top nav { display: flex; gap: 24px; margin-left: auto; font: 500 14px/1 var(--sans); }
+.top nav a { text-decoration: none; opacity: 0.86; }
+.top nav a:hover { opacity: 1; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 20px; border-radius: 999px; font: 600 15px/1 var(--sans); text-decoration: none; transition: transform .2s ease, background-color .2s ease; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-quiet { border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
+.btn-quiet:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.top .btn { min-height: 38px; padding: 0 16px; font-size: 14px; }
+
+/* ——— The hang ——— */
+.hang { padding: 0 0 72px; }
+.wall {
+  display: grid; gap: 18px 18px; align-items: start;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas:
+    "a a a b b b b c c d d d"
+    "e e e h h h h h h f f f"
+    "i i i j j j j j j k k k";
+}
+.stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.piece { position: relative; margin: 0; transition: opacity .45s ease, filter .45s ease, transform .45s cubic-bezier(.2,.7,.2,1); }
+.piece[data-a] { grid-area: var(--area); }
+.mount { position: relative; border-radius: 12px; background: var(--paper); color: var(--paper-ink); box-shadow: var(--shadow); overflow: hidden; transition: box-shadow .35s ease, transform .35s cubic-bezier(.2,.7,.2,1); }
+.mount.dark { background: var(--dark-mount); color: var(--dark-mount-ink); }
+.piece:hover .mount { box-shadow: var(--shadow-lift); transform: translateY(-3px); }
+.mount.text { padding: 24px 24px 22px; }
+.mount.text blockquote { margin: 0; font: 400 19px/1.45 var(--read); font-optical-sizing: auto; text-wrap: pretty; hanging-punctuation: first; }
+.mount.text.big blockquote { font: 400 clamp(26px, 2.2vw, 34px)/1.12 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
+.mount.text.small blockquote { font-size: 17px; }
+.mount.text .note { margin: 16px 0 0; padding: 10px 12px; border-left: 2px solid #d9a93a; background: color-mix(in srgb, #d9a93a 14%, transparent); border-radius: 0 8px 8px 0; font: 400 13.5px/1.45 var(--sans); }
+.mount.text .note b { display: block; margin-bottom: 2px; font: 700 10px/1.3 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: #9b6c08; }
+.mount.dark .note b { color: #e7b44c; }
+.mount.shot img { width: 100%; height: auto; }
+.mount.stat { padding: 20px 22px; display: grid; gap: 10px; }
+.stat dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; }
+.stat dt { font: 600 10px/1.2 var(--sans); letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+.stat dd { margin: 2px 0 0; font: 400 32px/1 var(--display); font-variant-numeric: lining-nums; }
+
+/* The cartel: the small label beside each work. */
+.cartel { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; padding-inline: 2px; font: 500 12px/1.35 var(--sans); color: color-mix(in srgb, currentColor 78%, transparent); }
+.cartel .no { flex: none; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: .04em; opacity: .85; }
+.cartel i { font-style: italic; }
+
+/* Skied row: hung above the line, tipped forward as the Salon hung them. */
+.skied .mount { transform-origin: 50% 0; transform: perspective(1200px) rotateX(-5deg); }
+.skied:hover .mount { transform: perspective(1200px) rotateX(-5deg) translateY(-3px); }
+
+mark { background: linear-gradient(transparent 52%, var(--mark) 52%, var(--mark) 92%, transparent 92%); color: inherit; padding: 0 1px; border-radius: 2px; }
+
+/* The centre of the wall, where the Salon put the work of the year. */
+.lede-panel { grid-area: h; align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding: 22px 26px 26px; text-align: center; }
+.lede-panel .eyebrow { margin: 0 0 18px; font: 600 11.5px/1.2 var(--sans); letter-spacing: .2em; text-transform: uppercase; opacity: .78; }
+.lede-panel h1 { margin: 0 auto; max-width: 13ch; font: 400 clamp(52px, 4.9vw, 76px)/0.98 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
+.lede-panel h1 em { font-style: italic; }
+.lede-panel p.sub { max-width: 46ch; margin: 22px auto 0; font: 400 18px/1.5 var(--read); color: color-mix(in srgb, currentColor 86%, transparent); text-wrap: pretty; }
+.ctas { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 26px; }
+.fine { margin: 14px 0 0; font: 500 12.5px/1.4 var(--sans); opacity: .75; }
+
+/* Searching the wall */
+.finder { display: grid; gap: 10px; justify-items: center; margin: 26px auto 0; width: min(100%, 520px); }
+.finder label { font: 600 10.5px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; opacity: .72; }
+.field { position: relative; width: 100%; }
+.field svg { position: absolute; left: 16px; top: 50%; translate: 0 -50%; opacity: .7; }
+.field input { width: 100%; height: 48px; padding: 0 92px 0 44px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: color-mix(in srgb, var(--paper) 12%, transparent); color: inherit; font: 400 17px/1 var(--read); }
+.field input::placeholder { color: color-mix(in srgb, currentColor 60%, transparent); font-style: italic; }
+.field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.field output { position: absolute; right: 16px; top: 50%; translate: 0 -50%; font: 600 12px/1 var(--sans); font-variant-numeric: tabular-nums; opacity: .75; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.chips button { min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); background: transparent; color: inherit; font: italic 400 15px/1 var(--read); cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--paper); color: var(--paper-ink); border-color: transparent; }
+.wall.searching .piece { opacity: .22; filter: saturate(.2) blur(.3px); }
+.wall.searching .piece.hit { opacity: 1; filter: none; }
+.wall.searching .piece.hit .mount { box-shadow: var(--shadow-lift), 0 0 0 1px color-mix(in srgb, #f0c46a 55%, transparent), 0 0 46px -6px color-mix(in srgb, #f0c46a 40%, transparent); }
+.wall.searching .lede-panel { opacity: 1; filter: none; }
+
+/* ——— Sections ——— */
+.sect { padding: 108px 0 112px; }
+.kicker { display: flex; align-items: baseline; gap: 14px; margin: 0 0 18px; font: 600 11.5px/1.2 var(--sans); letter-spacing: .2em; text-transform: uppercase; color: var(--ink-3); }
+.kicker span { font-variant-numeric: tabular-nums; color: var(--accent); }
+h2 { margin: 0; max-width: 18ch; font: 400 clamp(38px, 4.2vw, 64px)/1.02 var(--display); letter-spacing: -0.015em; text-wrap: balance; }
+.intro { max-width: 58ch; margin: 22px 0 0; font: 400 19px/1.55 var(--read); color: var(--ink-2); text-wrap: pretty; }
+
+/* The livret: the Salon's numbered catalogue, as the feature list. */
+.livret { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 72px; align-items: start; margin-top: 64px; }
+.livret > div:first-child { position: sticky; top: 32px; }
+.plate { margin: 0; }
+.plate .mount img { width: 100%; filter: sepia(.25) contrast(1.02); }
+.room-stone .plate .mount { background: #efe7d6; }
+.plate figcaption { max-width: 80ch; margin-top: 12px; font: 500 12.5px/1.45 var(--sans); color: var(--ink-3); }
+.plate figcaption i { color: var(--ink-2); }
+.entries { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 40px; }
+.entries li { break-inside: avoid; display: grid; grid-template-columns: 46px 1fr; gap: 0 4px; padding: 16px 0 18px; border-top: 1px solid var(--line); }
+.entries .n { font: 400 22px/1.1 var(--display); color: var(--accent); font-variant-numeric: tabular-nums; }
+.entries h3 { margin: 0 0 6px; font: 600 16px/1.3 var(--sans); }
+.entries p { grid-column: 2; margin: 0; font: 400 15px/1.5 var(--sans); color: var(--ink-2); }
+.readers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.readers span { padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 7%, transparent); font: 500 12.5px/1.2 var(--sans); }
+
+/* On the line: the product, hung at eye level. */
+.line-hang { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 22px; margin-top: 56px; align-items: start; }
+.line-hang .main { grid-column: 1 / 9; }
+.line-side { grid-column: 9 / 13; display: flex; flex-direction: column; gap: 20px; }
+.line-hang .under2 { grid-column: 1 / -1; }
+.room-green .cartel { color: var(--ink-2); }
+.cartel strong { font-weight: 700; color: var(--ink); }
+.shot-dark, .phone-shot { display: none; }
+
+/* Pillars: three cartels in the blue room. */
+.pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 56px; }
+.pillar { padding: 26px 26px 28px; border-radius: 14px; background: color-mix(in srgb, var(--paper) 70%, var(--blue-wall)); color: var(--paper-ink); box-shadow: var(--shadow); }
+.pillar .n { font: 400 15px/1 var(--display); color: var(--paper-ink); }
+.pillar h3 { margin: 18px 0 10px; font: 400 27px/1.1 var(--display); letter-spacing: -0.01em; }
+.pillar p { margin: 0; font: 400 15.5px/1.55 var(--sans); color: #4d3d32; }
+.pillar code { font: 500 13.5px/1 ui-monospace, "SF Mono", Menlo, monospace; background: rgb(0 0 0 / .06); padding: 2px 5px; border-radius: 5px; }
+
+.faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; margin-top: 44px; }
+.faq details { border-top: 1px solid var(--line); padding: 16px 0; }
+.faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 16px; font: 600 16px/1.4 var(--sans); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font: 400 22px/1 var(--display); color: var(--accent); transition: rotate .2s; }
+.faq details[open] summary::after { rotate: 45deg; }
+.faq p { margin: 10px 0 0; max-width: 56ch; font: 400 15.5px/1.55 var(--sans); color: var(--ink-2); }
+
+/* Closing room: the doorway to the next gallery, from Panini. */
+.close { padding: 112px 0 96px; overflow: hidden; }
+.close-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 64px; align-items: center; }
+.close h2 { max-width: 14ch; font-size: clamp(44px, 5vw, 76px); }
+.close .intro { color: color-mix(in srgb, currentColor 82%, transparent); }
+.close .ctas { justify-content: flex-start; }
+.close figure { margin: 0; justify-self: end; width: min(100%, 360px); }
+.close figure .mount { border-radius: 180px 180px 14px 14px; }
+.close figure img { width: 100%; aspect-ratio: 3 / 4.3; object-fit: cover; object-position: 50% 30%; }
+.close figcaption { margin-top: 10px; font: 500 12px/1.4 var(--sans); opacity: .75; text-align: right; }
+
+footer { padding: 0 0 48px; font: 400 13.5px/1.5 var(--sans); color: var(--ink-3); }
+.foot { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
+.foot h4 { margin: 0 0 10px; font: 600 11px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+.foot ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.foot a { text-decoration: none; } .foot a:hover { text-decoration: underline; }
+/* The footer opens on a reader's hands: a detail of Vivarini's saint holding
+   his book, dissolving into the stone wall rather than framed on it. */
+.keeper { position: relative; margin: 0 0 44px; height: clamp(320px, 38vw, 540px); overflow: hidden; }
+.keeper img { position: absolute; inset: 0 0 0 auto; width: min(72%, 980px); height: 100%; object-fit: cover; object-position: 50% 58%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 38%), linear-gradient(180deg, transparent 0, #000 16%, #000 70%, transparent 100%);
+  -webkit-mask-composite: source-in; mask-image: linear-gradient(90deg, transparent 0, #000 38%), linear-gradient(180deg, transparent 0, #000 16%, #000 70%, transparent 100%); mask-composite: intersect; }
+.keeper figcaption { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+.keeper-line { margin: 0; max-width: 11ch; font: 400 clamp(44px, 5.4vw, 84px)/0.98 var(--display); letter-spacing: -0.02em; color: var(--ink); }
+.keeper-line em { font-style: italic; color: var(--accent); }
+.keeper .cartel { margin-top: 22px; max-width: 60ch; white-space: normal; color: var(--ink-2); }
+@media (max-width: 720px) {
+  .keeper { height: auto; margin-bottom: 32px; }
+  .keeper img { position: relative; inset: auto; width: 100%; height: 300px; object-position: 62% 58%;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 62%, transparent 100%); -webkit-mask-composite: source-over; mask-composite: add; }
+  .keeper figcaption { margin-top: -40px; }
+}
+.credits { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; }
+
+@media (max-width: 1100px) {
+  .wall { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-areas:
+    "h h h h h h" "a a a d d d" "j j j j j j" "e e e f f f" "b b b b c c" "i i i k k k"; }
+  .skied .mount, .skied:hover .mount { transform: none; }
+  .livret { grid-template-columns: 1fr; gap: 40px; } .livret > div:first-child { position: static; }
+  .line-hang .main, .line-side, .line-hang .under2 { grid-column: 1 / -1; }
+  .pillars { grid-template-columns: 1fr; }
+  .close-grid { grid-template-columns: 1fr; } .close figure { justify-self: start; }
+}
+
+/* Phones: the wall recomposes as a narrow stair hang, two works wide. */
+@media (max-width: 640px) {
+  .wrap { width: calc(100% - 32px); }
+  .top { gap: 12px; padding-top: 16px; } .top nav { display: none; } .top .btn { margin-left: auto; }
+  .mark { font-size: 22px; } .mark small { display: none; }
+  .hang { padding: 22px 0 44px; }
+  .wall { gap: 14px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas:
+    "h h" "a d" "j j" "e e" "f f" "i i" "c c" "k k"; }
+  .desk-only { display: none; }
+  .line-hang .main .shot-light, .line-hang .main .shot-dark { display: none !important; }
+  .line-hang .main .phone-shot { display: block; aspect-ratio: 780 / 1240; object-fit: cover; object-position: top; }
+  .line-hang .main { width: 78%; justify-self: center; }
+  .stat dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stack { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; align-items: start; }
+  .stack > .wide { grid-column: 1 / -1; }
+  .stat dd { font-size: 26px; }
+  .livret { margin-top: 36px; }
+  .lede-panel { padding: 8px 0 6px; }
+  .lede-panel h1 { font-size: 46px; max-width: 10ch; }
+  .lede-panel p.sub { font-size: 17px; margin-top: 16px; }
+  .ctas { margin-top: 20px; } .ctas .btn { flex: 1 1 100%; justify-content: center; }
+  .finder { margin-top: 24px; }
+  .mount.text { padding: 16px 16px 15px; }
+  .mount.text blockquote { font-size: 16.5px; }
+  .mount.text.big blockquote { font-size: 24px; }
+  .mount.text.small blockquote { font-size: 15px; }
+  .cartel { font-size: 11px; margin-top: 7px; }
+  .sect { padding: 72px 0 76px; }
+  h2 { font-size: 38px; }
+  .intro { font-size: 17.5px; }
+  .entries { columns: 1; margin-top: 32px; }
+  .line-hang { gap: 18px; margin-top: 36px; }
+  .pillars { margin-top: 36px; gap: 16px; } .pillar h3 { font-size: 24px; }
+  .faq { grid-template-columns: 1fr; margin-top: 28px; }
+  .close { padding: 76px 0 64px; } .close h2 { font-size: 44px; }
+  .close .ctas .btn { flex: 1 1 100%; justify-content: center; }
+  .close figure { width: 70%; justify-self: center; }
+  .foot { grid-template-columns: 1fr 1fr; gap: 24px; } .foot > div:first-child { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  .piece:hover .mount { transform: none; }
+}
+
+}
+
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not(.light) .salon .plate .mount img, :root:not([data-theme="light"]):not(.light) .salon .banner figure img { filter: sepia(.35) brightness(.86) contrast(1.05); } }
+
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not(.light) .salon .shot-dark { display: block; } :root:not([data-theme="light"]):not(.light) .salon .shot-light { display: none; } }
+
+:root:is([data-theme="dark"], .dark) .salon .shot-dark { display: block; } :root:is([data-theme="dark"], .dark) .salon .shot-light { display: none; }
+
+.salon .salon-theme-toggle { display:inline-flex; align-items:center; justify-content:center; gap:7px; flex:none; padding:9px 12px; border:1px solid currentColor; border-radius:999px; background:transparent; color:inherit; font:500 12px/1 var(--sans); cursor:pointer; min-height:38px; }
+.salon .salon-theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media(max-width:720px) { .salon .salon-theme-toggle span { display:none; } .salon .salon-theme-toggle { padding:9px; } }
+.salon .salon-nav-icon { display:block; width:18px; height:18px; }
+.salon .top nav a:has(svg) { display:inline-flex; align-items:center; justify-content:center; min-width:38px; min-height:38px; }
+.salon .top .salon-icon-link { min-width:40px; padding:10px; }
+
+/* One compact, centred navigation row across the marketing sites. */
+.salon .top { min-height:64px; padding:12px 0; align-items:center; gap:20px; }
+.salon .top .mark { display:inline-flex; align-items:center; min-height:36px; line-height:1; }
+.salon .top nav { align-items:center; gap:20px; }
+.salon .top nav a { display:inline-flex; align-items:center; min-height:36px; line-height:1; }
+.salon .top .btn,.salon .top .salon-theme-toggle { min-height:36px; height:36px; }
+.salon .top .salon-icon-link { min-width:36px; padding:8px; }
+.salon .top > astro-island { display:contents; }
+@media(max-width:720px) { .salon .top { min-height:56px; padding:10px 0; gap:12px; } }
+
+.salon .top .mark { gap:9px; }
+.salon .top .mark > svg { flex:none; width:18px; height:18px; }
+
+.salon .dictionary-feature { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:64px; align-items:center; margin-top:72px; padding-top:54px; border-top:1px solid var(--line); }
+.salon .dictionary-copy h3 { margin:0 0 24px; font:400 clamp(32px,3.6vw,52px)/1.08 var(--display); letter-spacing:-.02em; }
+.salon .dictionary-copy h3 em { font-family:var(--read); font-weight:400; }
+.salon .dictionary-copy > p:not(.kicker) { font:400 18px/1.65 var(--read); max-width:42ch; }
+.salon .dictionary-copy > p.dictionary-detail { margin:20px 0; font:500 12px/1.5 var(--sans); color:var(--ink-2); }
+.salon .dictionary-guide { font:500 14px/1.4 var(--sans); text-underline-offset:4px; }
+.salon .dictionary-feature figure { min-width:0; margin:0; }
+.salon .dictionary-shot { padding:0; overflow:hidden; }
+.salon .dictionary-shot img { width:100%; height:auto; }
+@media(max-width:720px) { .salon .dictionary-feature { grid-template-columns:minmax(0,1fr); gap:28px; margin-top:44px; padding-top:34px; } }

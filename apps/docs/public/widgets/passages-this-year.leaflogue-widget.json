@@ -1,0 +1,12 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "passages-this-year",
+    "version": 1,
+    "title": "Passages this year",
+    "description": "Everything you have highlighted since January",
+    "count": "passages",
+    "where": [{ "field": "year", "is": "this-year" }],
+    "show": "number"
+  }
+}

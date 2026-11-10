@@ -1,0 +1,33 @@
+# Leaflogue's web app with its own PostgreSQL. Copy .env.example to .env,
+# fill it in, then: docker compose up -d
+# Put a TLS proxy in front, serving LEAFLOGUE_PUBLIC_URL and forwarding to
+# port 8787. Desktops sync with the same database (Settings → Remote library).
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://leaflogue:${POSTGRES_PASSWORD}@db:5432/leaflogue
+    ports:
+      - "127.0.0.1:8787:8787"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: leaflogue
+      POSTGRES_DB: leaflogue
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - leaflogue-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leaflogue -d leaflogue"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+volumes:
+  leaflogue-data:

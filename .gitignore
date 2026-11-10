@@ -1,0 +1,31 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Local libraries, imports, databases, backups, and model credentials.
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+*.backup
+*.key
+*.pem
+
+# Playwright visual-regression output. Baselines under tests/visual/baselines
+# are tracked; run output and failure traces are not.
+/test-results/
+/playwright-report/
+
+# Astro and Vercel local state.
+.astro/
+.vercel/

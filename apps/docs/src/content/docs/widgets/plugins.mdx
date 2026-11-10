@@ -1,0 +1,52 @@
+---
+title: Plugins
+description: Ready-made widgets to download and add to your library or Statistics page.
+---
+
+import WidgetGallery from "../../../components/WidgetGallery.astro";
+
+Plugins are ready-made [custom widgets](/widgets/custom-widgets/) that
+readers have shared. Each one is a small file: download it, then add it to
+Leaflogue in a few clicks.
+
+:::note
+Plugins are added in the desktop app. The [web app](/web/overview/) shows
+Leaflogue's own widgets only.
+:::
+
+## Add a plugin
+
+1. Choose **Download** on a widget below.
+2. In Leaflogue, open the library page or the Statistics page and choose
+   **Customise**.
+3. Choose **Import widgets** and pick the file you downloaded. You can pick
+   several at once.
+4. The widget appears in the list of widgets to add. Choose it to put it on
+   the page, then choose **Done**.
+
+A widget is only a recipe for counting and drawing a chart, never a program,
+so it can't change your library or send anything anywhere. Once added, you can
+[edit it](/widgets/custom-widgets/#edit-or-delete-a-widget) like one you made
+yourself.
+
+## Gallery
+
+<WidgetGallery />
+
+## Share your own
+
+Built a widget other readers would like? Add it to this page:
+
+1. In Leaflogue, choose **Customise**, then **Export** on your widget.
+2. Give it a short **Description** first if it doesn't have one; it becomes the
+   text on its card here.
+3. On GitHub, open [the gallery folder](https://github.com/Ka1Thakkar/leaflogue/tree/main/apps/docs/public/widgets)
+   and choose **Add file → Upload files**. Name the file after the widget's
+   ID, as Leaflogue does when it exports: `your-widget-id.leaflogue-widget.json`.
+4. Propose the change. GitHub turns it into a pull request; say in a sentence
+   or two what the widget shows and why it's useful.
+
+Every file is checked automatically to make sure it imports cleanly, and a
+maintainer reviews it before it appears here. Good plugins answer one clear
+question, work for most libraries, and have a title and description that say
+what they show.

@@ -1,0 +1,150 @@
+name: Cross-platform beta candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Validate the exact beta source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+      - run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+          npm ci
+      - run: npm run check
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - run: npm audit --omit=dev --audit-level=high
+
+  draft:
+    name: Create an unpublished beta candidate
+    needs: preflight
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="beta-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" \
+            --title "Leaflogue cross-platform beta candidate ${GITHUB_SHA::12}" \
+            --notes "INCOMPLETE until every candidate job succeeds. Source: $GITHUB_SHA. Native Mac/Windows and Linux checks, human desktop/accessibility acceptance, signing review, and final beta version/tag approval are required before publication."
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: Linux x64 and ARM64 plus backend
+    needs: draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/build-release-files
+      - name: Retain validated Linux and backend downloads directly in the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE_TAG: ${{ needs.draft.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release-files -type f -print | sort)
+          gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
+
+  native:
+    name: ${{ matrix.platform }} beta (${{ matrix.architecture }})
+    needs: draft
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: mac
+            architecture: arm64
+            runner: macos-15
+          - platform: mac
+            architecture: x64
+            runner: macos-15-intel
+          - platform: windows
+            architecture: x64
+            runner: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/build-native-beta
+        with:
+          platform: ${{ matrix.platform }}
+          architecture: ${{ matrix.architecture }}
+      - name: Retain only checksum-listed native files directly in the draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE_TAG: ${{ needs.draft.outputs.tag }}
+          NATIVE_PLATFORM: ${{ matrix.platform }}
+          NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          directory="apps/desktop/dist/beta-$NATIVE_PLATFORM-$NATIVE_ARCHITECTURE"
+          sums="$directory/SHA256SUMS-$NATIVE_PLATFORM-$NATIVE_ARCHITECTURE.txt"
+          assets=("$sums")
+          while read -r checksum name; do
+            test -n "$checksum"
+            assets+=("$directory/$name")
+          done < "$sums"
+          gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
+
+  complete:
+    name: Mark the candidate ready for human validation
+    needs: [draft, linux, native]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE_TAG: ${{ needs.draft.outputs.tag }}
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          cat > "$notes" <<EOF_NOTES
+          Automated cross-platform candidate completed for $GITHUB_SHA.
+
+          Linux x64/ARM64: AppImage and tar.gz. Mac Apple Silicon/Intel: DMG and ZIP. Windows x64: per-user installer and ZIP. Includes checksums, SBOMs, production audits, build inputs, and the Convex backend bundle.
+
+          Mac packages are ad-hoc signed and NOT Apple-notarized. Windows packages are unsigned. These are beta validation files, not a signed stable update feed.
+
+          Human acceptance on every supported OS/architecture, accessibility checks, signing review, and final matching beta version/tag approval remain required. This release stays DRAFT; the workflow never publishes it.
+
+          Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF_NOTES
+          gh release edit "$CANDIDATE_TAG" --notes-file "$notes"

@@ -1,0 +1,9 @@
+---
+interface Props { name: string; alt: string; eager?: boolean; web?: boolean; }
+const { name, alt, eager = false, web = false } = Astro.props;
+const base = web ? `/images/leaflogue-${name}` : `/images/desktop-${name}`;
+---
+<div class="product-image">
+  <img class="shot-light" src={`${base}-light.webp`} alt={alt} width="1440" height="1000" loading={eager ? "eager" : "lazy"} fetchpriority={eager ? "high" : "auto"} />
+  <img class="shot-dark" src={`${base}-dark.webp`} alt={alt} width="1440" height="1000" loading={eager ? "eager" : "lazy"} fetchpriority={eager ? "high" : "auto"} />
+</div>

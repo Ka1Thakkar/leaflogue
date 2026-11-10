@@ -1,0 +1,126 @@
+{
+  "name": "@leaflogue/desktop",
+  "version": "0.1.0-beta.1",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "description": "A local-first library for reading highlights.",
+  "author": "Leaflogue contributors",
+  "desktopName": "leaflogue",
+  "homepage": "https://github.com/Ka1Thakkar/leaflogue",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build && node scripts/third-party-notices.mjs",
+    "dev": "electron-vite dev",
+    "package:dir": "npm run build && electron-builder --dir --linux",
+    "package:linux": "npm run package:linux:native",
+    "package:linux:native": "npm run verify:release-policy && npm run prepare:release-artifacts && npm run build && electron-builder --linux AppImage tar.gz && npm run verify:release-artifacts && npm run generate:release-evidence",
+    "package:linux:x64": "npm run verify:release-policy && npm run prepare:release-artifacts -- --architecture x64 && npm run build && electron-builder --linux AppImage tar.gz --x64 && npm run verify:release-artifacts -- --architecture x64 && npm run generate:release-evidence -- --architecture x64",
+    "package:linux:arm64": "npm run verify:release-policy && npm run prepare:release-artifacts -- --architecture arm64 && npm run build && electron-builder --linux AppImage tar.gz --arm64 && npm run verify:release-artifacts -- --architecture arm64 && npm run generate:release-evidence -- --architecture arm64",
+    "preview:renderer": "vite src/renderer --host 0.0.0.0",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepare:release-artifacts": "node scripts/release-artifacts.mjs --prepare",
+    "verify:release-artifacts": "node scripts/release-artifacts.mjs",
+    "generate:release-evidence": "node scripts/release-evidence.mjs",
+    "verify:release-policy": "node scripts/release-policy.mjs",
+    "package:mac": "node scripts/package-native.mjs mac",
+    "package:mac:arm64": "node scripts/package-native.mjs mac arm64",
+    "package:mac:x64": "node scripts/package-native.mjs mac x64",
+    "package:windows:x64": "node scripts/package-native.mjs windows x64"
+  },
+  "dependencies": {
+    "@leaflogue/appearance": "0.0.0",
+    "@leaflogue/contracts": "0.0.0",
+    "@leaflogue/domain": "0.0.0",
+    "@leaflogue/importers": "0.0.0",
+    "@leaflogue/remote": "0.0.0",
+    "@leaflogue/storage": "0.0.0",
+    "@leaflogue/ui": "0.0.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "pg": "^8.23.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "wordnet-db": "^3.1.14",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electron/fuses": "^2.1.0",
+    "@types/node": "^26.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "44.10.2",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "happy-dom": "^21.0.4",
+    "typescript": "^6.0.2",
+    "vite": "^7.1.0",
+    "vitest": "^4.1.0"
+  },
+  "build": {
+    "appId": "dev.leaflogue.desktop",
+    "productName": "Leaflogue",
+    "icon": "resources/icon.png",
+    "asar": true,
+    "extraResources": [
+      {
+        "from": "../../LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "out/legal/THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "afterPack": "scripts/after-pack.mjs",
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "category": "Office",
+      "executableName": "leaflogue",
+      "syncDesktopName": true,
+      "synopsis": "A local-first library for reading highlights",
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ]
+    },
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.books",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "notarize": false,
+      "minimumSystemVersion": "13.0",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "Leaflogue ${version}"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": false
+    }
+  }
+}

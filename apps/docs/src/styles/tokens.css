@@ -1,0 +1,100 @@
+/* Fonts, semantic UI tokens, and scrollbars shared with both apps. */
+@import "@leaflogue/ui/ui.css";
+
+:root {
+  --font-sans: var(--ui-font);
+  --font-condensed: var(--ui-font-condensed);
+  --font-reader: var(--ui-font-reading);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --paper: #fbf6ea;
+  --dot: #e7dfcf;
+  --ink: #2a2521;
+  --pencil: #6d6459;
+  --pen: #27508c;
+  --highlighter: #ffd84d;
+  --highlighter-wash: #ffd84d;
+  --washi: #e8d98fd1;
+  --washi-cool: #c6dcd3d1;
+  --graph: #eaf1f0;
+  --graph-line: #b2cbd3;
+  --ruled: #fdfbf4;
+  --ruled-line: #e9e3d5;
+  --margin-red: #c0564a;
+  --kraft: #c9a97d;
+  --kraft-ink: #46381f;
+  --stamp: #bf453a;
+  --hairline: #2a252126;
+  --edge: #2a252121;
+  --drop: #2a2521a8;
+  --muted: #f1ead9;
+  --border: #d8cdb4;
+  --control-border: #6d6459;
+  --chart: #3f7a5a;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #211d17;
+    --dot: #393229;
+    --ink: #ece5d6;
+    --pencil: #a79c88;
+    --pen: #8fb6ea;
+    --highlighter-wash: #ffd84d3d;
+    --washi: #7a6a2fc4;
+    --washi-cool: #3f5d54c4;
+    --graph: #1a2325;
+    --graph-line: #2f444c;
+    --ruled: #241f19;
+    --ruled-line: #2e2922;
+    --margin-red: #8f4239;
+    --kraft: #6d5638;
+    --kraft-ink: #f0e4cd;
+    --stamp: #d9695c;
+    --hairline: #ece5d626;
+    --edge: #ece5d61c;
+    --drop: #000000b8;
+    --muted: #2b251d;
+    --border: #3d3529;
+    --control-border: #a79c88;
+    --chart: #8cc7a1;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #211d17;
+  --dot: #393229;
+  --ink: #ece5d6;
+  --pencil: #a79c88;
+  --pen: #8fb6ea;
+  --highlighter-wash: #ffd84d3d;
+  --washi: #7a6a2fc4;
+  --washi-cool: #3f5d54c4;
+  --graph: #1a2325;
+  --graph-line: #2f444c;
+  --ruled: #241f19;
+  --ruled-line: #2e2922;
+  --margin-red: #8f4239;
+  --kraft: #6d5638;
+  --kraft-ink: #f0e4cd;
+  --stamp: #d9695c;
+  --hairline: #ece5d626;
+  --edge: #ece5d61c;
+  --drop: #000000b8;
+  --muted: #2b251d;
+  --border: #3d3529;
+  --control-border: #a79c88;
+  --chart: #8cc7a1;
+  color-scheme: dark;
+}
+
+
+:root { --header-height: var(--ui-header-height); --header-pad-x: 20px; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--ui-bg); color: var(--ui-text); font-family: var(--ui-font); }
+.wordmark { display: inline-flex; align-items: center; gap: 7px; color: var(--ui-text); white-space: nowrap; font: 500 15px/1 var(--ui-font-reading); letter-spacing: -0.01em; }
+.wordmark svg { flex: none; }
+::selection { background: var(--highlighter-wash); color: var(--ui-text); }
+:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }

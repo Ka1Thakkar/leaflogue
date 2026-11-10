@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/out
+**/release
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.claude
+**/*.sqlite
+**/*.db
+test-results
+playwright-report

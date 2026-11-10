@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an improvement to Leaflogue.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the reading or note-keeping task, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the roadmap (docs/roadmap.md) and existing issues.
+          required: true

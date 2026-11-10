@@ -1,0 +1,14 @@
+{
+  "format": "leaflogue-widget",
+  "widget": {
+    "id": "reading-languages",
+    "version": 1,
+    "title": "Languages you read",
+    "description": "Books on your shelf by the language your reader recorded",
+    "count": "books",
+    "groupBy": "language",
+    "show": "ranked",
+    "limit": 6,
+    "sort": "count"
+  }
+}

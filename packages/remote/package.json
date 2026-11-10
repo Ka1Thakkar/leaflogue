@@ -1,0 +1,28 @@
+{
+  "name": "@leaflogue/remote",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@leaflogue/ai": "0.0.0",
+    "@leaflogue/appearance": "0.0.0",
+    "@leaflogue/contracts": "0.0.0",
+    "@leaflogue/domain": "0.0.0",
+    "convex": "^1.45.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/pg": "^8.23.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.0"
+  }
+}

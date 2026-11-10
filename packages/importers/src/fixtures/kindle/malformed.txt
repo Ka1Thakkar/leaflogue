@@ -1,0 +1,15 @@
+The Clockwork Orchard
+- Your Bookmark on Location 14 | Added on definitely-not-a-date
+
+This record type is intentionally unsupported.
+==========
+The Clockwork Orchard
+- Your Highlight on Location 30-20 | Added on definitely-not-a-date
+
+The range runs backwards, so its location must not be trusted.
+==========
+The Clockwork Orchard
+- Your Note on Location 999999999999999999999999999999999999
+
+This unsafe location must not attach to another clipping.
+==========
