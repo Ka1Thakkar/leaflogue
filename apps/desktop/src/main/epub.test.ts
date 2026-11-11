@@ -92,3 +92,21 @@ describe("local EPUB reader", () => {
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 });
+
+describe("Calibre KEPUB conversions", () => {
+  it("opens a KEPUB that links Adobe's page template as a stylesheet", async () => {
+    const kepub = zip({
+      mimetype: "application/epub+zip",
+      "META-INF/container.xml": '<container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+      "OEBPS/content.opf": '<package><manifest><item id="t" href="page-template.xpgt" media-type="application/vnd.adobe-page-template+xml"/><item id="s" href="stylesheet.css" media-type="text/css"/><item id="c" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c"/></spine></package>',
+      "OEBPS/page-template.xpgt": "<?xml version='1.0' encoding='utf-8'?>\n<ade:template xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:ade=\"http://ns.adobe.com/2006/ade\" xmlns:fo=\"http://www.w3.org/1999/XSL/Format\"><fo:layout-master-set/></ade:template>",
+      "OEBPS/stylesheet.css": "p { text-indent: 1em }",
+      "OEBPS/chapter.xhtml": '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="stylesheet.css"/><link rel="stylesheet" type="application/vnd.adobe-page-template+xml" href="page-template.xpgt"/><style type="text/css" id="kobostylehacks">div#book-inner p, div#book-inner div { font-size: 1.0em; }</style></head><body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Linked at last.</span></p></div></div></body></html>',
+    });
+    const document = await parseEpub(kepub);
+    expect(JSON.stringify(document)).toContain("Linked at last.");
+    expect(JSON.stringify(document)).toContain("text-indent");
+    expect(JSON.stringify(document)).not.toContain("ade:template");
+  });
+});
+

@@ -26,4 +26,20 @@ describe("formatted EPUB chapters", () => {
     expect(result.styles).toContain("data:,");
     expect(result.text).toBe("Safe");
   });
+  it("ignores Adobe page templates linked as stylesheets, as Calibre conversions do", () => {
+    const template = Buffer.from("<?xml version='1.0' encoding='utf-8'?>\n<ade:template xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:ade=\"http://ns.adobe.com/2006/ade\"></ade:template>");
+    const files = new Map([["OPS/page_styles.css", Buffer.from("p { margin: 0 }")], ["OPS/page-template.xpgt", template], ["OPS/untyped.xpgt", template]]);
+    const media = new Map([["OPS/page_styles.css", "text/css"], ["OPS/page-template.xpgt", "application/vnd.adobe-page-template+xml"]]);
+    const result = formatEpubChapter('<html><head><link rel="stylesheet" href="page-template.xpgt"/><link rel="stylesheet" type="application/vnd.adobe-page-template+xml" href="untyped.xpgt"/><link rel="stylesheet" href="page_styles.css"/></head><body><p>Kept.</p></body></html>', "OPS/chapter.xhtml", files, media, { bytes: 0 });
+    expect(result.styles).toContain("margin: 0");
+    expect(result.styles).not.toContain("ade:template");
+    expect(result.text).toBe("Kept.");
+  });
+  it("drops a stylesheet that cannot be parsed and keeps the chapter", () => {
+    const files = new Map([["OPS/broken.css", Buffer.from("p { color: red")], ["OPS/bad.css", Buffer.from("<?xml version='1.0'?><x/>")]]);
+    const result = formatEpubChapter('<html><head><link rel="stylesheet" href="bad.css"/><style>@import "bad.css"; h1 { font-weight: bold }</style></head><body><h1>Still here</h1></body></html>', "OPS/chapter.xhtml", files, new Map(), { bytes: 0 });
+    expect(result.styles).toContain("font-weight: bold");
+    expect(result.styles).not.toContain("xml");
+    expect(result.text).toBe("Still here");
+  });
 });

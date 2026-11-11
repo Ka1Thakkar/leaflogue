@@ -50,18 +50,35 @@ export function formatEpubChapter(source: string, path: string, files: Map<strin
     });
     return parsed.toString();
   };
+  // Only CSS is read as a stylesheet. Calibre and Adobe tooling often link an
+  // XML page template (.xpgt) with rel="stylesheet"; the manifest's media type
+  // tells them apart, and a missing one is accepted only for a declared CSS link.
+  const isStylesheet = (resolved: string, declared?: string) => {
+    const type = media.get(resolved)?.toLowerCase();
+    if (type) return type === "text/css";
+    return declared === undefined || declared.trim().toLowerCase() === "text/css";
+  };
+  // A stylesheet the parser cannot read is dropped, so one bad file costs the
+  // chapter its publisher styling rather than failing the whole book.
+  const parse = (value: string) => {
+    try { return postcss.parse(value); } catch (error) {
+      if (error instanceof Error && error.name === "CssSyntaxError") return undefined;
+      throw error;
+    }
+  };
   const css = (value: string, from: string, seen = new Set<string>()): string => {
     if (seen.size > 12 || value.length > 2_000_000) throw new Error("EPUB stylesheet exceeds reader limits.");
-    const sheet = postcss.parse(value);
+    const sheet = parse(value);
+    if (!sheet) return "";
     sheet.walkAtRules((rule) => {
       if (rule.name.toLowerCase() !== "import") return;
       const first = valueParser(rule.params).nodes[0];
       const url = first?.type === "string" ? first.value : first?.type === "function" ? valueParser.stringify(first.nodes).replace(/^(['"])(.*)\1$/u, "$2") : "";
       const resolved = resolve(url, from);
-      if (!resolved || seen.has(resolved) || !files.has(resolved)) { rule.remove(); return; }
+      if (!resolved || seen.has(resolved) || !files.has(resolved) || !isStylesheet(resolved)) { rule.remove(); return; }
       const nextSeen = new Set(seen); nextSeen.add(resolved);
-      const imported = postcss.parse(css(files.get(resolved)!.toString("utf8"), resolved, nextSeen));
-      rule.replaceWith(...imported.nodes);
+      const imported = parse(css(files.get(resolved)!.toString("utf8"), resolved, nextSeen));
+      if (imported?.nodes.length) rule.replaceWith(...imported.nodes); else rule.remove();
     });
     sheet.walkDecls((decl) => { decl.value = urls(decl.value, from); });
     return sheet.toString();
@@ -73,7 +90,7 @@ export function formatEpubChapter(source: string, path: string, files: Map<strin
     if (node.tag === "style") styles.push(css(textOf(node), path));
     if (node.tag === "link" && node.attributes.rel?.toLowerCase() === "stylesheet") {
       const resolved = resolve(node.attributes.href ?? "", path);
-      if (resolved && files.has(resolved)) styles.push(css(files.get(resolved)!.toString("utf8"), resolved, new Set([resolved])));
+      if (resolved && files.has(resolved) && isStylesheet(resolved, node.attributes.type)) styles.push(css(files.get(resolved)!.toString("utf8"), resolved, new Set([resolved])));
     }
     for (const child of node.children) if (typeof child !== "string") inspect(child);
   };
