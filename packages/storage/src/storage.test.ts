@@ -3052,6 +3052,8 @@ describe("importing on a second synced installation", () => {
     const first = new LocalLibrary(":memory:"), laptop = new LocalLibrary(":memory:");
     try {
       first.importDocument({ document, source, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [] });
+      const editedBook = first.listBooks()[0]!;
+      first.updateBookMetadata({ id: editedBook.id, expectedRevision: editedBook.revision, title: "My renamed edition", authors: ["My corrected author"] });
       laptop.bootstrapSync({ generation: 1, afterSequence: 0 });
       let sequence = 0;
       for (const { change } of first.resolvePendingSyncChanges().changes) {

@@ -2982,6 +2982,24 @@ export class LocalLibrary implements Disposable, LibraryRepository {
       if (!incomingIds.has(row.provider_record_id) || !all.has(row.book_id)) continue;
       sourceLinks.set(row.provider_record_id, [...(sourceLinks.get(row.provider_record_id) ?? []), { sourceId: row.source_id, bookId: row.book_id }]);
     }
+    // Metadata can have been edited on the first computer. Build a bounded
+    // lookup of the incoming quotation/date keys and scan existing passages once.
+    const wanted = new Set<string>();
+    const keysByBook = new Map<string, Set<string>>();
+    for (const annotation of document.annotations) {
+      if (!annotation.text || annotation.createdAt === undefined) continue;
+      const key = fingerprint([annotation.text, annotation.createdAt]);
+      wanted.add(key);
+      const keys = keysByBook.get(annotation.bookProviderRecordId) ?? new Set<string>();
+      keys.add(key); keysByBook.set(annotation.bookProviderRecordId, keys);
+    }
+    const evidence = new Map<string, Set<BookId>>();
+    if (all.size && wanted.size) for (const row of this.#database.prepare("SELECT book_id, text, source_created_at FROM highlights WHERE source_created_at IS NOT NULL AND deleted=0").iterate() as Iterable<{ book_id: BookId; text: string; source_created_at: number }>) {
+      if (!all.has(row.book_id)) continue;
+      const key = fingerprint([row.text, row.source_created_at]);
+      if (!wanted.has(key)) continue;
+      const ids = evidence.get(key) ?? new Set<BookId>(); ids.add(row.book_id); evidence.set(key, ids);
+    }
     return document.books.flatMap((incoming) => {
       const links = sourceLinks.get(incoming.providerRecordId) ?? [];
       const authors = new Set(incoming.authors.map(normalizeBookText));
@@ -2991,6 +3009,12 @@ export class LocalLibrary implements Disposable, LibraryRepository {
         if (isbn && book.isbn13 && isbn !== book.isbn13) continue;
         if (!(isbn && isbn === book.isbn13) && (!authors.size || !book.authors.some((author) => authors.has(normalizeBookText(author))))) continue;
         candidates.set(book.id, book);
+      }
+      const passageMatches = new Set<BookId>();
+      for (const key of keysByBook.get(incoming.providerRecordId) ?? []) for (const id of evidence.get(key) ?? []) passageMatches.add(id);
+      if (passageMatches.size) {
+        candidates.clear();
+        for (const id of passageMatches) candidates.set(id, all.get(id)!);
       }
       for (const link of links) candidates.set(link.bookId, all.get(link.bookId)!);
       return candidates.size ? [{ providerRecordId: incoming.providerRecordId, links, candidates: [...candidates.values()].slice(0, 20).map(({ id, title, authors, archived }) => ({ bookId: id, title, authors, archived })) }] : [];

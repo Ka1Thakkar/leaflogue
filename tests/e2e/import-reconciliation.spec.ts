@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createProfile, launch, removeProfile } from "./harness";
 import { KOBO_BOOK, writeKoboDatabase } from "./fixtures";
@@ -16,12 +17,14 @@ for (const ambiguous of [false, true]) test(`reconciles Kobo on a replica withou
       const book = (await window.leaflogue.library.listBooks())[0]!;
       return (await window.leaflogue.library.getBookContents(book.id))!;
     });
-    if (ambiguous) await session.page.evaluate(async (book) => { await window.leaflogue.library.createBook({ title: book.title, authors: book.authors }); }, original.book);
+    const duplicate = ambiguous ? await session.page.evaluate(async (book) => (await window.leaflogue.library.createBook({ title: book.title, authors: book.authors })).id, original.book) : undefined;
     await session.close();
     // Sync currently transfers content but not these local import mappings.
     // Keep content unchanged while simulating a fresh synced replica.
     const db = new DatabaseSync(session.libraryFile);
-    db.exec("PRAGMA foreign_keys=ON; BEGIN; DELETE FROM import_conflicts; DELETE FROM import_runs; DELETE FROM source_annotations; DELETE FROM source_books; DELETE FROM import_sources; COMMIT;"); db.close();
+    db.exec("PRAGMA foreign_keys=ON; BEGIN; DELETE FROM import_conflicts; DELETE FROM import_runs; DELETE FROM source_annotations; DELETE FROM source_books; DELETE FROM import_sources; COMMIT;");
+    if (duplicate) for (const highlight of original.highlights) db.prepare("INSERT INTO highlights(id,book_id,text,source_location,source_created_at,created_at,updated_at) SELECT ?,?,text,source_location,source_created_at,created_at,updated_at FROM highlights WHERE id=?").run(randomUUID(), duplicate, highlight.id);
+    db.close();
     session = await launch(profile);
     const review = await openImport(session.page);
     await session.chooseFile(file);
