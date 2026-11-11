@@ -72,7 +72,7 @@ export class CalibreLibrary {
     if (!value || typeof value !== "object") throw new Error("Invalid Calibre reference.");
     const reference = value as Partial<CalibreReference>;
     if (!uuid(reference.libraryId) || !uuid(reference.bookUuid) || typeof reference.libraryRoot !== "string" || !isAbsolute(reference.libraryRoot)) throw new Error("Invalid Calibre reference.");
-    const format = reference.format ?? "EPUB";
+    const format = reference.format === undefined ? "EPUB" : reference.format;
     if (format !== "EPUB" && format !== "KEPUB") throw new Error("Choose EPUB or KEPUB from Calibre.");
     const current = await this.connection();
     const rootPath = current?.libraryId === reference.libraryId ? current.root : reference.libraryRoot;
