@@ -287,3 +287,20 @@ describe("running until settled", () => {
     expect(endless.run).toHaveBeenCalledTimes(3);
   });
 });
+
+it("publishes monotonic counters across bounded passes and the real remaining queue", async () => {
+  const library = bootstrappedLibrary();
+  try {
+    for (let index = 0; index < 3; index += 1) library.createBook({ title: `Local ${index}` });
+    const provider = new MemoryProvider();
+    provider.feed.push({ sequence: 1, entityId: remoteBookId, change: remoteBook("A remote book") });
+    const progress: import("@leaflogue/contracts").SyncProgress[] = [];
+    const result = await runUntilSettled(createSyncRunner({ ledger: library, transport: provider, batchSize: 1, maxBatches: 1, onProgress: (value) => progress.push(value) }));
+    expect(result).toMatchObject({ status: "complete", pushed: 3, pulled: 1 });
+    expect(progress.at(-1)).toMatchObject({ phase: "pull", pushed: 3, pulled: 1, remaining: 0 });
+    expect(progress.some((value) => value.remaining === 3)).toBe(true);
+    expect(progress.every((value, index) => index === 0 || (value.pushed >= progress[index - 1]!.pushed && value.pulled >= progress[index - 1]!.pulled))).toBe(true);
+    expect(library.countPendingSyncChanges()).toBe(0);
+    expect((await createSyncRunner({ ledger: library, transport: provider, onProgress: () => { throw Error("Broken observer"); } }).run()).status).toBe("complete");
+  } finally { library.close(); }
+});

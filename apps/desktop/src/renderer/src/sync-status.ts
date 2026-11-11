@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SyncRunResult, SyncStatus } from "@leaflogue/contracts";
+import type { SyncProgress, SyncRunResult, SyncStatus } from "@leaflogue/contracts";
 
 /** The background sync's state, as the main process last reported it. */
 export function useSyncStatus(): SyncStatus | undefined {
@@ -16,9 +16,18 @@ export function useSyncStatus(): SyncStatus | undefined {
 
 export type SyncTone = "ready" | "syncing" | "synced" | "attention" | "failed";
 
+export function describeSyncProgress(progress: SyncProgress): { readonly phase: string; readonly counts: string } {
+  const phases = { connect: "Connecting…", prepare: "Preparing library…", push: "Sending changes…", pull: "Receiving changes…" };
+  const remaining = progress.remaining === undefined ? "" : ` · ${progress.remaining.toLocaleString()} queued`;
+  return { phase: phases[progress.phase], counts: `${progress.pushed.toLocaleString()} sent · ${progress.pulled.toLocaleString()} received${progress.superseded ? ` · ${progress.superseded.toLocaleString()} already current` : ""}${remaining}` };
+}
+
 /** A few words for the header, and the full story for its tooltip. */
 export function describeSyncStatus(status: SyncStatus): { readonly label: string; readonly tone: SyncTone; readonly detail: string } {
-  if (status.state === "syncing") return { label: "Syncing…", tone: "syncing", detail: "Sending and receiving changes." };
+  if (status.state === "syncing") {
+    const progress = status.progress ? describeSyncProgress(status.progress) : undefined;
+    return { label: "Syncing…", tone: "syncing", detail: progress ? `${progress.phase} ${progress.counts}` : "Sending and receiving changes." };
+  }
   if (status.lastError) return { label: "Sync failed", tone: "failed", detail: status.lastError };
   const result = status.lastResult;
   if (!result) return { label: "Ready to sync", tone: "ready", detail: "Not synced since Leaflogue opened." };

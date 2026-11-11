@@ -356,6 +356,10 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     };
   }
 
+  countPendingSyncChanges(): number {
+    return Number((this.#database.prepare("SELECT count(*) AS count FROM sync_outbox WHERE acknowledged_at IS NULL").get() as { count: number }).count);
+  }
+
   listPendingSyncChanges(limit = 100): readonly LocalSyncOutboxEntry[] {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
       throw new Error("Sync outbox limit is invalid");

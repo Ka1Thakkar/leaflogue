@@ -272,6 +272,7 @@ const syncService = createDesktopSyncService({
   getLibrary: () => library,
   readConfig: () => readRemoteConfig(),
   createPostgresClient,
+  onProgress: (progress) => syncTracker.progress(progress),
   createConvexTransport: async (config, deviceId, runOptions, signal) => {
     if (!config.syncKey) throw Object.assign(new Error("Save the Convex sync key before synchronizing"), { code: "LEAFLOGUE_SYNC_KEY_UNCONFIGURED" });
     const { mutationContractVersion } = await assertCompatibleConvexDeployment(config.deploymentUrl, { releaseVersion: app.getVersion(), signal });

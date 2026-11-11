@@ -1596,7 +1596,14 @@ export type SyncRunResult =
  * Background sync as the header shows it. `off` means no sync provider is set
  * up; a finished run keeps its result, or the message it failed with.
  */
+export interface SyncProgress extends SyncRunCounts {
+  readonly phase: "connect" | "prepare" | "push" | "pull";
+  /** Local queued edits only; the remote does not advertise a reliable total. */
+  readonly remaining?: number;
+}
+
 export interface SyncStatus {
+  readonly progress?: SyncProgress;
   readonly state: "off" | "idle" | "syncing";
   readonly lastFinishedAt?: number;
   readonly lastResult?: SyncRunResult;
