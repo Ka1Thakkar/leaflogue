@@ -1,7 +1,8 @@
-import { execFile, spawn } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { constants, existsSync } from "node:fs";
-import { access, lstat, open, writeFile } from "node:fs/promises";
+import { access, lstat, open, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import type { UpdateManifest } from "./update-manifest";
 
 function run(command: string, args: string[]): Promise<{ stdout: string }> {
@@ -84,13 +85,15 @@ try {
 }
 `;
 
-async function detached(command: string, args: string[], logFile?: string): Promise<void> {
+export async function launchUpdateHelper(command: string, args: string[], logFile?: string): Promise<ChildProcess> {
   const log = logFile ? await open(logFile, "wx", 0o600) : undefined;
   try {
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(command, args, { detached: true, stdio: ["ignore", log?.fd ?? "ignore", log?.fd ?? "ignore"], windowsHide: true });
+    return await new Promise<ChildProcess>((resolve, reject) => {
+      // Windows PowerShell can exit successfully without executing -File under
+      // DETACHED_PROCESS. unref + independent stdio allow it to outlive the app.
+      const child = spawn(command, args, { detached: process.platform !== "win32", stdio: ["ignore", log?.fd ?? "ignore", log?.fd ?? "ignore"], windowsHide: true });
       child.once("error", reject);
-      child.once("spawn", () => { child.unref(); resolve(); });
+      child.once("spawn", () => { child.unref(); resolve(child); });
     });
   } finally { await log?.close(); }
 }
@@ -127,7 +130,17 @@ export async function installNativeUpdate(download: string, manifest: UpdateMani
     await writeFile(helper, WINDOWS_UPDATE_HELPER, { mode: 0o600, flag: "wx" });
     await writeFile(config, JSON.stringify({ parent: options.pid ?? process.pid, installer: download, executable: options.executable, directory: dirname(options.executable), args: options.args ?? [], work }), { mode: 0o600, flag: "wx" });
     const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    await detached(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper, config], join(work, "helper.log"));
+    const helperProcess = await launchUpdateHelper(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper, config], join(work, "helper.log"));
+    // Creating a process does not establish that its script initialized.
+    // Keep the app open unless the helper confirms it is ready for app exit.
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const state = await readFile(join(work, "state.txt"), "utf8").catch(() => "");
+      if (state.trim() === "waiting-for-app-exit") { ready = true; break; }
+      if (helperProcess.exitCode !== null || helperProcess.signalCode !== null) break;
+      await delay(100);
+    }
+    if (!ready) { helperProcess.kill(); throw new Error("The Windows update helper did not initialize; Leaflogue will stay open"); }
     options.quit();
     return;
   }
@@ -158,7 +171,7 @@ export async function installNativeUpdate(download: string, manifest: UpdateMani
   const helper = join(work, "install.sh");
   await writeFile(helper, MAC_UPDATE_HELPER, { mode: 0o700, flag: "wx" });
   try {
-    await detached("/bin/sh", [helper, String(options.pid ?? process.pid), sibling, target, `${sibling}.previous`, work, ...(options.args ?? [])]);
+    await launchUpdateHelper("/bin/sh", [helper, String(options.pid ?? process.pid), sibling, target, `${sibling}.previous`, work, ...(options.args ?? [])]);
   } catch (error) {
     // Only the random sibling copy is disposable; the running app is untouched.
     const { rm } = await import("node:fs/promises");

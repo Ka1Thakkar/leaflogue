@@ -22,6 +22,9 @@ runs:
         test "$(npm --version)" = "12.0.2"
         npm ci
         node node_modules/electron/install.js
+    - name: Verify native update helper startup before packaging
+      shell: bash
+      run: npx vitest run apps/desktop/src/main/update-native.test.ts
     - name: Build and verify native beta packages
       shell: bash
       env:

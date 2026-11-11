@@ -2,14 +2,36 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { once } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
-import { MAC_UPDATE_HELPER, nativeUpdateUnavailable } from "./update-native";
+import { launchUpdateHelper, MAC_UPDATE_HELPER, nativeUpdateUnavailable } from "./update-native";
 
 const folders: string[] = [];
 function folder() { const path = mkdtempSync(join(tmpdir(), "leaflogue-update-native-")); folders.push(path); return path; }
 afterEach(() => folders.splice(0).forEach(path => rmSync(path, { recursive: true, force: true })));
 
 describe("native update installation boundary", () => {
+  it.skipIf(process.platform !== "win32")("runs a background PowerShell file before the app exits", async () => {
+    const path = folder();
+    const script = join(path, "helper with spaces.ps1"), ready = join(path, "ready marker.txt");
+    writeFileSync(script, 'param([string]$ReadyPath)\n[IO.File]::WriteAllText($ReadyPath, "initialized")\n');
+    const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    const child = await launchUpdateHelper(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, ready], join(path, "helper.log"));
+    try {
+      for (let attempt = 0; attempt < 100 && !existsSync(ready); attempt += 1) {
+        if (child.exitCode !== null || child.signalCode !== null) break;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      expect(existsSync(ready), "PowerShell must execute the script, not merely create a process").toBe(true);
+      expect(readFileSync(ready, "utf8")).toBe("initialized");
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        const exited = once(child, "exit");
+        child.kill();
+        await exited;
+      }
+    }
+  }, 10_000);
   it("requires a real Windows installer installation", () => {
     const path = folder();
     const options = { platform: "win32" as const, executable: join(path, "Leaflogue.exe"), quit: () => undefined };
