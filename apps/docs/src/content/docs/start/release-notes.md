@@ -1,14 +1,14 @@
 ---
-title: 0.1.0 preview notes
+title: 0.1.0-beta.3 release notes
 description: What the first preview includes, what is still being validated, and where to get it.
 ---
 
-**Release status: experimental public beta, `0.1.0-beta.1`.** Automated
+**Release status: experimental public beta, `0.1.0-beta.3`.** Automated
 source, native package, and MCP checks pass. Clean-desktop installation,
 manual updates/uninstall, and actual Orca, VoiceOver, and Narrator checks
 remain pending. The maintainer approved experimental publication with these
 limitations disclosed. Back up your library before testing.
-Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.0-beta.1).
+Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.0-beta.3).
 This prerelease is not a signed stable update feed.
 
 ## Included
@@ -46,8 +46,10 @@ Linux builds target x64 and arm64 as AppImage and tarball packages. Mac builds
 target Apple Silicon and Intel as DMG and ZIP; Windows builds target x64 as a
 per-user installer and ZIP.
 The release carries the matching Convex backend bundle, checksums, dependency
-audit, SBOM, and build metadata. This experimental beta uses manual replacement updates; it does not publish
-signed stable update manifests.
+audit, SBOM, and build metadata. Standard Mac app bundles, Windows installer builds, and Linux AppImages offer
+signed beta updates through **Settings → Updates → Install and restart**.
+Windows ZIP/Linux tarball copies remain manual. This is a beta feed, not a
+stable update channel.
 
 The first release uses local SQLite schema **17**, PostgreSQL schema **13**,
 and Convex schema **17**, mutation contract **23**. The desktop accepts Convex

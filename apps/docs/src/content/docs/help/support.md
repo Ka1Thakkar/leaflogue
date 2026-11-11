@@ -25,11 +25,11 @@ For sync, Leaflogue works with [Convex](/sync/convex/) and
 
 ## Updates
 
-For this beta, download the next release from
-[GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases) and replace
-the application manually. Back up your library first. Prereleases are not
-offered by the app's signed-stable update checker. Read the release notes for
-any schema or sync compatibility changes before updating.
+Beta.3 and later offer in-app signed beta updates for Mac app bundles, Windows
+per-user installer builds, and Linux AppImages. Back up your library, then open
+**Settings → Updates** and choose **Install and restart** when offered.
+Portable Windows ZIP/Linux tarball copies use manual downloads. See the
+[update instructions](/start/install/#updates) and release compatibility notes.
 
 ## Security problems
 
