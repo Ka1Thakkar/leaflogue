@@ -90,10 +90,53 @@ export function epubText(source: string): string {
   return output.split(/\n\s*\n/u).map((part) => part.replace(/\s+/gu, " ").trim()).filter(Boolean).join("\n\n");
 }
 
+const IDPF_FONT_OBFUSCATION = "http://www.idpf.org/2008/embedding";
+const ADOBE_FONT_OBFUSCATION = "http://ns.adobe.com/pdf/enc#RC";
+
+/**
+ * META-INF/encryption.xml usually only means embedded fonts are obfuscated,
+ * which Calibre conversions and many publishers do. Both published schemes
+ * XOR the start of the font with a key derived from the book's identifier, so
+ * those fonts are restored in memory. Anything else is real encryption (DRM),
+ * which this reader cannot and does not try to open.
+ */
+function unmaskFonts(files: Map<string, Buffer>, encryption: string, bookIdentifier: string) {
+  const entries: { algorithm: string; uri: string }[] = [];
+  let current: { algorithm: string; uri: string } | undefined;
+  xml(encryption, {
+    open(name, attrs) {
+      if (name === "encrypteddata") current = { algorithm: "", uri: "" };
+      if (name === "encryptionmethod" && current) current.algorithm = attrs.Algorithm ?? "";
+      if (name === "cipherreference" && current) current.uri = attrs.URI ?? "";
+    },
+    close(name) { if (name === "encrypteddata" && current) { entries.push(current); current = undefined; } },
+  });
+  if (entries.some(({ algorithm }) => algorithm !== IDPF_FONT_OBFUSCATION && algorithm !== ADOBE_FONT_OBFUSCATION)) {
+    throw new Error("This book is protected by DRM, so Leaflogue can't open it. Link a DRM-free copy instead.");
+  }
+  const idpfKey = createHash("sha1").update(bookIdentifier.replace(/[ \t\r\n]/gu, ""), "utf8").digest();
+  const adobeHex = bookIdentifier.replace(/^urn:uuid:/iu, "").replace(/-/gu, "");
+  const adobeKey = /^[\da-f]{32}$/iu.test(adobeHex) ? Buffer.from(adobeHex, "hex") : undefined;
+  for (const { algorithm, uri } of entries) {
+    let path: string;
+    try { path = posix.normalize(decodeURIComponent(uri)); } catch { continue; }
+    const font = files.get(path);
+    if (!font) continue;
+    const idpf = algorithm === IDPF_FONT_OBFUSCATION;
+    const key = idpf && bookIdentifier ? idpfKey : adobeKey;
+    // Without the identifier the font cannot be restored; the book still opens
+    // in the reader's own fonts rather than showing scrambled glyph data.
+    if (!key) { files.delete(path); continue; }
+    const restored = Buffer.from(font);
+    const length = Math.min(restored.length, idpf ? 1040 : 1024);
+    for (let index = 0; index < length; index++) restored[index]! ^= key[index % key.length]!;
+    files.set(path, restored);
+  }
+}
+
 export async function parseEpub(bytes: Buffer): Promise<EpubDocument> {
   const files = await entries(bytes);
   if (files.get("mimetype")?.toString().trim() !== "application/epub+zip") throw new Error("Choose a valid EPUB file.");
-  if (files.has("META-INF/encryption.xml")) throw new Error("Encrypted EPUB resources are not supported in this reader yet.");
   const get = (name: string) => {
     const result = files.get(name);
     if (!result) throw new Error("EPUB is missing a required document.");
@@ -105,10 +148,20 @@ export async function parseEpub(bytes: Buffer): Promise<EpubDocument> {
   } });
   const manifest = new Map<string, { href: string; media: string }>();
   const spine: string[] = [];
-  xml(get(packagePath), { open(name, attrs) {
-    if (name === "item") manifest.set(attrs.id ?? "", { href: attrs.href ?? "", media: attrs["media-type"] ?? "" });
-    if (name === "itemref" && attrs.linear !== "no") spine.push(attrs.idref ?? "");
-  } });
+  const identifiers = new Map<string, string>();
+  let uniqueIdentifier = "";
+  let identifier: { id: string; text: string } | undefined;
+  xml(get(packagePath), {
+    open(name, attrs) {
+      if (name === "package") uniqueIdentifier = attrs["unique-identifier"] ?? "";
+      if (name === "identifier") identifier = { id: attrs.id ?? "", text: "" };
+      if (name === "item") manifest.set(attrs.id ?? "", { href: attrs.href ?? "", media: attrs["media-type"] ?? "" });
+      if (name === "itemref" && attrs.linear !== "no") spine.push(attrs.idref ?? "");
+    },
+    text(value) { if (identifier) identifier.text += value; },
+    close(name) { if (name === "identifier" && identifier) { identifiers.set(identifier.id, identifier.text.trim()); identifier = undefined; } },
+  });
+  if (files.has("META-INF/encryption.xml")) unmaskFonts(files, get("META-INF/encryption.xml"), identifiers.get(uniqueIdentifier) ?? [...identifiers.values()][0] ?? "");
   if (!spine.length || spine.length > 1000) throw new Error("EPUB has no supported reading order.");
   const media = new Map([...manifest.values()].map((item) => [posix.normalize(posix.join(posix.dirname(packagePath), decodeURIComponent(item.href.split("#")[0]!))), item.media]));
   const budget: EpubFormatBudget = { bytes: 0, embedded: new Map(), sheets: new Set() };
