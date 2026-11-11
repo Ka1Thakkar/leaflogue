@@ -1,4 +1,4 @@
-import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL, type CalibreConnection, type CalibreSearch } from "@leaflogue/contracts";
+import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL, type CalibreConnection, type CalibreFormat, type CalibreSearch } from "@leaflogue/contracts";
 import { CATALOG_SEARCH_CHANNEL, type CatalogSearch } from "@leaflogue/contracts";
 import { EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL, type EpubDocument } from "@leaflogue/contracts";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
@@ -199,7 +199,7 @@ const bridge: LeaflogueBridge = Object.freeze({
     describe: () => ipcRenderer.invoke(CALIBRE_DESCRIBE_CHANNEL) as Promise<CalibreConnection | undefined>,
     choose: () => ipcRenderer.invoke(CALIBRE_CHOOSE_CHANNEL) as Promise<CalibreConnection | undefined>,
     search: (id: BookId, query: string) => ipcRenderer.invoke(CALIBRE_SEARCH_CHANNEL, id, query) as Promise<CalibreSearch>,
-    link: (id: BookId, uuid: string) => ipcRenderer.invoke(CALIBRE_LINK_CHANNEL, id, uuid) as Promise<EpubDocument>,
+    link: (id: BookId, uuid: string, format?: CalibreFormat) => ipcRenderer.invoke(CALIBRE_LINK_CHANNEL, id, uuid, format) as Promise<EpubDocument>,
   }),
   epub: Object.freeze({
     unlink: (id: BookId) => ipcRenderer.invoke(EPUB_UNLINK_CHANNEL, id) as Promise<void>,

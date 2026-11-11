@@ -41,6 +41,13 @@ const files = {
 };
 
 describe("local EPUB reader", () => {
+  it("reads Kobo KEPUB spans and emphasis through the same inert EPUB parser", async () => {
+    const bytes = await readFile(new URL("../../../../tests/fixtures/local-reader.kepub", import.meta.url));
+    const book = await parseEpub(bytes);
+    expect(book.chapters[0]?.text).toContain("A small passage with emphasis stays readable.");
+    expect(book.chapters[0]?.html).toContain("<em");
+    expect(book.chapters[0]?.html).not.toContain("<script");
+  });
   it("follows the spine, preserves original file identity, and returns only inert text", async () => {
     const result = await parseEpub(zip(files));
     expect(result.sha256).toMatch(/^[a-f0-9]{64}$/u);
