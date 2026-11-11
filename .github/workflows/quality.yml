@@ -409,6 +409,74 @@ jobs:
       - name: Verify checksums, contents, and deploy command
         run: bash scripts/validate-convex-release.sh release/convex
 
+  validation-summary:
+    name: Change-aware validation
+    # Branch protection relies on this one stable check. It verifies the
+    # relevant lane instead of requiring matrix job names that do not exist
+    # for documentation-only pull requests.
+    if: always()
+    needs:
+      [
+        changes,
+        docs,
+        quality,
+        package-smoke,
+        visual-regression,
+        web-e2e,
+        desktop-e2e,
+        native-beta,
+        release-version,
+        release-packages,
+        convex-backend-package,
+      ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every applicable lane to pass
+        env:
+          DOCS_CHANGED: ${{ needs.changes.outputs.docs }}
+          PRODUCT_CHANGED: ${{ needs.changes.outputs.product }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          PACKAGE_RESULT: ${{ needs.package-smoke.result }}
+          VISUAL_RESULT: ${{ needs.visual-regression.result }}
+          WEB_RESULT: ${{ needs.web-e2e.result }}
+          DESKTOP_RESULT: ${{ needs.desktop-e2e.result }}
+          NATIVE_RESULT: ${{ needs.native-beta.result }}
+          VERSION_RESULT: ${{ needs.release-version.result }}
+          RELEASE_PACKAGES_RESULT: ${{ needs.release-packages.result }}
+          BACKEND_RESULT: ${{ needs.convex-backend-package.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          require_success() {
+            local name="$1" result="$2"
+            if [[ "$result" != "success" ]]; then
+              echo "$name was expected to pass, but was $result" >&2
+              exit 1
+            fi
+          }
+
+          if [[ "$DOCS_CHANGED" == "true" ]]; then
+            require_success "Documentation checks" "$DOCS_RESULT"
+          fi
+
+          if [[ "$PRODUCT_CHANGED" == "true" ]]; then
+            require_success "Quality gate" "$QUALITY_RESULT"
+            require_success "Linux package smoke" "$PACKAGE_RESULT"
+            require_success "Linux browser regression" "$VISUAL_RESULT"
+            require_success "Web app end-to-end" "$WEB_RESULT"
+            require_success "Linux desktop end-to-end" "$DESKTOP_RESULT"
+            require_success "Native beta" "$NATIVE_RESULT"
+            require_success "Release version contract" "$VERSION_RESULT"
+
+            if [[ "$EVENT_NAME" != "workflow_dispatch" && "$REF" != refs/tags/v* ]]; then
+              require_success "Linux release packages" "$RELEASE_PACKAGES_RESULT"
+              require_success "Versioned Convex backend package" "$BACKEND_RESULT"
+            fi
+          fi
+
   candidate-release:
     name: Build and retain validation candidate
     if: github.event_name == 'workflow_dispatch'
