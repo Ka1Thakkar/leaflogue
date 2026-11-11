@@ -42,3 +42,16 @@ and no Leaflogue account.
 
 Anyone with your database credentials (the PostgreSQL URL, or the Convex sync
 key) can read and change your library. Keep them like a password.
+
+
+## Follow sync progress
+
+The next 0.1.1 beta shows live progress in **Settings → Sync → Remote library**,
+including connecting/preparing, sending changes, receiving changes, sent and
+received counts, and how many local edits remain queued. Background sync from
+the header uses the same status. A finished run keeps its result and finish time.
+
+The remote service does not provide a reliable total, so receiving uses an
+activity indicator and a running count rather than a percentage. Counters
+continue across batches; a failed sync reports its completed work and leaves
+unsent changes queued for the next attempt.

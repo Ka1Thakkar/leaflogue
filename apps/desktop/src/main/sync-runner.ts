@@ -4,6 +4,7 @@ import {
   type SyncProblemKind,
   type SyncExchangeRunResult,
   type SyncRunCounts,
+  type SyncProgress,
 } from "@leaflogue/contracts";
 import {
   deliverPendingSyncChanges,
@@ -35,11 +36,12 @@ export interface SyncRunner {
 const DEFAULT_MAX_BATCHES = 10;
 
 export function createSyncRunner(options: {
-  readonly ledger: SyncOutboxLedger & SyncIncomingLedger & Partial<SyncBootstrapLedger>;
+  readonly ledger: SyncOutboxLedger & SyncIncomingLedger & Partial<SyncBootstrapLedger> & { readonly countPendingSyncChanges?: () => number };
   readonly transport: SyncTransport & SyncChangeSource & Partial<SyncBootstrapSource>;
   readonly batchSize?: number;
   readonly maxBatches?: number;
   readonly onProblem?: (problem: SyncProblem) => void;
+  readonly onProgress?: (progress: SyncProgress) => void;
 }): SyncRunner {
   const batchSize = options.batchSize ?? MAX_SYNC_CHANGE_PAGE;
   const maxBatches = options.maxBatches ?? DEFAULT_MAX_BATCHES;
@@ -49,29 +51,45 @@ export function createSyncRunner(options: {
   }
   const controller = new AbortController();
   let inFlight: Promise<SyncExchangeRunResult> | undefined;
+  let completed: SyncRunCounts = { bootstrapped: 0, pushed: 0, superseded: 0, pulled: 0 };
 
   const pass = async (): Promise<SyncExchangeRunResult> => {
     const { signal } = controller;
     let counts: SyncRunCounts = { bootstrapped: 0, pushed: 0, superseded: 0, pulled: 0 };
     let phase: SyncProblem["phase"] = "push";
     let rebuilt = false;
+    const report = (currentPhase: SyncProgress["phase"]) => {
+      try {
+        options.onProgress?.({ phase: currentPhase,
+          bootstrapped: completed.bootstrapped + counts.bootstrapped,
+          pushed: completed.pushed + counts.pushed,
+          superseded: completed.superseded + counts.superseded,
+          pulled: completed.pulled + counts.pulled,
+          ...(options.ledger.countPendingSyncChanges ? { remaining: options.ledger.countPendingSyncChanges() } : {}),
+        });
+      } catch { /* An observer cannot interrupt synchronization. */ }
+    };
     // An unbootstrapped library would push passages whose books the provider
     // never received, so neither direction runs until a snapshot exists.
     const bootstrap = async (): Promise<boolean> => {
       const { ledger, transport } = options;
       if (!ledger.bootstrapSync || !transport.bootstrapCursor) return false;
+      report("prepare");
       const cursor = await transport.bootstrapCursor(signal);
       if (signal.aborted) return false;
       counts = { ...counts, bootstrapped: counts.bootstrapped + ledger.bootstrapSync(cursor).enqueued };
+      report("prepare");
       return true;
     };
     const exchange = async (): Promise<SyncExchangeRunResult> => {
       phase = "push";
+      report("push");
       for (let batch = 0; ; batch += 1) {
         if (signal.aborted) return { ...counts, status: "cancelled" };
         if (batch === maxBatches) return { ...counts, status: "incomplete" };
         const record = ({ delivered, superseded }: { readonly delivered: number; readonly superseded: number }) => {
           counts = { ...counts, pushed: counts.pushed + delivered, superseded: counts.superseded + superseded };
+          report("push");
         };
         // A failed delivery still reports its acknowledged prefix, so the count
         // never claims that nothing was sent when part of it was.
@@ -83,6 +101,7 @@ export function createSyncRunner(options: {
         }
       }
       phase = "pull";
+      report("pull");
       for (let batch = 0; ; batch += 1) {
         if (signal.aborted) return { ...counts, status: "cancelled" };
         if (batch === maxBatches) return { ...counts, status: "incomplete" };
@@ -97,6 +116,7 @@ export function createSyncRunner(options: {
           return exchange();
         }
         counts = { ...counts, pulled: counts.pulled + pull.applied + pull.superseded };
+        report("pull");
         if (pull.status === "unsupported-change") return { ...counts, status: "unsupported-change", entityType: pull.entityType };
         if (pull.isDone) return { ...counts, status: signal.aborted ? "cancelled" : "complete" };
       }
@@ -128,7 +148,10 @@ export function createSyncRunner(options: {
   return {
     run() {
       if (controller.signal.aborted) return Promise.resolve({ bootstrapped: 0, pushed: 0, superseded: 0, pulled: 0, status: "cancelled" });
-      inFlight ??= pass().finally(() => { inFlight = undefined; });
+      inFlight ??= pass().then((result) => {
+        completed = { bootstrapped: completed.bootstrapped + result.bootstrapped, pushed: completed.pushed + result.pushed, superseded: completed.superseded + result.superseded, pulled: completed.pulled + result.pulled };
+        return result;
+      }).finally(() => { inFlight = undefined; });
       return inFlight;
     },
     async shutdown() {

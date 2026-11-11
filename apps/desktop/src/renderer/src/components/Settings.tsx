@@ -20,7 +20,7 @@ import { useDesktop, useHost } from "../host";
 import { setNavigationBlocker } from "../router";
 import { focusSetting, settingAnchor, settingRequests, settingsSections } from "../palette/settings-index";
 import { APPEARANCE_SAVED_EVENT } from "../palette/actions";
-import { describeSyncResult, useSyncStatus } from "../sync-status";
+import { describeSyncProgress, describeSyncResult, describeSyncStatus, useSyncStatus } from "../sync-status";
 import { useConfirm } from "./Confirm";
 import { ExportLibrary } from "./Library";
 import { countOf, InlineError, Loading } from "./shared";
@@ -583,7 +583,9 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
   const [location, setLocation] = useState<"default" | "choose">("default");
   const [message, setMessage] = useState("");
   const [syncKey, setSyncKey] = useState("");
-  const syncing = useSyncStatus()?.state === "syncing";
+  const syncStatus = useSyncStatus();
+  const syncing = syncStatus?.state === "syncing";
+  const progress = syncStatus?.progress ? describeSyncProgress(syncStatus.progress) : undefined;
   useEffect(() => {
     void window.leaflogue.remote.describe().then((result) => {
       setConfig(result);
@@ -602,9 +604,15 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
     <details className={styles.section}>
       <summary className={styles.sectionHeading}>
         <Network size={20} aria-hidden="true" />
-        <div><h2 id="remote-library-title">Remote library</h2>{config?.configured && <p className="ll-muted">{config.provider === "convex" ? "Convex" : "PostgreSQL"} · {config.host}</p>}</div>
+        <div><h2 id="remote-library-title">Remote library</h2>{config?.configured && <p className="ll-muted">{config.provider === "convex" ? "Convex" : "PostgreSQL"} · {config.host}</p>}{syncing && <p className="ll-muted">{progress ? `${progress.phase} ${progress.counts}` : "Syncing…"}</p>}</div>
       </summary>
       <div className={styles.sectionBody} aria-labelledby="remote-library-title">
+      {config?.configured && syncStatus && <section className={styles.syncProgress} aria-label="Synchronization status">
+        <strong>{syncing ? progress?.phase ?? "Syncing…" : describeSyncStatus(syncStatus).label}</strong>
+        {syncing && <progress aria-label="Sync progress" />}
+        <p role="status">{syncing ? progress?.counts ?? "Waiting for the sync provider…" : describeSyncStatus(syncStatus).detail}</p>
+        {syncing && <small className="ll-muted">The remote total is not known yet; received changes update as each batch finishes.</small>}
+      </section>}
       {config === undefined ? (
         <Loading>Reading configuration…</Loading>
       ) : config.configured ? (

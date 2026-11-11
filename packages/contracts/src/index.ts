@@ -1065,6 +1065,13 @@ export interface ImportSourceProfile {
   readonly lastImportedAt: number;
 }
 
+export interface ImportBookMatch {
+  readonly providerRecordId: string;
+  readonly candidates: readonly { readonly bookId: BookId; readonly title: string; readonly authors: readonly string[]; readonly archived: boolean }[];
+  readonly links: readonly { readonly sourceId: string; readonly bookId: BookId }[];
+}
+export interface ImportBookSelection { readonly providerRecordId: string; readonly bookId: BookId | null }
+
 export interface PendingImport {
   readonly token: string;
   readonly fileName: string;
@@ -1072,11 +1079,13 @@ export interface PendingImport {
   readonly preview: ImportPreview;
   readonly sourceProfiles: readonly ImportSourceProfile[];
   readonly newSourceId: string;
+  readonly bookMatches?: readonly ImportBookMatch[];
   readonly suggestedSourceId?: string;
   readonly suggestedSourceName: string;
 }
 
 export interface CommitImport {
+  readonly bookSelections?: readonly ImportBookSelection[];
   readonly token: string;
   readonly sourceId: string;
   readonly newSourceName?: string;
@@ -1587,7 +1596,14 @@ export type SyncRunResult =
  * Background sync as the header shows it. `off` means no sync provider is set
  * up; a finished run keeps its result, or the message it failed with.
  */
+export interface SyncProgress extends SyncRunCounts {
+  readonly phase: "connect" | "prepare" | "push" | "pull";
+  /** Local queued edits only; the remote does not advertise a reliable total. */
+  readonly remaining?: number;
+}
+
 export interface SyncStatus {
+  readonly progress?: SyncProgress;
   readonly state: "off" | "idle" | "syncing";
   readonly lastFinishedAt?: number;
   readonly lastResult?: SyncRunResult;
@@ -1844,9 +1860,10 @@ export const CALIBRE_CHOOSE_CHANNEL = "calibre:choose";
 export const CALIBRE_SEARCH_CHANNEL = "calibre:search";
 export const CALIBRE_LINK_CHANNEL = "calibre:link";
 export const EPUB_UNLINK_CHANNEL = "epub:unlink";
-export interface CalibreReference { readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
-export interface CalibreConnection { readonly libraryId: string; readonly name: string; readonly epubCount: number }
-export interface CalibreBook { readonly uuid: string; readonly title: string; readonly authors: readonly string[]; readonly isbn13?: string; readonly match: "isbn" | "title-author" | "none" }
+export type CalibreFormat = "EPUB" | "KEPUB";
+export interface CalibreReference { readonly format?: CalibreFormat; readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
+export interface CalibreConnection { readonly libraryId: string; readonly name: string; readonly bookCount: number }
+export interface CalibreBook { readonly formats: readonly CalibreFormat[]; readonly uuid: string; readonly title: string; readonly authors: readonly string[]; readonly isbn13?: string; readonly match: "isbn" | "title-author" | "none" }
 export interface CalibreSearch { readonly books: readonly CalibreBook[]; readonly hasMore: boolean }
 
 export const EPUB_ATTACH_CHANNEL = "epub:attach";
@@ -1864,7 +1881,7 @@ export interface LeaflogueBridge {
     describe(): Promise<CalibreConnection | undefined>;
     choose(): Promise<CalibreConnection | undefined>;
     search(bookId: BookId, query: string): Promise<CalibreSearch>;
-    link(bookId: BookId, bookUuid: string): Promise<EpubDocument>;
+    link(bookId: BookId, bookUuid: string, format?: CalibreFormat): Promise<EpubDocument>;
   };
   readonly catalog?: { search(query: string): Promise<CatalogSearch> };
   /** Desktop-only, local book files. Never automatically uploaded with library sync. */

@@ -272,6 +272,7 @@ const syncService = createDesktopSyncService({
   getLibrary: () => library,
   readConfig: () => readRemoteConfig(),
   createPostgresClient,
+  onProgress: (progress) => syncTracker.progress(progress),
   createConvexTransport: async (config, deviceId, runOptions, signal) => {
     if (!config.syncKey) throw Object.assign(new Error("Save the Convex sync key before synchronizing"), { code: "LEAFLOGUE_SYNC_KEY_UNCONFIGURED" });
     const { mutationContractVersion } = await assertCompatibleConvexDeployment(config.deploymentUrl, { releaseVersion: app.getVersion(), signal });
@@ -512,10 +513,11 @@ void app.whenReady().then(async () => {
     if (typeof query !== "string") throw new Error("Invalid Calibre search.");
     return calibre().search(query, library!.getBookContents(bookId)!.book);
   });
-  registerTrustedHandler(ipcMain, CALIBRE_LINK_CHANNEL, () => app.isPackaged, async (id: unknown, uuid: unknown) => {
+  registerTrustedHandler(ipcMain, CALIBRE_LINK_CHANNEL, () => app.isPackaged, async (id: unknown, uuid: unknown, format: unknown = "EPUB") => {
     const bookId = epubBook(id); const store = epubStore(); const service = calibre();
     if (typeof uuid !== "string") throw new Error("Choose a Calibre book.");
-    const linked = await service.reference(uuid);
+    if (format !== "EPUB" && format !== "KEPUB") throw new Error("Choose EPUB or KEPUB from Calibre.");
+    const linked = await service.reference(uuid, format);
     return store.attach(bookId, linked.path, linked.reference);
   });
   registerTrustedHandler(ipcMain, EPUB_UNLINK_CHANNEL, () => app.isPackaged, (id: unknown) => epubStore().unlink(epubBook(id)));
@@ -523,7 +525,7 @@ void app.whenReady().then(async () => {
   registerTrustedHandler(ipcMain, EPUB_ATTACH_CHANNEL, () => app.isPackaged, async (id: unknown) => {
     const bookId = epubBook(id);
     const store = epubStore();
-    const chosen = await dialog.showOpenDialog({ title: "Attach a local DRM-free EPUB", properties: ["openFile"], filters: [{ name: "EPUB books", extensions: ["epub"] }] });
+    const chosen = await dialog.showOpenDialog({ title: "Attach a local DRM-free EPUB or KEPUB", properties: ["openFile"], filters: [{ name: "EPUB and Kobo EPUB books", extensions: ["epub", "kepub"] }] });
     if (chosen.canceled || !chosen.filePaths[0]) return undefined;
     const path = chosen.filePaths[0];
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
@@ -759,11 +761,20 @@ void app.whenReady().then(async () => {
     const existingSource = pending.sourceProfiles.find(({ id }) => id === input.sourceId);
     if (!existingSource && input.sourceId !== pending.newSourceId) throw new Error("Import source was not reviewed");
     if (!existingSource && !input.newSourceName) throw new Error("Import source name is required");
+    const selections = new Map(input.bookSelections?.map((selection) => [selection.providerRecordId, selection.bookId]));
+    for (const match of pending.bookMatches ?? []) {
+      if (match.links.some((link) => link.sourceId === input.sourceId)) continue;
+      if (!selections.has(match.providerRecordId)) throw new Error("Review the existing book matches before importing.");
+      const selected = selections.get(match.providerRecordId);
+      if (selected !== null && !match.candidates.some((candidate) => candidate.bookId === selected)) throw new Error("That book was not part of the import review.");
+    }
+    if (input.bookSelections?.some((selection) => !pending.bookMatches?.some((match) => match.providerRecordId === selection.providerRecordId))) throw new Error("That book was not part of the import review.");
     if (committingImports.has(input.token)) throw new Error("Import is already being committed");
     committingImports.add(input.token);
     try {
       const receipt = library.importDocument({
         document: pending.preview.document,
+        ...(input.bookSelections ? { bookSelections: input.bookSelections } : {}),
         fileName: pending.fileName,
         provider: pending.provider,
         source: {
@@ -1406,13 +1417,15 @@ function holdImport(provider: ImportProvider, preview: ImportPreview, selectedPa
     name,
     lastImportedAt,
   }));
-  const suggestedSourceId = storedProfiles.find((profile) => profile.pathHintHash === pathHintHash)?.id;
+  const suggestedSourceId = storedProfiles.find((profile) => profile.pathHintHash === pathHintHash)?.id ?? (storedProfiles.length === 1 ? storedProfiles[0]!.id : undefined);
+  const bookMatches = library.reviewImportBooks(preview.document, provider);
   const pending: PendingImport & { readonly pathHintHash: string } = {
     token,
     fileName: basename(selectedPath),
     provider,
     preview,
     sourceProfiles,
+    bookMatches,
     newSourceId: randomUUID(),
     ...(suggestedSourceId ? { suggestedSourceId } : {}),
     suggestedSourceName: suggestedImportSourceName(provider, selectedPath),
@@ -1427,6 +1440,7 @@ function holdImport(provider: ImportProvider, preview: ImportPreview, selectedPa
     provider,
     preview,
     sourceProfiles,
+    bookMatches,
     newSourceId: pending.newSourceId,
     ...(suggestedSourceId ? { suggestedSourceId } : {}),
     suggestedSourceName: pending.suggestedSourceName,

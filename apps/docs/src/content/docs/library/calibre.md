@@ -6,6 +6,17 @@ description: Read Calibre-managed EPUBs without copying them or changing your Ca
 Calibre linking is included in the experimental **0.1.1-beta.1** desktop
 release. See the [release notes](/start/release-notes/).
 
+:::note[Format selection in development]
+The 0.1.1-beta.2 candidate adds a **Book format** choice for EPUB and
+KEPUB (Kobo EPUB). Each book appears once with its available supported formats;
+choose one, then confirm **Link selected EPUB** or **Link selected KEPUB**.
+The selected format is remembered, including after Calibre renames. If it is
+removed, Leaflogue reports it instead of silently opening another format.
+The published 0.1.0-beta.3 download does not include the reader. These changes
+are preparing for the next public beta. Files are read in place, without
+conversion or copies.
+:::
+
 ## Choose a library and edition
 
 1. Open the book in Leaflogue and choose **Read**, then **Link from Calibre**.

@@ -1,7 +1,8 @@
-import type { SyncRunOptions, SyncRunResult, SyncStatus } from "@leaflogue/contracts";
+import type { SyncProgress, SyncRunOptions, SyncRunResult, SyncStatus } from "@leaflogue/contracts";
 
 export interface SyncStatusTracker {
   current(): SyncStatus;
+  progress(progress: SyncProgress): void;
   /** Run a sync, or join the one already running, and publish each change of state. */
   run(options?: SyncRunOptions): Promise<SyncRunResult>;
   /** Re-read whether sync is set up, after the reader changes the provider. */
@@ -30,6 +31,7 @@ export function createSyncStatusTracker(options: {
 
   return {
     current: () => status,
+    progress(progress) { if (status.state === "syncing") set({ ...status, progress }); },
     run(runOptions) {
       if (inFlight) return inFlight;
       set({ ...status, state: "syncing" });

@@ -2391,3 +2391,28 @@ describe("command palette", () => {
     expect(chooseReader).toHaveBeenCalledWith("a".repeat(32));
   });
 });
+
+
+it("shows live sync phases, counters, and completion in Settings", async () => {
+  const listeners = new Set<(status: import("@leaflogue/contracts").SyncStatus) => void>();
+  override({ remote: { describe: vi.fn().mockResolvedValue({ configured: true, provider: "convex", host: "example.convex.cloud", deployment: "example", source: "file", transport: "tls", syncKeySaved: true }) }, sync: {
+    status: vi.fn().mockResolvedValue({ state: "idle" }),
+    onStatus: (listener: (status: import("@leaflogue/contracts").SyncStatus) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  } });
+  await render(); await visit("#/settings");
+  const status = document.querySelector('section[aria-label="Synchronization status"]');
+  expect(status).not.toBeNull();
+  await act(async () => {
+    for (const listener of listeners) listener({ state: "syncing", progress: { phase: "pull", pushed: 12, pulled: 150, superseded: 2, bootstrapped: 0, remaining: 0 } });
+    await tick();
+  });
+  expect(status?.textContent).toContain("Receiving changes…");
+  expect(status?.textContent).toContain("12 sent · 150 received · 2 already current · 0 queued");
+  expect(status?.querySelector("progress")?.hasAttribute("value")).toBe(false);
+  await act(async () => {
+    for (const listener of listeners) listener({ state: "idle", lastFinishedAt: 1700000000000, lastResult: { status: "complete", bootstrapped: 0, pushed: 12, pulled: 180, superseded: 2 } });
+    await tick();
+  });
+  expect(status?.textContent).toContain("12 sent, 180 received, 2 already current");
+  expect(status?.querySelector("progress")).toBeNull();
+});

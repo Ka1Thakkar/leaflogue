@@ -37,6 +37,13 @@ describe("main-process IPC security", () => {
     }
   });
 
+  it("validates explicit imported-book destinations and rejects ambiguous payloads", () => {
+    expect(validateCommitImport({ token: firstId, sourceId: secondId, bookSelections: [{ providerRecordId: "kobo-volume", bookId: firstId }, { providerRecordId: "another-volume", bookId: null }] }).bookSelections).toHaveLength(2);
+    for (const bookSelections of [null, {}, [null], [{ providerRecordId: "volume", bookId: "bad" }], [{ providerRecordId: "", bookId: firstId }], [{ providerRecordId: "volume", bookId: firstId }, { providerRecordId: "volume", bookId: null }]]) {
+      expect(() => validateCommitImport({ token: firstId, sourceId: secondId, bookSelections })).toThrow(/selection/i);
+    }
+  });
+
   it("allows only a validated conflict id and explicit resolution", () => {
     expect(validateConflictResolution({ id: firstId, resolution: "keep-local" }))
       .toEqual({ id: firstId, resolution: "keep-local" });
