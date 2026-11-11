@@ -1,4 +1,4 @@
-# 0.1.0-beta.2 release readiness
+# 0.1.0-beta.3 release readiness
 
 Status: experimental public beta authorized, 10 November 2026.
 This is a prerelease, with the manual checks below explicitly deferred.
@@ -36,7 +36,7 @@ must not be treated as evidence for later source changes or an untested target.
       Record observed Gatekeeper/SmartScreen prompts; claim no publisher trust.
 - [x] Maintainer approved experimental publication with the manual acceptance
       checks above still pending, disclosed in the release notes (10 November 2026).
-      This exception applies to 0.1.0-beta.2, not a stable release.
+      This exception applies to 0.1.0-beta.3, not a stable release.
 - [ ] Review final tagged CI, notes, checksums and publish the matching prerelease.
 
 The unchecked human checks are unperformed, not passed or replaced by CI.

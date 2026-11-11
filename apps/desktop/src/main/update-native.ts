@@ -63,9 +63,13 @@ function Restart-Leaflogue {
   }
 }
 try {
+  # Capture the process identity before telling the app it may quit.
+  $parentProcess = Get-Process -Id $cfg.parent -ErrorAction SilentlyContinue
+  if ($parentProcess) { $null = $parentProcess.Handle }
   Write-State 'waiting-for-app-exit'
-  Wait-Process -Id $cfg.parent -Timeout 60 -ErrorAction SilentlyContinue
-  if (Get-Process -Id $cfg.parent -ErrorAction SilentlyContinue) { exit 1 }
+  if ($parentProcess -and -not $parentProcess.WaitForExit(60000)) {
+    throw 'The application did not exit within 60 seconds'
+  }
   # NSIS /D consumes everything after it, including spaces, without quotes.
   Write-State 'installing'
   $install = Start-Process -FilePath $cfg.installer -ArgumentList ('/S /currentuser --updated /D=' + $cfg.directory) -PassThru -WindowStyle Hidden
