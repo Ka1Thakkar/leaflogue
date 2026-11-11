@@ -10,13 +10,14 @@ download. See the [release notes](/start/release-notes/).
 :::
 
 :::note[Format selection in development]
-After 0.1.1-beta.1, the source adds a **Book format** choice for EPUB and
+The 0.1.1-beta.2 candidate adds a **Book format** choice for EPUB and
 KEPUB (Kobo EPUB). Each book appears once with its available supported formats;
 choose one, then confirm **Link selected EPUB** or **Link selected KEPUB**.
 The selected format is remembered, including after Calibre renames. If it is
 removed, Leaflogue reports it instead of silently opening another format.
-The published 0.1.1-beta.1 reader links EPUB only; this selector is for a
-follow-up beta. Files are read in place, without conversion or copies.
+The published 0.1.0-beta.3 download does not include the reader. These changes
+are preparing for the next public beta. Files are read in place, without
+conversion or copies.
 :::
 
 ## Choose a library and edition
