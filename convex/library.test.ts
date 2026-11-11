@@ -129,6 +129,25 @@ describe("Convex online mutation parity", () => {
     expect(changes.map(({ entityType, revision }) => [entityType, revision])).toEqual([["book", 2], ["book", 3]]);
   });
 
+  it("ignores retained ISBN tombstones before bounding live collision checks", async () => {
+    const t = convexTest(schema, convexModules);
+    await seedLibrary(t);
+    const isbn13 = "9780306406157";
+    const liveId = await t.run(async (ctx) => {
+      const row = { libraryId: LIBRARY, title: "Retained copy", authors: [], status: "unread" as const, archived: false, highlightCount: 0, noteCount: 0, readingDataBytes: 0, revision: 1, createdAt: 1, updatedAt: 1, isbn13 };
+      await ctx.db.insert("books", { ...row, id: "70000000-0000-4000-8000-000000000001", deletedAt: 2 });
+      await ctx.db.insert("books", { ...row, id: "70000000-0000-4000-8000-000000000002", deletedAt: 2 });
+      return ctx.db.insert("books", { ...row, id: "70000000-0000-4000-8000-000000000003", title: "Live owner" });
+    });
+    const input = { libraryId: LIBRARY, id: SOURCE_BOOK, expectedRevision: 1, title: "Surviving book", authors: [], isbn13 };
+    await expect(t.mutation(functions.updateBookMetadata, input)).rejects.toThrow(/Another book already has that ISBN-13/u);
+    await t.run((ctx) => ctx.db.patch(liveId, { deletedAt: 3 }));
+    await expect(t.mutation(functions.updateBookMetadata, input)).resolves.toMatchObject({ isbn13, revision: 2 });
+    await expect(t.mutation(functions.updateBookMetadata, { ...input, title: "Edited after cleanup", expectedRevision: 2 })).resolves.toMatchObject({ title: "Edited after cleanup", isbn13, revision: 3 });
+    const removed = await t.run((ctx) => ctx.db.query("books").withIndex("by_library_and_isbn13", (q) => q.eq("libraryId", LIBRARY).eq("isbn13", isbn13)).collect());
+    expect(removed.filter((book) => book.deletedAt !== undefined)).toHaveLength(3);
+  });
+
   it("normalizes metadata exactly like the shared domain rule", () => {
     for (const input of [
       { title: "  Jonathan   Strange ", authors: [" A ", "", "A", "B"], description: "  One.\n\nTwo.  ", publisher: " ", series: " S  1 ", isbn13: "978-1-63557-563-7" },

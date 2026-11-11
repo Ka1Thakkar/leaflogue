@@ -2,8 +2,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LeaflogueBridge } from "@leaflogue/contracts";
-import { BookForm } from "./BookForms";
+import type { Book, LeaflogueBridge } from "@leaflogue/contracts";
+import { BookForm, MetadataForm } from "./BookForms";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -101,4 +101,48 @@ it("ignores a slow response for a superseded query", async () => {
   await act(async () => { finishOld!({ source: "google-books", items: [{ ...item, title: "Outdated result" }] }); });
   expect(container.querySelector("li button")?.textContent).toContain(item.title);
   expect(container.textContent).not.toContain("Outdated result");
+});
+
+
+const metadataBook: Book = { ...book, id: book.id as Book["id"], status: "unread" as const, archived: false, createdAt: 1, updatedAt: 1, highlightCount: 0, isbn13: "9780306406157" };
+async function metadataEditor(latest = metadataBook) {
+  Object.defineProperty(window, "leaflogue", { configurable: true, value: { library: { updateBookMetadata, getBookContents: vi.fn().mockResolvedValue({ book: latest, highlights: [], standaloneNotes: [] }) } } as unknown as LeaflogueBridge });
+  await act(async () => { root.render(<MetadataForm book={metadataBook} onClose={onClose} onSaved={onSaved} />); await tick(); });
+}
+
+describe("metadata save feedback", () => {
+  it("identifies an invalid ISBN before sending and keeps the edited field", async () => {
+    await metadataEditor();
+    container.querySelector<HTMLInputElement>('input[name="isbn13"]')!.value = "123";
+    await submit("Edit book metadata");
+    expect(updateBookMetadata).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("valid 13-digit ISBN");
+    expect(container.querySelector<HTMLInputElement>('input[name="isbn13"]')!.value).toBe("123");
+  });
+  it("explains ISBN collisions without exposing raw IPC or database errors", async () => {
+    await metadataEditor();
+    updateBookMetadata.mockRejectedValue(new Error("Error invoking remote method: Error: Another book already has that ISBN-13"));
+    await submit("Edit book metadata");
+    expect(container.textContent).toContain("Another book already uses this ISBN-13");
+    expect(container.textContent).not.toContain("remote method");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+  it("retries a stale revision only when the latest metadata is unchanged", async () => {
+    await metadataEditor({ ...metadataBook, revision: 2 });
+    container.querySelector<HTMLInputElement>('input[name="title"]')!.value = "My edited title";
+    updateBookMetadata.mockRejectedValueOnce(new Error("Book changed elsewhere or no longer exists")).mockResolvedValueOnce({ ...metadataBook, title: "My edited title", revision: 3 });
+    await submit("Edit book metadata");
+    expect(updateBookMetadata).toHaveBeenCalledTimes(2);
+    expect(updateBookMetadata).toHaveBeenLastCalledWith(expect.objectContaining({ title: "My edited title", expectedRevision: 2 }));
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ title: "My edited title", revision: 3 }));
+  });
+  it("preserves the draft and refuses to overwrite metadata changed through sync", async () => {
+    await metadataEditor({ ...metadataBook, title: "Changed through sync", revision: 2 });
+    container.querySelector<HTMLInputElement>('input[name="title"]')!.value = "My edited title";
+    updateBookMetadata.mockRejectedValue(new Error("Book changed elsewhere or no longer exists"));
+    await submit("Edit book metadata");
+    expect(updateBookMetadata).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("changed while the editor was open");
+    expect(container.querySelector<HTMLInputElement>('input[name="title"]')!.value).toBe("My edited title");
+  });
 });
