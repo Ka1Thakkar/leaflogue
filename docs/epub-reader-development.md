@@ -1,8 +1,7 @@
 # Local EPUB reader development
 
-The first 0.1.1 development slice is available from a desktop book page:
-**Read**, then **Attach EPUB** in the right-hand Reader tab. This is source functionality, not part of
-the published 0.1.0 beta. Attach a DRM-free text EPUB to an existing book.
+The 0.1.1-beta.1 reader is available from a desktop book page:
+**Read**, then **Attach EPUB** in the right-hand Reader tab. This is included in the experimental 0.1.1-beta.1 release. Attach a DRM-free text EPUB to an existing book.
 
 The reader follows the EPUB spine and lays the book out as reflowable pages.
 Arrow keys, Page Up/Down, Space (Shift+Space goes back), mouse-wheel movement,
@@ -41,7 +40,7 @@ resume points are accepted only for that edition and valid chapter/paragraph
 indices. This data stays on this device and is never sent by library sync.
 
 **SQLite backups and library exports do not include attachments or resume points.**
-Keep your original EPUBs. To preserve this development reader's local state,
+Keep your original EPUBs. To preserve the reader's local state,
 copy the sidecar directory separately while the app is closed. Restoring a
 SQLite backup does not restore or roll back this directory. Merging books does
 not move their attachments yet; attach to the book you intend to keep.

@@ -52,7 +52,7 @@ it back to icons. Leaflogue remembers your choice.
 
 ## Reader and Assistant panel
 
-In 0.1.1 development builds, the header's rightmost button opens or closes a
+In 0.1.1, the header's rightmost button opens or closes a
 right-hand context panel with **Reader** and **Assistant** tabs. **Read** on
 a desktop book opens the Reader; **Explain this passage** opens the Assistant.
 Drag the panel's left edge to resize it. Its expand control fills the workspace;

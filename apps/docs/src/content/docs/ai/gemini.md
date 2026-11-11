@@ -26,8 +26,7 @@ provider may have different terms.
 ## Explain a passage
 
 Point at a passage, or focus its controls with <kbd>Tab</kbd>, then choose
-**Explain this passage** to open the reading companion. In 0.1.1 development
-builds it opens in the right context panel's **Assistant** tab; 0.1.0 uses a
+**Explain this passage** to open the reading companion. In 0.1.1 it opens in the right context panel's **Assistant** tab; 0.1.0 uses a
 side sheet. After any required consent, the explanation starts.
 
 The first time you use a provider, the companion shows exactly what would be sent

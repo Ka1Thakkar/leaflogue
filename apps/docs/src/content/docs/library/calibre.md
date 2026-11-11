@@ -3,11 +3,8 @@ title: Link your Calibre library
 description: Read Calibre-managed EPUBs without copying them or changing your Calibre library.
 ---
 
-:::note[Available in 0.1.1 development builds]
-Calibre linking is part of the desktop EPUB reader in the source and local
-`0.1.1-beta.1` build. It is not included in the published `0.1.0-beta.3`
-download. See the [release notes](/start/release-notes/).
-:::
+Calibre linking is included in the experimental **0.1.1-beta.1** desktop
+release. See the [release notes](/start/release-notes/).
 
 ## Choose a library and edition
 

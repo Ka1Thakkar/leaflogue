@@ -19,13 +19,13 @@ review what Leaflogue found, name the source, and confirm the import. The
 [importing guide](/library/importing/) shows where each reader keeps its files.
 
 You can also choose **Add book** and enter its title and author manually.
-In 0.1.1 development builds, **Search books online** finds editions by title,
+In 0.1.1, **Search books online** finds editions by title,
 author, or ISBN. Search starts after you type at least two characters and
 pause briefly; **Search books** or Enter searches immediately. Queries go to
 Google Books, with Open Library as a fallback. Choose an edition, review its
 details, and save. Manual entry remains available offline.
 
-In those builds, **Read** on a desktop book page opens the
+In the desktop app, **Read** on a desktop book page opens the
 [EPUB reader](/library/epub/). Link your file directly or
 [choose it from Calibre](/library/calibre/); no duplicate EPUB is created.
 

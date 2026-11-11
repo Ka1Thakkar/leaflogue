@@ -3,11 +3,9 @@ title: Read an EPUB
 description: Link a local EPUB, turn pages, and keep highlights and notes beside your book.
 ---
 
-:::note[Available in 0.1.1 development builds]
-These features are merged into the source and included in the local
-`0.1.1-beta.1` build. The published `0.1.0-beta.3` download does not include
-them yet. Check the [release notes](/start/release-notes/) before downloading.
-:::
+The EPUB reader is included in the experimental **0.1.1-beta.1** desktop
+release. See the [release notes](/start/release-notes/) for downloads and
+known limitations.
 
 ## Link your book file
 

@@ -43,7 +43,7 @@ where it left off.
 
 ## EPUB files and reading positions
 
-In 0.1.1 development builds, the reader links EPUBs in their original location.
+In 0.1.1, the reader links EPUBs in their original location.
 SQLite backups and library exports include saved library highlights and notes,
 but do not include EPUB files, local file links, Calibre connections, or reading
 positions. Back up your original EPUBs or Calibre library separately.
