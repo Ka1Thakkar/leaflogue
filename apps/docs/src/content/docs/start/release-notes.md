@@ -1,14 +1,14 @@
 ---
-title: 0.1.1-beta.1 release notes
+title: 0.1.1-beta.2 release notes
 description: What the reader beta adds, its known limits, and where to get it.
 ---
 
-**Release status: experimental public beta, `0.1.1-beta.1`.** Automated
+**Release status: experimental public beta, `0.1.1-beta.2`.** Automated
 source, native package, and MCP checks pass. Clean-desktop installation,
 manual updates/uninstall, and actual Orca, VoiceOver, and Narrator checks
 remain pending. The maintainer approved experimental publication with these
 limitations disclosed. Back up your library before testing.
-Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.1).
+Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.2).
 This prerelease is not a signed stable update feed.
 
 ## Included
@@ -37,20 +37,28 @@ first version is read-only. Source and packaged-client automation passed on Mac,
 the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
-## New in 0.1.1-beta.1
+## New in 0.1.1-beta.2
 
 This release adds:
 
 - A paged [desktop EPUB reader](/library/epub/) with remembered position,
   keyboard page turns, and an in-app right-click options overlay.
-- [Calibre library linking](/library/calibre/), reading the original EPUB
-  without copying it or changing Calibre's catalogue.
+- [Calibre library linking](/library/calibre/), with a choice of EPUB or KEPUB,
+  reading the original file without copies, conversion, or catalogue changes.
 - Confirmed highlight creation, notes with margin icons, clickable saved
   highlights, and navigation between a library passage and its EPUB context.
 - A resizable right context panel with Reader and Assistant tabs, plus reader
   light/dark mode and optional theme-colour mapping.
 - Google Books search as you type in Add book, with Open Library fallback
   and manual entry.
+- Reviewed existing-book destinations when importing on a synced computer,
+  preventing duplicate books when that device lacks local import history.
+  Exact unique highlights and imported notes are reattached to the same records.
+- Live sync phases, sent/received counts, and queued edits in Settings.
+
+The earlier 0.1.1-beta.1 candidate was not published. This beta includes the
+cross-device Kobo import fix. Earlier duplicate copies remain for review;
+this release does not remove them automatically.
 
 EPUB files, local links, Calibre connections, and reading positions stay on
 this device. SQLite backups and library exports do not include them; back up

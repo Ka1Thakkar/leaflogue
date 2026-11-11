@@ -3,14 +3,15 @@ title: Read an EPUB
 description: Link a local EPUB, turn pages, and keep highlights and notes beside your book.
 ---
 
-The EPUB reader is included in the experimental **0.1.1-beta.1** desktop
+The EPUB reader is included in the experimental **0.1.1-beta.2** desktop
 release. See the [release notes](/start/release-notes/) for downloads and
 known limitations.
 
 ## Link your book file
 
 In the desktop app, open a book and choose **Read**. In the right-hand
-**Reader** tab, choose **Attach EPUB** and select a DRM-free, reflowable EPUB.
+**Reader** tab, choose **Attach EPUB** and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
+`.kepub.epub`).
 Leaflogue links the original file; it does not make another copy. Keep that
 file available where you attached it. If Calibre manages your books, use
 [Link from Calibre](/library/calibre/) so Leaflogue can follow catalogue renames.

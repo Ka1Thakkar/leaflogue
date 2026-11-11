@@ -1,7 +1,7 @@
 # Local EPUB reader development
 
-The 0.1.1-beta.1 reader is available from a desktop book page:
-**Read**, then **Attach EPUB** in the right-hand Reader tab. This is included in the experimental 0.1.1-beta.1 release. Attach a DRM-free text EPUB to an existing book.
+The 0.1.1-beta.2 reader is available from a desktop book page:
+**Read**, then **Attach EPUB** in the right-hand Reader tab. This is included in the experimental 0.1.1-beta.2 release. Attach a DRM-free text EPUB to an existing book.
 
 The reader follows the EPUB spine and lays the book out as reflowable pages.
 Arrow keys, Page Up/Down, Space (Shift+Space goes back), mouse-wheel movement,

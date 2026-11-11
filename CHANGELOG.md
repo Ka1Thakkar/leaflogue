@@ -4,19 +4,23 @@ Notable changes to Leaflogue are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 the policy in [`docs/release-process.md`](docs/release-process.md).
 
-Current experimental beta: `v0.1.1-beta.1`. Release
+Current experimental beta: `v0.1.1-beta.2`. Release
 gates are in [`docs/release-readiness.md`](docs/release-readiness.md).
 
-## 0.1.1-beta.1 — 2026-11-11
+## 0.1.1-beta.2 — 2026-11-11
 
 - Add a local paged EPUB reader with keyboard navigation, saved position,
   publisher formatting, an in-app options overlay, and dark/theme colours.
-- Link Calibre-managed EPUBs read-only and in place, without duplicate files.
+- Link Calibre-managed EPUB/KEPUB files read-only and in place, with an explicit
+  format choice and no copies or conversion.
 - Add confirmed highlight and note creation, clickable annotations and note
   icons, and navigation between library passages and their reader context.
 - Add a resizable right context sidebar with Reader and Assistant tabs.
 - Search Google Books as you type in Add book, with Open Library fallback.
 - Document reader controls, Calibre linking, and local-file backup limits.
+- Review matching existing books when importing on a second synced desktop,
+  reattaching exact source highlights/notes without duplicating the book.
+- Show live sync phases, sent/received counts, and queued edits in Settings.
 
 This is an experimental beta. Original files, local links, and reading positions
 are not synced or included in SQLite backups/exports. File sync, PDFs, DRM,
