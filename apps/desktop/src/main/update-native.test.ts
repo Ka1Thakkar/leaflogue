@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
@@ -45,12 +44,7 @@ describe("native update installation boundary", () => {
     const helper = await launchUpdateHelper(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, config], join(path, "helper.log"));
     const waitState = async (expected: string) => {
       for (let i = 0; i < 100; i += 1) {
-        let value: string | undefined;
-        try { value = await readFile(state, "utf8"); }
-        catch (error) {
-          if (!(error instanceof Error) || !("code" in error) || !["ENOENT", "EBUSY"].includes(String(error.code))) throw error;
-        }
-        if (value?.trim() === expected) return;
+        if (existsSync(state) && readFileSync(state, "utf8").trim() === expected) return;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       throw new Error(`Windows helper did not reach ${expected}`);
