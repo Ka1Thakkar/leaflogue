@@ -37,8 +37,26 @@ first version is read-only. Source and packaged-client automation passed on Mac,
 the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
-The integrated book reader and book-file sync are not included. Future plans
-are tracked in the [development roadmap](https://github.com/Ka1Thakkar/leaflogue/blob/main/docs/roadmap.md).
+## Upcoming: 0.1.1 reader beta
+
+The merged source and local `0.1.1-beta.1` build now include:
+
+- A paged [desktop EPUB reader](/library/epub/) with remembered position,
+  keyboard page turns, and an in-app right-click options overlay.
+- [Calibre library linking](/library/calibre/), reading the original EPUB
+  without copying it or changing Calibre's catalogue.
+- Confirmed highlight creation, notes with margin icons, clickable saved
+  highlights, and navigation between a library passage and its EPUB context.
+- A resizable right context panel with Reader and Assistant tabs, plus reader
+  light/dark mode and optional theme-colour mapping.
+- Google Books search as you type in Add book, with Open Library fallback
+  and manual entry.
+
+These changes are **not included in the published 0.1.0-beta.3 download**.
+A public 0.1.1 release has not been published yet. The guides label these
+features as development-build functionality. Book-file sync, PDFs, and DRM
+remain outside this reader version. Further scope is tracked in the
+[development roadmap](https://github.com/Ka1Thakkar/leaflogue/blob/main/docs/roadmap.md).
 
 ## Downloads and compatibility
 

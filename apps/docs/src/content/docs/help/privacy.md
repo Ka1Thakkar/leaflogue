@@ -12,6 +12,11 @@ SQLite file in your [data folder](/start/files-and-settings/). Saved database
 URLs, sync keys, and AI keys live in a settings file only your user account
 can read. There is no account, no analytics, and no telemetry.
 
+In 0.1.1 development builds, EPUB files stay in their original location.
+Local file links, Calibre connections, and reading positions are stored beside
+the library and are not uploaded by sync. Calibre's catalogue is read-only.
+The EPUB reading surface blocks scripts and external network resources.
+
 ## When Leaflogue uses the network
 
 Only in these cases, each of which you turn on or start:
@@ -24,7 +29,10 @@ Only in these cases, each of which you turn on or start:
 - **AI**, when you ask it to explain a passage, to the provider you chose,
   after showing you what will be sent.
 - **Book lookup**, when you choose to find or fill in book details. Your search
-  terms or book identifiers go to the configured catalogue providers.
+  terms or book identifiers go to the configured catalogue providers. In the
+  0.1.1 Add book form, typing at least two characters and pausing starts a
+  Google Books search automatically, with Open Library as a fallback. Your
+  library and notes are not sent with that search.
 - **Updates**, when you choose **Check for updates**, or if you enable the
   optional daily check. Leaflogue asks GitHub Releases for version metadata;
   it downloads an update only when you choose to install it.

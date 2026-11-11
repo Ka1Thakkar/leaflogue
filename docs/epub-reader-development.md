@@ -6,11 +6,11 @@ the published 0.1.0 beta. Attach a DRM-free text EPUB to an existing book.
 
 The reader follows the EPUB spine and lays the book out as reflowable pages.
 Arrow keys, Page Up/Down, Space (Shift+Space goes back), mouse-wheel movement,
-edge clicks, and the page controls turn pages across chapters. The chapter
-picker jumps directly to a section. Reading position saves automatically,
+edge clicks turn pages across chapters. The chapter picker in reader options
+jumps directly to a section. Reading position saves automatically,
 including a character offset within long paragraphs. Text size and panel size
-reflow the pages while retaining the anchored text. It uses the application's
-current colours. Closing and reopening the application
+reflow the pages while retaining the anchored text. Plain dark/light paper
+and optional theme-colour mapping are available. Closing and reopening the application
 retains the attachment and resume point. The existing global offline dictionary
 can define selected words in this reading surface.
 
@@ -35,7 +35,7 @@ Dictionary selection works in the Reader tab too.
 Only a local file reference and resume metadata are saved in
 `<library.sqlite>.epubs/`, beside the active SQLite library. EPUB bytes remain
 in their original location and are never copied or modified. Each book has one
-linked edition; replacement and removal are not implemented yet. A SHA-256
+linked edition; unlink it before linking a different edition. A SHA-256
 identity is computed from the original file;
 resume points are accepted only for that edition and valid chapter/paragraph
 indices. This data stays on this device and is never sent by library sync.

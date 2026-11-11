@@ -26,10 +26,11 @@ provider may have different terms.
 ## Explain a passage
 
 Point at a passage, or focus its controls with <kbd>Tab</kbd>, then choose
-**Explain this passage**. The side sheet opens and the explanation starts
-right away.
+**Explain this passage** to open the reading companion. In 0.1.1 development
+builds it opens in the right context panel's **Assistant** tab; 0.1.0 uses a
+side sheet. After any required consent, the explanation starts.
 
-The first time you use a provider, the sheet shows exactly what would be sent
+The first time you use a provider, the companion shows exactly what would be sent
 before anything leaves your computer. Review it and choose **Send to** the
 named provider. You won't be asked again for that provider.
 
@@ -40,14 +41,15 @@ reveal more than you wanted.
 
 ## Ask follow-ups or save an answer
 
-Answers scroll inside the side sheet. Type a question in the box at the bottom
+Answers scroll inside the companion. Type a question in the box at the bottom
 to keep talking about the same passage. Questions that aren't about the
 passage get a short refusal instead of an answer.
 
 Choose **Save as note** under any answer to keep it beside the passage. The
 note is labelled as AI-generated and becomes part of your library. Nothing
-else from the conversation is saved, and closing the sheet stops a request
-that is still running.
+else from the conversation is saved. In 0.1.1, switching tabs or collapsing
+the context panel preserves the session; conversations do not survive an app
+restart. In 0.1.0, closing the side sheet stops a request still running.
 
 ## Other providers and local servers
 

@@ -57,6 +57,7 @@ the desktop app:
 | In the desktop app only | In the browser instead |
 | --- | --- |
 | Choosing a folder, or a plugged-in e-reader, to import from | Choose the file itself, such as `KoboReader.sqlite` or `My Clippings.txt`. For KOReader or Boox, choose all their files at once. |
+| [Local EPUB reader](/library/epub/) and [Calibre library links](/library/calibre/) (0.1.1 development builds) | Read linked files in the desktop app; saved library highlights and notes remain available in the browser. |
 | Backups and restores | Your library lives on your server or deployment; back that up. |
 | Exporting to Markdown or JSON | Export from the desktop app. |
 | Checking for and installing updates | Whoever hosts it updates the web app. |
