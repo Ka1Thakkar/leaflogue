@@ -512,10 +512,11 @@ void app.whenReady().then(async () => {
     if (typeof query !== "string") throw new Error("Invalid Calibre search.");
     return calibre().search(query, library!.getBookContents(bookId)!.book);
   });
-  registerTrustedHandler(ipcMain, CALIBRE_LINK_CHANNEL, () => app.isPackaged, async (id: unknown, uuid: unknown) => {
+  registerTrustedHandler(ipcMain, CALIBRE_LINK_CHANNEL, () => app.isPackaged, async (id: unknown, uuid: unknown, format: unknown = "EPUB") => {
     const bookId = epubBook(id); const store = epubStore(); const service = calibre();
     if (typeof uuid !== "string") throw new Error("Choose a Calibre book.");
-    const linked = await service.reference(uuid);
+    if (format !== "EPUB" && format !== "KEPUB") throw new Error("Choose EPUB or KEPUB from Calibre.");
+    const linked = await service.reference(uuid, format);
     return store.attach(bookId, linked.path, linked.reference);
   });
   registerTrustedHandler(ipcMain, EPUB_UNLINK_CHANNEL, () => app.isPackaged, (id: unknown) => epubStore().unlink(epubBook(id)));
@@ -523,7 +524,7 @@ void app.whenReady().then(async () => {
   registerTrustedHandler(ipcMain, EPUB_ATTACH_CHANNEL, () => app.isPackaged, async (id: unknown) => {
     const bookId = epubBook(id);
     const store = epubStore();
-    const chosen = await dialog.showOpenDialog({ title: "Attach a local DRM-free EPUB", properties: ["openFile"], filters: [{ name: "EPUB books", extensions: ["epub"] }] });
+    const chosen = await dialog.showOpenDialog({ title: "Attach a local DRM-free EPUB or KEPUB", properties: ["openFile"], filters: [{ name: "EPUB and Kobo EPUB books", extensions: ["epub", "kepub"] }] });
     if (chosen.canceled || !chosen.filePaths[0]) return undefined;
     const path = chosen.filePaths[0];
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");

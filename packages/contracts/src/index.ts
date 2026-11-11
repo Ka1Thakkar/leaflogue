@@ -1844,9 +1844,10 @@ export const CALIBRE_CHOOSE_CHANNEL = "calibre:choose";
 export const CALIBRE_SEARCH_CHANNEL = "calibre:search";
 export const CALIBRE_LINK_CHANNEL = "calibre:link";
 export const EPUB_UNLINK_CHANNEL = "epub:unlink";
-export interface CalibreReference { readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
-export interface CalibreConnection { readonly libraryId: string; readonly name: string; readonly epubCount: number }
-export interface CalibreBook { readonly uuid: string; readonly title: string; readonly authors: readonly string[]; readonly isbn13?: string; readonly match: "isbn" | "title-author" | "none" }
+export type CalibreFormat = "EPUB" | "KEPUB";
+export interface CalibreReference { readonly format?: CalibreFormat; readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
+export interface CalibreConnection { readonly libraryId: string; readonly name: string; readonly bookCount: number }
+export interface CalibreBook { readonly formats: readonly CalibreFormat[]; readonly uuid: string; readonly title: string; readonly authors: readonly string[]; readonly isbn13?: string; readonly match: "isbn" | "title-author" | "none" }
 export interface CalibreSearch { readonly books: readonly CalibreBook[]; readonly hasMore: boolean }
 
 export const EPUB_ATTACH_CHANNEL = "epub:attach";
@@ -1864,7 +1865,7 @@ export interface LeaflogueBridge {
     describe(): Promise<CalibreConnection | undefined>;
     choose(): Promise<CalibreConnection | undefined>;
     search(bookId: BookId, query: string): Promise<CalibreSearch>;
-    link(bookId: BookId, bookUuid: string): Promise<EpubDocument>;
+    link(bookId: BookId, bookUuid: string, format?: CalibreFormat): Promise<EpubDocument>;
   };
   readonly catalog?: { search(query: string): Promise<CatalogSearch> };
   /** Desktop-only, local book files. Never automatically uploaded with library sync. */
