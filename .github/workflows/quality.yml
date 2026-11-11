@@ -15,8 +15,95 @@ concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
 
 jobs:
+  changes:
+    name: Classify changed files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      docs: ${{ steps.classify.outputs.docs }}
+      product: ${{ steps.classify.outputs.product }}
+    steps:
+      - name: Check out source and comparison history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify the changed files
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          # A manually requested or version-tagged validation is deliberately
+          # comprehensive. Path selection is only an optimisation for branch
+          # and pull-request feedback.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$REF" == refs/tags/v* ]]; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            echo "product=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            echo "product=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
+          node <<'NODE'
+          const { readFileSync, appendFileSync } = require("node:fs");
+          const files = readFileSync("changed-files.txt", "utf8").trim().split("\n").filter(Boolean);
+          const documentationFile = (file) =>
+            file.startsWith("apps/docs/") ||
+            // This workflow's routing can be verified by the docs check itself;
+            // keeping it lightweight makes documentation PRs stay lightweight.
+            file === ".github/workflows/quality.yml" ||
+            ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", "LICENSE"].includes(file) ||
+            file.startsWith("LICENSE.");
+          const docs = files.some(documentationFile);
+          const product = files.some((file) => !documentationFile(file));
+          appendFileSync(process.env.GITHUB_OUTPUT, `docs=${docs}\nproduct=${product}\n`);
+          NODE
+
+  docs:
+    name: Documentation checks
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate the pinned npm version with Corepack
+        run: |
+          corepack enable npm
+          corepack install
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build and exercise the documentation site
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:docs
+
   quality:
     name: Quality gate
+    needs: changes
+    if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -51,7 +138,8 @@ jobs:
 
   package-smoke:
     name: Linux package smoke
-    needs: quality
+    needs: [changes, quality]
+    if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -79,7 +167,8 @@ jobs:
 
   visual-regression:
     name: Linux browser regression
-    needs: quality
+    needs: [changes, quality]
+    if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -110,7 +199,8 @@ jobs:
 
   web-e2e:
     name: Web app end-to-end
-    needs: quality
+    needs: [changes, quality]
+    if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -145,7 +235,8 @@ jobs:
 
   desktop-e2e:
     name: Linux desktop end-to-end
-    needs: quality
+    needs: [changes, quality]
+    if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -206,7 +297,8 @@ jobs:
 
   native-beta:
     name: Native beta (${{ matrix.platform }}, ${{ matrix.architecture }})
-    needs: quality
+    needs: [changes, quality]
+    if: needs.changes.outputs.product == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     strategy:
@@ -233,7 +325,8 @@ jobs:
 
   release-version:
     name: Release version contract
-    needs: quality
+    needs: [changes, quality]
+    if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -253,8 +346,8 @@ jobs:
 
   release-packages:
     name: Linux release packages (${{ matrix.architecture }})
-    if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
-    needs: [quality, release-version]
+    if: needs.changes.outputs.product == 'true' && github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    needs: [changes, quality, release-version]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -286,8 +379,8 @@ jobs:
 
   convex-backend-package:
     name: Versioned Convex backend package
-    if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
-    needs: [quality, release-version]
+    if: needs.changes.outputs.product == 'true' && github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    needs: [changes, quality, release-version]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -315,6 +408,74 @@ jobs:
 
       - name: Verify checksums, contents, and deploy command
         run: bash scripts/validate-convex-release.sh release/convex
+
+  validation-summary:
+    name: Change-aware validation
+    # Branch protection relies on this one stable check. It verifies the
+    # relevant lane instead of requiring matrix job names that do not exist
+    # for documentation-only pull requests.
+    if: always()
+    needs:
+      [
+        changes,
+        docs,
+        quality,
+        package-smoke,
+        visual-regression,
+        web-e2e,
+        desktop-e2e,
+        native-beta,
+        release-version,
+        release-packages,
+        convex-backend-package,
+      ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every applicable lane to pass
+        env:
+          DOCS_CHANGED: ${{ needs.changes.outputs.docs }}
+          PRODUCT_CHANGED: ${{ needs.changes.outputs.product }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          PACKAGE_RESULT: ${{ needs.package-smoke.result }}
+          VISUAL_RESULT: ${{ needs.visual-regression.result }}
+          WEB_RESULT: ${{ needs.web-e2e.result }}
+          DESKTOP_RESULT: ${{ needs.desktop-e2e.result }}
+          NATIVE_RESULT: ${{ needs.native-beta.result }}
+          VERSION_RESULT: ${{ needs.release-version.result }}
+          RELEASE_PACKAGES_RESULT: ${{ needs.release-packages.result }}
+          BACKEND_RESULT: ${{ needs.convex-backend-package.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          require_success() {
+            local name="$1" result="$2"
+            if [[ "$result" != "success" ]]; then
+              echo "$name was expected to pass, but was $result" >&2
+              exit 1
+            fi
+          }
+
+          if [[ "$DOCS_CHANGED" == "true" ]]; then
+            require_success "Documentation checks" "$DOCS_RESULT"
+          fi
+
+          if [[ "$PRODUCT_CHANGED" == "true" ]]; then
+            require_success "Quality gate" "$QUALITY_RESULT"
+            require_success "Linux package smoke" "$PACKAGE_RESULT"
+            require_success "Linux browser regression" "$VISUAL_RESULT"
+            require_success "Web app end-to-end" "$WEB_RESULT"
+            require_success "Linux desktop end-to-end" "$DESKTOP_RESULT"
+            require_success "Native beta" "$NATIVE_RESULT"
+            require_success "Release version contract" "$VERSION_RESULT"
+
+            if [[ "$EVENT_NAME" != "workflow_dispatch" && "$REF" != refs/tags/v* ]]; then
+              require_success "Linux release packages" "$RELEASE_PACKAGES_RESULT"
+              require_success "Versioned Convex backend package" "$BACKEND_RESULT"
+            fi
+          fi
 
   candidate-release:
     name: Build and retain validation candidate

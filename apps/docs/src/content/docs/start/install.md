@@ -3,7 +3,7 @@ title: Install Leaflogue
 description: Choose the Linux, macOS, or Windows beta build and understand installation and updates.
 ---
 
-The experimental **0.1.0-beta.1** targets Linux, macOS, and Windows. Automated
+The experimental **0.1.0-beta.3** targets Linux, macOS, and Windows. Automated
 checks pass; clean-desktop installation and actual Orca, VoiceOver, and Narrator
 acceptance remain pending. Back up your library before testing. Downloads and
 their validation records are on the
@@ -59,7 +59,7 @@ for the experimental beta.
 1. Save the matching AppImage in a folder you want to keep, such as
    `~/Applications`.
 2. In your file manager, open its properties and allow it to run as a program,
-   or run `chmod +x Leaflogue-0.1.0-beta.1-*.AppImage` in that folder.
+   or run `chmod +x Leaflogue-0.1.0-beta.3-*.AppImage` in that folder.
 3. Double-click the AppImage. First-run setup shows where your library and
    settings will live. Choose **Local only** to get started.
 
@@ -102,14 +102,20 @@ checks should say `OK`. Do not run a file whose checksum differs.
 
 ## Updates
 
-The experimental beta updates by downloading the next release and replacing
-the application. Back up your library first. This applies to Mac, Windows,
-Linux AppImage, and ZIP/tarball builds.
+Back up your library, then open **Settings → Updates → Check for updates**.
+On Mac apps installed in Applications, Windows per-user installer builds, and
+Linux AppImages, choose **Install and restart** when a newer beta is available.
+Leaflogue verifies the update manifest signature, platform, architecture, size,
+and file hash before installing. You do not need to download another installer.
+Your library stays in its separate data folder; a newer app may migrate its format.
 
-**Settings → Updates** checks for signed stable releases. It does not offer
-experimental prereleases. Get beta updates from
-[GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases); this beta
-has no published signed stable update feed.
+The optional daily check is off by default. Enabling it checks and notifies;
+installation still requires your choice. Beta builds check the signed beta feed.
+A network or verification failure leaves the installed version in place.
+
+On Mac, move the app from its disk image into Applications before updating.
+Portable Windows ZIP and Linux tarball copies use manual replacement from
+[GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases).
 
 ## In a browser
 
