@@ -22,6 +22,7 @@ jobs:
     outputs:
       docs: ${{ steps.classify.outputs.docs }}
       product: ${{ steps.classify.outputs.product }}
+      security: ${{ steps.classify.outputs.security }}
     steps:
       - name: Check out source and comparison history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,12 +45,14 @@ jobs:
           if [[ "$EVENT_NAME" == "workflow_dispatch" || "$REF" == refs/tags/v* ]]; then
             echo "docs=true" >> "$GITHUB_OUTPUT"
             echo "product=true" >> "$GITHUB_OUTPUT"
+            echo "security=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
             echo "docs=true" >> "$GITHUB_OUTPUT"
             echo "product=true" >> "$GITHUB_OUTPUT"
+            echo "security=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -66,7 +69,8 @@ jobs:
             file.startsWith("LICENSE.");
           const docs = files.some(documentationFile);
           const product = files.some((file) => !documentationFile(file));
-          appendFileSync(process.env.GITHUB_OUTPUT, `docs=${docs}\nproduct=${product}\n`);
+          const security = product || files.includes(".github/workflows/quality.yml");
+          appendFileSync(process.env.GITHUB_OUTPUT, `docs=${docs}\nproduct=${product}\nsecurity=${security}\n`);
           NODE
 
   docs:
@@ -135,6 +139,34 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  security:
+    name: Security scans
+    needs: changes
+    if: needs.changes.outputs.security == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source history for secret detection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect committed credentials and private keys
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan dependencies and configuration for high-severity issues
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
 
   package-smoke:
     name: Linux package smoke
@@ -428,6 +460,7 @@ jobs:
         release-version,
         release-packages,
         convex-backend-package,
+        security,
       ]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -436,6 +469,7 @@ jobs:
         env:
           DOCS_CHANGED: ${{ needs.changes.outputs.docs }}
           PRODUCT_CHANGED: ${{ needs.changes.outputs.product }}
+          SECURITY_CHANGED: ${{ needs.changes.outputs.security }}
           DOCS_RESULT: ${{ needs.docs.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
           PACKAGE_RESULT: ${{ needs.package-smoke.result }}
@@ -446,6 +480,7 @@ jobs:
           VERSION_RESULT: ${{ needs.release-version.result }}
           RELEASE_PACKAGES_RESULT: ${{ needs.release-packages.result }}
           BACKEND_RESULT: ${{ needs.convex-backend-package.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
           EVENT_NAME: ${{ github.event_name }}
           REF: ${{ github.ref }}
         run: |
@@ -460,6 +495,10 @@ jobs:
 
           if [[ "$DOCS_CHANGED" == "true" ]]; then
             require_success "Documentation checks" "$DOCS_RESULT"
+          fi
+
+          if [[ "$SECURITY_CHANGED" == "true" ]]; then
+            require_success "Security scans" "$SECURITY_RESULT"
           fi
 
           if [[ "$PRODUCT_CHANGED" == "true" ]]; then
@@ -489,6 +528,7 @@ jobs:
         desktop-e2e,
         release-version,
         native-beta,
+        security,
       ]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -526,6 +566,7 @@ jobs:
         desktop-e2e,
         release-version,
         native-beta,
+        security,
       ]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
