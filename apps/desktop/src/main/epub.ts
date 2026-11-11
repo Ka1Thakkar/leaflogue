@@ -1,4 +1,4 @@
-import { formatEpubChapter } from "./epub-format";
+import { formatEpubChapter, type EpubFormatBudget } from "./epub-format";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, writeFile, rm } from "node:fs/promises";
 import { isAbsolute, join, posix } from "node:path";
@@ -111,7 +111,7 @@ export async function parseEpub(bytes: Buffer): Promise<EpubDocument> {
   } });
   if (!spine.length || spine.length > 1000) throw new Error("EPUB has no supported reading order.");
   const media = new Map([...manifest.values()].map((item) => [posix.normalize(posix.join(posix.dirname(packagePath), decodeURIComponent(item.href.split("#")[0]!))), item.media]));
-  const budget = { bytes: 0 };
+  const budget: EpubFormatBudget = { bytes: 0, embedded: new Map(), sheets: new Set() };
   const chapters = spine.map((id, index) => {
     const item = manifest.get(id);
     if (!item || item.media !== "application/xhtml+xml") throw new Error("Only text EPUB chapters are supported yet.");

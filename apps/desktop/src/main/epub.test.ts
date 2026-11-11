@@ -108,5 +108,21 @@ describe("Calibre KEPUB conversions", () => {
     expect(JSON.stringify(document)).toContain("text-indent");
     expect(JSON.stringify(document)).not.toContain("ade:template");
   });
+  it("embeds a font shared by every chapter once instead of once per chapter", async () => {
+    const chapters = Array.from({ length: 30 }, (_, index) => index);
+    const kepub = zip({
+      mimetype: "application/epub+zip",
+      "META-INF/container.xml": '<container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+      "OEBPS/content.opf": `<package><manifest><item id="s" href="style.css" media-type="text/css"/><item id="f" href="book.ttf" media-type="font/ttf"/>${chapters.map((index) => `<item id="c${index}" href="c${index}.xhtml" media-type="application/xhtml+xml"/>`).join("")}</manifest><spine>${chapters.map((index) => `<itemref idref="c${index}"/>`).join("")}</spine></package>`,
+      "OEBPS/style.css": "@font-face { font-family: Book; src: url(book.ttf) } body { font-family: Book }",
+      "OEBPS/book.ttf": "f".repeat(2 * 1024 * 1024),
+      ...Object.fromEntries(chapters.map((index) => [`OEBPS/c${index}.xhtml`, `<html><head><link rel="stylesheet" href="style.css"/></head><body><p><span class="koboSpan" id="kobo.1.1">Chapter ${index + 1}.</span></p></body></html>`])),
+    });
+    const document = await parseEpub(kepub);
+    expect(document.chapters).toHaveLength(30);
+    const styles = document.chapters.map((chapter) => chapter.styles ?? "").join("");
+    expect(styles.match(/data:font\/ttf;base64,/gu)).toHaveLength(1);
+    expect(document.chapters[29]!.text).toBe("Chapter 30.");
+  });
 });
 
