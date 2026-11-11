@@ -24,6 +24,7 @@ export interface ImportReview {
   readonly titles: readonly string[];
   /** KOReader highlights are chosen as a folder rather than a file. */
   readonly folder?: boolean;
+  readonly separateCopies?: readonly string[];
 }
 
 /** Choose a file (or folder), check the review, name a new source, commit, and close. */
@@ -38,6 +39,7 @@ export async function importFile(session: Session, path: string, review: ImportR
   const listed = dialog.getByRole("table", { name: "Books in this file" });
   for (const title of review.titles) await expect(listed.getByText(title, { exact: true })).toBeVisible();
   await expect(dialog.getByRole("combobox", { name: "Import source" })).toContainText("Create a new source");
+  for (const title of review.separateCopies ?? []) await selectOption(dialog.getByRole("combobox", { name: `Import ${title} into`, exact: true }), "new");
   await dialog.getByLabel("Name this source").fill(review.sourceName);
   await dialog.getByRole("button", { name: "Import highlights and notes" }).click();
   await expect(dialog.getByRole("status")).toContainText("Import complete:");

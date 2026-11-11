@@ -109,3 +109,24 @@ for example) or that are not what they claim to be. Page bookmarks without any
 highlighted text are skipped, and the review tells you how many. If Leaflogue
 says it could not read a file, choose a fresh copy from your reader and try
 again.
+
+## Importing on another synced computer
+
+Import-source profiles and their record mappings currently stay on the computer
+that performed the import. A second computer can have synced books, highlights,
+and notes without that local import history.
+
+The next 0.1.1 beta adds a review of matching books before a desktop import.
+Under **Import into**, choose **Keep existing** to reuse a book already in your
+library, or **Create a separate book** when you intend another copy. A unique
+ISBN or title/author candidate is suggested; when several copies match, choose
+one explicitly before importing. Existing source links take precedence.
+
+Keeping an existing book preserves its metadata, notes, and identity. Exact,
+unique source highlight matches are linked back to the local import history;
+new annotations are added. Ambiguous or edited passages are not guessed.
+Later imports from the same source reconcile normally. When multiple source
+profiles exist, choose one explicitly; a new source is not selected for you.
+
+If duplicates already exist, review them before merging or deleting anything.
+This import change does not remove earlier copies automatically.

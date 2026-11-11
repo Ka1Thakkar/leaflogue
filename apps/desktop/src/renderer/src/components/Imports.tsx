@@ -3,7 +3,7 @@ import { Select, SelectItem } from "@leaflogue/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Bell, Check, CheckCheck, CircleAlert, Download, FolderOpen, History, Usb, X } from "../components/icons";
 import { Panel, StatTile, TitleRow } from "@leaflogue/ui";
-import type { ConnectedReader, ImportAnnotation, ImportConflict, ImportReceipt, PendingImport } from "@leaflogue/contracts";
+import type { BookId, ConnectedReader, ImportAnnotation, ImportConflict, ImportReceipt, PendingImport } from "@leaflogue/contracts";
 import { useDesktop } from "../host";
 import { href } from "../router";
 import { importRequests } from "../palette/actions";
@@ -58,7 +58,7 @@ function providerLabel(provider: PendingImport["provider"]): string {
 
 export function receiptSummary(receipt: ImportReceipt): string {
   const added = receipt.highlightsCreated + receipt.notesCreated;
-  return `${added.toLocaleString()} added, ${receipt.annotationsUpdated.toLocaleString()} updated${receipt.booksCreated ? `, ${receipt.booksCreated.toLocaleString()} new ${receipt.booksCreated === 1 ? "book" : "books"}` : ""}`;
+  return `${added.toLocaleString()} added, ${receipt.annotationsUpdated.toLocaleString()} updated${receipt.booksReused ? `, ${receipt.booksReused.toLocaleString()} existing ${receipt.booksReused === 1 ? "book kept" : "books kept"}` : ""}${receipt.booksCreated ? `, ${receipt.booksCreated.toLocaleString()} new ${receipt.booksCreated === 1 ? "book" : "books"}` : ""}`;
 }
 
 export function ImportTool({ history, onImported }: {
@@ -68,6 +68,7 @@ export function ImportTool({ history, onImported }: {
   const [pending, setPending] = useState<PendingImport>();
   const [sourceId, setSourceId] = useState("");
   const [sourceName, setSourceName] = useState("");
+  const [bookSelections, setBookSelections] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState("");
   const [error, setError] = useState("");
@@ -100,7 +101,8 @@ export function ImportTool({ history, onImported }: {
           : await window.leaflogue.imports.chooseReader(from.id);
       if (next) {
         setPending(next);
-        setSourceId(next.suggestedSourceId ?? "");
+        setBookSelections(Object.fromEntries((next.bookMatches ?? []).map((match) => [match.providerRecordId, match.candidates.length === 1 ? match.candidates[0]!.bookId : "review"])));
+        setSourceId(next.suggestedSourceId ?? (next.sourceProfiles.length === 1 ? next.sourceProfiles[0]!.id : next.sourceProfiles.length > 1 ? "review" : ""));
         setSourceName(next.suggestedSourceName);
         setStage("");
       } else {
@@ -117,7 +119,7 @@ export function ImportTool({ history, onImported }: {
   }
 
   async function commit() {
-    if (!pending) return;
+    if (!pending || sourceId === "review" || reviewNeeded) return;
     const creating = !sourceId;
     setBusy(true);
     setError("");
@@ -127,6 +129,7 @@ export function ImportTool({ history, onImported }: {
     try {
       const result = await window.leaflogue.imports.commit({
         token: pending.token,
+        ...(pending.bookMatches ? { bookSelections: pending.bookMatches.filter((match) => !match.links.some((link) => link.sourceId === sourceId)).map((match) => ({ providerRecordId: match.providerRecordId, bookId: bookSelections[match.providerRecordId] === "new" ? null : bookSelections[match.providerRecordId] as BookId })) } : {}),
         sourceId: creating ? pending.newSourceId : sourceId,
         ...(creating ? { newSourceName: sourceName.trim() } : {}),
       });
@@ -145,6 +148,8 @@ export function ImportTool({ history, onImported }: {
     }
   }
 
+  const reviewNeeded = pending?.bookMatches?.some((match) => !match.links.some((link) => link.sourceId === sourceId) && (!bookSelections[match.providerRecordId] || bookSelections[match.providerRecordId] === "review"));
+  const bookMatches = new Map(pending?.bookMatches?.map((match) => [match.providerRecordId, match]));
   const books = pending?.preview.document.books ?? [];
   const annotations = pending?.preview.document.annotations ?? [];
   const passages = annotations.filter(({ text }) => text !== undefined).length;
@@ -212,7 +217,7 @@ export function ImportTool({ history, onImported }: {
                 <table className={sheet.table}>
                   <caption className="sr-only">Books in this file</caption>
                   <thead>
-                    <tr><th scope="col" className="ui-label">Book</th><th scope="col" className="ui-label">Passages</th><th scope="col" className="ui-label">Notes</th></tr>
+                    <tr><th scope="col" className="ui-label">Book</th><th scope="col" className="ui-label">Passages</th><th scope="col" className="ui-label">Notes</th>{bookMatches.size > 0 && <th scope="col" className="ui-label">Import into</th>}</tr>
                   </thead>
                   <tbody>
                     {rows.map((book) => (
@@ -220,6 +225,16 @@ export function ImportTool({ history, onImported }: {
                         <th scope="row"><span>{book.title}</span><small className="ui-sub">{book.authors.join(", ") || "Author unknown"}</small></th>
                         <td className="ui-number">{(perBook.get(book.providerRecordId)?.passages ?? 0).toLocaleString()}</td>
                         <td className="ui-number">{(perBook.get(book.providerRecordId)?.notes ?? 0).toLocaleString()}</td>
+                        {bookMatches.size > 0 && <td>{(() => {
+                          const match = bookMatches.get(book.providerRecordId);
+                          if (!match) return <span className="ui-sub">New book</span>;
+                          if (match.links.some((link) => link.sourceId === sourceId)) return <span className="ui-sub">Keep existing book</span>;
+                          return <Select aria-label={`Import ${book.title} into`} value={bookSelections[book.providerRecordId] ?? "review"} onValueChange={(value) => setBookSelections((previous) => ({ ...previous, [book.providerRecordId]: value }))}>
+                            <SelectItem value="review">Choose an existing book or a new copy</SelectItem>
+                            {match.candidates.map((candidate) => <SelectItem key={candidate.bookId} value={candidate.bookId}>Keep existing: {candidate.title} · {candidate.authors.join(", ") || "Unknown author"}{candidate.archived ? " · archived" : ""}</SelectItem>)}
+                            <SelectItem value="new">Create a separate book</SelectItem>
+                          </Select>;
+                        })()}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -229,13 +244,15 @@ export function ImportTool({ history, onImported }: {
                     {pending.preview.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}>{warning.message}</li>)}
                   </ul>
                 )}
+                {bookMatches.size > 0 && <p className="ui-sub">Matching books are already in this library. Review where to import them. Keeping an existing book preserves its details and reuses exact matching highlights and notes.</p>}
                 <div className={sheet.source}>
                   <div>
                     <label className="ll-label" htmlFor="import-source">Import source</label>
                     <Select id="import-source" className="ll-field" value={sourceId} onValueChange={(value) => setSourceId(value)} aria-describedby="source-help">
+                      {pending.sourceProfiles.length > 1 && <SelectItem value="review">Choose a source</SelectItem>}
                       <SelectItem value="">Create a new source</SelectItem>
                       {pending.sourceProfiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>{profile.name}{profile.id === pending.suggestedSourceId ? " (used for this file before)" : ""}</SelectItem>
+                        <SelectItem key={profile.id} value={profile.id}>{profile.name}{profile.id === pending.suggestedSourceId ? " (suggested)" : ""}</SelectItem>
                       ))}
                     </Select>
                   </div>
@@ -258,7 +275,7 @@ export function ImportTool({ history, onImported }: {
                 <div className={sheet.footer}>
                   <span className="ui-sub">Edits you made here are always kept. Anything that changed in both places waits for you to review.</span>
                   <button type="button" className="ll-button-secondary" disabled={busy} onClick={() => { setPending(undefined); setError(""); }}>Cancel import</button>
-                  <button type="submit" className="ll-button" disabled={busy || (!sourceId && !sourceName.trim())}>Import highlights and notes</button>
+                  <button type="submit" className="ll-button" disabled={busy || sourceId === "review" || Boolean(reviewNeeded) || (!sourceId && !sourceName.trim())}>Import highlights and notes</button>
                 </div>
               </Panel>
             </>

@@ -3036,3 +3036,70 @@ describe("thread synchronization", () => {
     }
   });
 });
+
+describe("importing on a second synced installation", () => {
+  const document = {
+    formatVersion: 1 as const,
+    books: [{ providerRecordId: "file:///mnt/onboard/glass.epub", title: "The Glass Orchard", authors: ["Imogen Vale"] }],
+    annotations: [
+      { providerRecordId: "kobo-mark-1", bookProviderRecordId: "file:///mnt/onboard/glass.epub", text: "Every pane held a different season.", location: "/chapter/1", createdAt: 1700000000000, note: "A note from Kobo." },
+      { providerRecordId: "kobo-note-1", bookProviderRecordId: "file:///mnt/onboard/glass.epub", note: "A standalone Kobo note." },
+    ],
+  };
+  const source = { id: "11111111-1111-4111-8111-111111111111", name: "My Kobo" };
+  const laptopSource = { id: "22222222-2222-4222-8222-222222222222", name: "My Kobo on laptop" };
+  it("reattaches reviewed synced books and exact annotations without changing their IDs or notes", () => {
+    const first = new LocalLibrary(":memory:"), laptop = new LocalLibrary(":memory:");
+    try {
+      first.importDocument({ document, source, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [] });
+      laptop.bootstrapSync({ generation: 1, afterSequence: 0 });
+      let sequence = 0;
+      for (const { change } of first.resolvePendingSyncChanges().changes) {
+        laptop.applyIncomingSyncedChange({ change, sequence: sequence + 1, expectedCursor: { generation: 1, afterSequence: sequence }, nextCursor: { generation: 1, afterSequence: ++sequence } });
+      }
+      expect(laptop.listImportSources("kobo")).toEqual([]);
+      const book = laptop.listBooks()[0]!;
+      const original = laptop.getBookContents(book.id)!;
+      const review = laptop.reviewImportBooks(document, "kobo");
+      expect(review).toMatchObject([{ providerRecordId: document.books[0]!.providerRecordId, candidates: [{ bookId: book.id }], links: [] }]);
+      const input = { document, source: laptopSource, provider: "kobo" as const, fileName: "KoboReader.sqlite", warnings: [], bookSelections: [{ providerRecordId: document.books[0]!.providerRecordId, bookId: book.id }] };
+      expect(laptop.importDocument(input)).toMatchObject({ booksCreated: 0, booksReused: 1, highlightsCreated: 0, notesCreated: 0 });
+      expect(laptop.listBooks()).toHaveLength(1);
+      expect(laptop.getBookContents(book.id)).toEqual(original);
+      expect(laptop.importDocument({ ...input, bookSelections: undefined })).toMatchObject({ booksCreated: 0, highlightsCreated: 0, notesCreated: 0 });
+      const extra = { ...document.annotations[0]!, providerRecordId: "kobo-mark-2", text: "A newly highlighted sentence.", note: undefined };
+      expect(laptop.importDocument({ ...input, document: { ...document, annotations: [...document.annotations, extra] } })).toMatchObject({ booksCreated: 0, highlightsCreated: 1, notesCreated: 0 });
+      const passage = laptop.getBookContents(book.id)!.highlights[0]!;
+      laptop.updateHighlight({ id: passage.id, bookId: book.id, expectedRevision: passage.revision, text: "My local correction." });
+      expect(laptop.importDocument({ ...input, document: { ...document, annotations: [{ ...document.annotations[0]!, text: "Changed on Kobo." }, document.annotations[1]!] } })).toMatchObject({ conflictsCreated: 1, highlightsCreated: 0 });
+      expect(laptop.getBookContents(book.id)!.highlights.find((item) => item.id === passage.id)?.text).toBe("My local correction.");
+    } finally { first.close(); laptop.close(); }
+  });
+  it("keeps ambiguous editions explicit and permits an intentional separate copy", () => {
+    const library = new LocalLibrary(":memory:");
+    try {
+      const first = library.createBook({ title: document.books[0]!.title, authors: ["Imogen Vale"] });
+      library.createBook({ title: document.books[0]!.title, authors: ["Imogen Vale"] });
+      expect(library.reviewImportBooks(document, "kobo")[0]?.candidates).toHaveLength(2);
+      expect(library.importDocument({ document, source, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [], bookSelections: [{ providerRecordId: document.books[0]!.providerRecordId, bookId: null }] })).toMatchObject({ booksCreated: 1, booksReused: 0 });
+      expect(library.listBooks()).toHaveLength(3);
+      expect(() => library.importDocument({ document, source: laptopSource, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [], bookSelections: [{ providerRecordId: "unknown", bookId: first.id }] })).toThrow(/selection/u);
+    } finally { library.close(); }
+  });
+});
+
+it("keeps a local location edit when an identical source quotation and date reconnect on another source", () => {
+  const library = new LocalLibrary(":memory:");
+  try {
+    const document = { formatVersion: 1 as const, books: [{ providerRecordId: "book", title: "A book", authors: ["A Reader"] }], annotations: [{ providerRecordId: "mark", bookProviderRecordId: "book", text: "A passage with a stable source timestamp.", createdAt: 1700000000000, location: "/old-location" }] };
+    library.importDocument({ document, provider: "kobo", fileName: "KoboReader.sqlite", source: { id: "11111111-1111-4111-8111-111111111111", name: "Kobo" }, warnings: [] });
+    const book = library.listBooks()[0]!;
+    const original = library.getBookContents(book.id)!;
+    const changed = { ...document, annotations: [{ ...document.annotations[0]!, location: "Chapter one · 10%" }] };
+    const input = { document: changed, provider: "kobo" as const, fileName: "KoboReader.sqlite", source: { id: "22222222-2222-4222-8222-222222222222", name: "Same Kobo" }, warnings: [], bookSelections: [{ providerRecordId: "book", bookId: book.id }] };
+    expect(library.importDocument(input)).toMatchObject({ booksCreated: 0, highlightsCreated: 0 });
+    expect(library.getBookContents(book.id)).toEqual(original);
+    expect(library.importDocument({ ...input, document: { ...changed, annotations: [{ ...changed.annotations[0]!, text: "Changed later on the source." }] } })).toMatchObject({ conflictsCreated: 1 });
+    expect(library.getBookContents(book.id)).toEqual(original);
+  } finally { library.close(); }
+});
