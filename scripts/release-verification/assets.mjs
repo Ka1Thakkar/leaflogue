@@ -43,7 +43,9 @@ for (const name of expected.filter(name=>name.startsWith('SHA256SUMS-'))) {
   covered.add(match[2]);
  }
 }
-for(const name of expected.filter(name=>!name.startsWith('SHA256SUMS-'))) assert(covered.has(name),`Not covered by checksum ${name}`);
+// Linux evidence JSON uses the independently checked GitHub SHA-256 digests.
+// Its checksum manifest covers the actual installable archives.
+for(const name of expected.filter(name=>/\.(?:AppImage|tar\.gz|dmg|zip|exe)$/u.test(name)||name.startsWith('leaflogue-update-')||name.endsWith('.manifest.json'))) assert(covered.has(name),`Not covered by checksum ${name}`);
 const keySource=execFileSync('git',['show',`${source}:apps/desktop/src/main/update-keys.ts`],{encoding:'utf8'});
 const pem=JSON.parse(/channel:\s*"beta"[\s\S]*?publicKeyPem:\s*("(?:[^"\\]|\\.)*")/.exec(keySource)[1]);
 const key=createPublicKey(pem);
