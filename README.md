@@ -70,8 +70,9 @@ in [`tests/marketing`](tests/marketing/README.md); dictionary credits are in
 
 ## Get Leaflogue
 
-**0.1.0-beta.1 is an experimental public beta.** Automated source and native
-package checks pass, but clean-desktop installation, manual updates/uninstall,
+**The update-enabled experimental beta, 0.1.0-beta.2, is in preparation.**
+The previous candidate passed automated checks; this build adds signed beta
+updates. Clean-desktop installation, manual updates/uninstall,
 and actual Orca, VoiceOver, and Narrator acceptance are still pending.
 Back up your library before testing; keep another copy of irreplaceable data.
 

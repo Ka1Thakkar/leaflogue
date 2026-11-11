@@ -4,12 +4,21 @@ Notable changes to Leaflogue are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 the policy in [`docs/release-process.md`](docs/release-process.md).
 
-The first public beta is being prepared as `v0.1.0-beta.1`. Current release
+The first public beta is being prepared as `v0.1.0-beta.2`. Current release
 gates are in [`docs/release-readiness.md`](docs/release-readiness.md).
 
 ## [Unreleased]
 
-## [0.1.0-beta.1] (candidate)
+## [0.1.0-beta.2] (candidate)
+
+Supersedes the unpublished beta.1 candidate with signed beta-channel in-app
+updates. Mac app bundles, per-user Windows installer builds, and Linux
+AppImages verify updates before installing and restarting. Windows ZIP/Linux
+tarball copies remain manual. The release workflow signs five platform/architecture
+feeds with a separate beta key. Actual native fixture-upgrade checks supplement
+the signature and corruption tests; human acceptance remains pending.
+
+## [0.1.0-beta.1] (unpublished candidate)
 
 Candidate for the first public beta on Linux x64/ARM64, Mac Apple Silicon/Intel,
 and Windows x64, plus the web app you can host beside your sync database. Final publication
@@ -119,8 +128,8 @@ waits on the checks in [`docs/release-readiness.md`](docs/release-readiness.md).
 ### Upgrade notes
 
 - First release. Libraries made with earlier development builds open as they
-  are. Beta packages use manual replacement. Signed stable AppImage updates
-  remain a separate release path and always require the user to install.
+  are. Beta.1 used manual replacement outside stable Linux AppImages; beta.2
+  adds the signed beta update paths described above.
 - Local library schema 17. PostgreSQL schema 13. Convex schema 17, mutation
   contract 23; the matching Convex backend bundle is attached to the release.
 - The web app's server keeps its own tables in a separate `leaflogue_web`
@@ -143,5 +152,6 @@ Schema versions this release migrates to, whether an older release can still
 open the library afterwards, and anything the reader must do.
 -->
 
-[Unreleased]: https://github.com/Ka1Thakkar/leaflogue/compare/v0.1.0-beta.1...HEAD
+[Unreleased]: https://github.com/Ka1Thakkar/leaflogue/compare/v0.1.0-beta.2...HEAD
+[0.1.0-beta.2]: https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.0-beta.1

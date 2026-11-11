@@ -1,37 +1,27 @@
 # Support policy
 
-Status: adopted for the first public release; the maintainer reviews it before
-each minor release.
+Status: experimental beta. The targets below have automated checks; they are
+not a claim of completed clean-machine or screen-reader acceptance.
 
-## Desktop platforms
+## Desktop beta targets
 
-| Area | Supported |
-| --- | --- |
-| Architectures | Linux x64 and arm64 |
-| Distributions | Ubuntu 22.04 LTS and 24.04 LTS; Debian 12 and 13; the two most recent Fedora releases; current Arch Linux |
-| Sessions | Wayland and X11 |
-| Packages | AppImage and `.tar.gz` per architecture, with validation evidence, checksums, SBOM, audit, and notices; signed AppImage updates after a public release. Flathub is planned and is not yet an install option. |
+| Platform | Architecture | Downloads | Update path |
+| --- | --- | --- | --- |
+| Linux | x64, ARM64 | AppImage, tarball | In-app signed updates for AppImage; tarballs are manual |
+| macOS 13+ | Apple Silicon, Intel | DMG, ZIP | In-app signed updates for an app moved to Applications |
+| Windows | x64 | Per-user NSIS installer, portable ZIP | In-app signed updates for installer builds; portable ZIPs are manual |
 
-Other distributions with glibc 2.35 or newer usually work but are not tested
-before release.
+Linux CI uses Ubuntu 24.04; native container checks additionally exercise
+Linux ARM64. No blanket acceptance claim is made for other distributions,
+desktop sessions, or all supported OS versions. Actual clean-desktop and
+Orca/VoiceOver/Narrator records remain pending in
+[release readiness](release-readiness.md).
 
-macOS is planned for phase 5 of the roadmap and will be published as a Homebrew
-cask, which is what makes an unsigned build open normally. It is not supported
-until its clean-machine gate passes.
-
-Windows is conditional. It ships only if the project obtains free code signing
-for open source, and only after the credential-store work in
-[ADR 0004](decisions/0004-cross-platform-secrets-and-signing.md), because the
-protected-configuration guarantee this project makes about saved credentials has
-no Windows equivalent today. If neither lands, macOS and Linux are the supported
-platforms.
-
-Builds carry no paid code-signing certificate. Flathub signs what it
-distributes, and the AppImage verifies every update against Leaflogue's own
-signing key ([ADR 0007](decisions/0007-signed-updates-and-flathub.md)); a
-first direct download can optionally be checked against its published checksum
-or build attestation. ADR 0004 records why an unsigned Windows installer is
-the one case this project would rather not ship at all.
+Mac packages are ad-hoc signed without Apple notarization; Windows packages are
+unsigned. The maintainer approved experimental distribution with those limits.
+An Ed25519-signed update manifest authenticates the update bytes; it does not
+establish Apple/Windows publisher trust. There are no published package-manager
+or app-store distributions.
 
 ## Databases for sync and self-hosting
 
@@ -56,10 +46,10 @@ state which provider and runtime checks were actually run.
   beside the library as `library.before-upgrade.schema-<N>.sqlite`, keeping the
   two most recent. It is an ordinary backup that the previous release can
   restore; if it cannot be written, the library stays closed and unmigrated.
-- A release can upgrade libraries created by any release from the previous
-  twelve months. For anything older, upgrade through an intermediate release.
-  JSON exports can be imported into another library; they merge data rather
-  than restoring a previous database file.
+- The first beta has no long-term compatibility guarantee. Consult the exact
+  release notes before opening an older development library. JSON exports can
+  be imported into another library; they merge data rather than restoring a
+  previous database file.
 - Older builds refuse to open a newer library, configuration, or remote schema
   rather than guessing. Keep a backup before downgrading.
 

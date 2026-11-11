@@ -17,4 +17,8 @@ export const TRUSTED_UPDATE_KEYS: readonly TrustedUpdateKey[] = [
     // One string: the release signing script reads this PEM straight from the source.
     publicKeyPem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAPy7QlwEM+DR34G9pgM3+S4XNgmoEpJFO/WAm/K1SlYc=\n-----END PUBLIC KEY-----\n",
   },
+  {
+    channel: "beta",
+    publicKeyPem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA/1nKy48V9Dis5c4HzlyhM5jMegRKPGZkU1kyrE/kVfw=\n-----END PUBLIC KEY-----\n",
+  },
 ];

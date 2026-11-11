@@ -1,6 +1,6 @@
 # Project status
 
-Leaflogue 0.1.0-beta.1 is an experimental public desktop beta.
+Leaflogue 0.1.0-beta.2 is the update-enabled experimental desktop beta in preparation.
 Automated checks pass; clean-desktop and actual screen-reader acceptance remain
 pending. The maintainer explicitly approved experimental publication with
 these limitations disclosed on 10 November 2026.
@@ -15,3 +15,8 @@ Consult [release readiness](release-readiness.md) for the exact validation statu
 The [roadmap](roadmap.md) assigns EPUB reading and optional book-file sync to
 0.1.1. See [CONTRIBUTING](../CONTRIBUTING.md) to help with code, documentation,
 import formats, accessibility, and native testing.
+
+The updater verifies separately signed beta manifests and exact artifact hashes
+before installation. Standard Mac bundles, per-user Windows installer builds,
+and Linux AppImages can install and restart from the app; portable Windows
+ZIP/Linux tarballs remain manual. The earlier beta.1 candidate was not published.

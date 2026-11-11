@@ -77,3 +77,17 @@ System Settings → Privacy & Security → Open Anyway, and the cask avoids that
   under Flatpak.
 - Install guides lead with Flathub, then the AppImage, and no longer require a
   checksum.
+
+## Experimental beta amendment (10 November 2026)
+
+The beta ships direct downloads, with no Flathub or Homebrew distribution.
+Beta update discovery includes published prereleases, with a separate Ed25519
+key. Signed format-2 manifests bind platform and architecture as well as the
+artifact name, size and hash; legacy stable Linux manifests remain readable.
+Mac updates verify and stage an app bundle before a post-exit atomic swap.
+Windows per-user NSIS updates run after exit and restart with the same profile
+arguments. Linux AppImages retain their verified atomic replacement. Windows
+ZIP and Linux tarball installations remain portable manual-update formats.
+The beta signing approval remains ad-hoc Mac and unsigned Windows; manifest
+signing authenticates update contents and makes no OS publisher/notarization
+claim.

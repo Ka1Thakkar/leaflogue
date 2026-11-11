@@ -200,6 +200,7 @@ import { createSyncStatusTracker } from "./sync-status";
 import { rendererContentPolicyForRequest, validateDevelopmentRendererUrl } from "./content-policy";
 import { TRUSTED_UPDATE_KEYS } from "./update-keys";
 import { DesktopUpdater } from "./update-service";
+import { installNativeUpdate, nativeUpdateUnavailable } from "./update-native";
 import { scheduleAutomaticUpdateChecks } from "./update-scheduler";
 import { writeMarkdownExport } from "./markdown-export";
 import { mountRoots, watchConnectedReaders, type DetectedReader } from "./connected-readers";
@@ -778,9 +779,15 @@ void app.whenReady().then(async () => {
     return runExclusiveFileOperation(() => exportMarkdown(includeArchived));
   });
   // Update checks run only when the reader asks (ADR 0007).
+  const nativeUpdateOptions = { platform: process.platform, executable: process.execPath, args: process.argv.slice(1), quit: () => app.quit() };
   const updater = new DesktopUpdater({
     currentVersion: app.getVersion(),
     architecture: process.arch,
+    platform: process.platform === "darwin" ? "mac" : process.platform === "win32" ? "windows" : "linux",
+    channel: app.getVersion().includes("-") ? "beta" : "stable",
+    temporaryDirectory: app.getPath("temp"),
+    nativeUnavailableReason: process.platform === "linux" ? undefined : () => nativeUpdateUnavailable(nativeUpdateOptions),
+    installNative: (download, manifest) => installNativeUpdate(download, manifest, nativeUpdateOptions),
     appImagePath: process.env.APPIMAGE,
     packaged: app.isPackaged,
     flatpak: Boolean(process.env.FLATPAK_ID) || existsSync("/.flatpak-info"),

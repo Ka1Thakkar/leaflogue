@@ -1141,7 +1141,7 @@ export type UpdateStatus =
       readonly state: "unavailable";
       readonly currentVersion: string;
       /** development: an unpackaged build; not-appimage: the tarball; unconfigured: no trusted key; flatpak: Flathub updates it. */
-      readonly reason: "development" | "not-appimage" | "unconfigured" | "flatpak";
+      readonly reason: "development" | "not-appimage" | "unconfigured" | "flatpak" | "unsupported-installation";
     }
   | { readonly state: "up-to-date"; readonly currentVersion: string }
   | {
