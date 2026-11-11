@@ -576,3 +576,12 @@ textarea.ll-field {
 @media (prefers-reduced-motion: reduce) {
   [data-setting-flash] { animation: none; }
 }
+
+/* Each workspace scrolls independently of the contextual reading pane. */
+.ui-frame { height: calc(100dvh - var(--ui-header-height)); min-height: 0; overflow: hidden; }
+.ui-main { height: 100%; overflow-y: auto; overscroll-behavior: contain; container: workspace / inline-size; }
+.ui-rail { top: 0; height: 100%; }
+@media (max-width: 640px) {
+  .ui-frame { padding-bottom: var(--ui-tabbar-height); }
+  .ui-rail { top: auto; height: var(--ui-tabbar-height); }
+}

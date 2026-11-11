@@ -1,0 +1,47 @@
+name: Desktop beta feedback
+description: Share installation, update, or everyday-use results from the experimental beta.
+labels: [beta-feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Leaflogue. Failed attempts and partial results are useful too.
+        Do not attach personal libraries, reading exports, credentials, or keys.
+        Report security issues privately using SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Leaflogue version
+      placeholder: 0.1.0-beta.3
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS version and architecture
+      placeholder: macOS 15 / Apple Silicon, Windows 11 / x64, Ubuntu 24.04 GNOME / arm64
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Download filename
+      description: Include the installer/archive filename you used.
+  - type: textarea
+    id: results
+    attributes:
+      label: What worked and what failed?
+      description: Include installation and OS prompts, launch, import, editing, backup/restore, restart, update (with previous version), and uninstall/reinstall where tested. Mark anything you did not test.
+    validations:
+      required: true
+  - type: textarea
+    id: accessibility
+    attributes:
+      label: Keyboard and screen reader observations
+      description: Optional. Include screen reader name/version and the controls tested.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Errors or redacted logs
+      description: Remove names, file paths, passage text, connection strings, and tokens before sharing.
+      render: text

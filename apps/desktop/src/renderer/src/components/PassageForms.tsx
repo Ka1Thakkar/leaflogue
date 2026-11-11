@@ -53,6 +53,7 @@ export function HighlightForm({
           setPending(false);
           return;
         }
+        window.dispatchEvent(new Event("leaflogue:annotations-changed"));
         setCommitted(true);
         try {
           await onSaved();
@@ -120,6 +121,7 @@ export function NoteForm({
           setPending(false);
           return;
         }
+        window.dispatchEvent(new Event("leaflogue:annotations-changed"));
         setCommitted(true);
         try {
           await onSaved();

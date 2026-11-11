@@ -1,6 +1,6 @@
 {
   "name": "@leaflogue/desktop",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.1-beta.1",
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@leaflogue/appearance": "0.0.0",
+    "@leaflogue/catalog": "^0.0.0",
     "@leaflogue/contracts": "0.0.0",
     "@leaflogue/domain": "0.0.0",
     "@leaflogue/importers": "0.0.0",
@@ -39,11 +40,15 @@
     "@leaflogue/ui": "0.0.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "pg": "^8.23.0",
+    "postcss": "^8.5.32",
+    "postcss-value-parser": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "saxes": "^6.0.0",
     "wordnet-db": "^3.1.14",
+    "yauzl": "^3.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -52,6 +57,7 @@
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/yauzl": "^3.4.0",
     "@vitejs/plugin-react": "^5.1.4",
     "electron": "44.10.2",
     "electron-builder": "^26.15.3",

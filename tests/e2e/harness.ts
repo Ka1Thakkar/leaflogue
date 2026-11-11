@@ -6,8 +6,9 @@ import { pathToFileURL } from "node:url";
 import { _electron, expect, type ElectronApplication, type Page } from "@playwright/test";
 
 const repositoryRoot = resolve(__dirname, "../..");
-const mainEntry = join(repositoryRoot, "apps/desktop/out/main/index.js");
-const rendererRoot = join(repositoryRoot, "apps/desktop/out/renderer");
+const buildRoot = process.env.LEAFLOGUE_E2E_BUILD_ROOT ?? join(repositoryRoot, "apps/desktop/out");
+const mainEntry = join(buildRoot, "main/index.js");
+const rendererRoot = join(buildRoot, "renderer");
 const electronExecutable = createRequire(__filename)("electron") as string;
 
 /**

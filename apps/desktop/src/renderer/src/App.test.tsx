@@ -1351,6 +1351,19 @@ describe("explaining a passage with AI", () => {
     expect(button("Explain this passage")).toBeUndefined();
   });
 
+  it("reflects saved AI settings in the Assistant tab without claiming a configured provider is disabled", async () => {
+    const describe = vi.fn().mockResolvedValue({ ...enabledAi, enabled: false });
+    override({ ai: { describe } });
+    await render("#/highlights");
+    await click(button("Open context panel"));
+    await click(document.querySelector("#context-assistant-tab"));
+    expect(document.querySelector("#context-assistant")?.textContent).toContain("AI is disabled.");
+    describe.mockResolvedValue(enabledAi);
+    await act(async () => { window.dispatchEvent(new Event("leaflogue:ai-saved")); await tick(); });
+    expect(document.querySelector("#context-assistant")?.textContent).toContain("Your AI provider is ready.");
+    expect(document.querySelector("#context-assistant")?.textContent).not.toContain("AI is disabled.");
+  });
+
   it("shows what would be sent, records consent once, and returns the explanation", async () => {
     const acceptTerms = vi.fn().mockResolvedValue({ ...enabledAi, providers: [{ ...enabledAi.providers[0], consented: true }] });
     const explainPassage = vi.fn().mockResolvedValue({ providerId: "gemini", model: "gemini-3.8-flash", explanation: "A house read as a presence.", saveable: true });
@@ -1361,7 +1374,7 @@ describe("explaining a passage with AI", () => {
     await render("#/highlights");
     await click(button("Explain this passage"));
 
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     expect(dialog.textContent).toContain("has not sent anything to Google Gemini yet");
     expect(dialog.textContent).toContain("Every room of the House keeps its weather.");
     expect(dialog.textContent).toContain("may be used to improve their products");
@@ -1387,7 +1400,7 @@ describe("explaining a passage with AI", () => {
     });
     await render("#/highlights");
     await click(button("Explain this passage"));
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     expect(dialog.textContent).toContain("Asking about this passage transmits");
     expect(dialog.textContent).toContain("The House, book 1");
     expect(dialog.textContent).toContain("Bloomsbury");
@@ -1407,7 +1420,7 @@ describe("explaining a passage with AI", () => {
     });
     await render("#/highlights");
     await click(button("Explain this passage"));
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     expect(explainPassage).toHaveBeenCalledTimes(1);
     expect(explainPassage.mock.calls[0]?.[0]).not.toHaveProperty("followUp");
     expect(dialog.textContent).toContain("A house read as a presence.");
@@ -1424,6 +1437,10 @@ describe("explaining a passage with AI", () => {
     }));
     expect(dialog.textContent).toContain("What do the tides mean?");
     expect(dialog.textContent).toContain("The tides stand for memory.");
+    await click(document.querySelector("#context-reader-tab"));
+    await click(document.querySelector("#context-assistant-tab"));
+    expect(dialog.textContent).toContain("The tides stand for memory.");
+    expect(explainPassage).toHaveBeenCalledTimes(2);
   });
 
   it("saves an answer as an AI note the passage then shows", async () => {
@@ -1444,7 +1461,7 @@ describe("explaining a passage with AI", () => {
     await render("#/highlights");
     await click(button("Explain this passage"));
 
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     await click(button("Save as note", dialog));
     expect(createNote).toHaveBeenCalledWith({ bookId: firstBookId, highlightId, markdown: "A house read as a presence.", origin: "ai" });
     expect(button("Saved to this highlight", dialog)?.disabled).toBe(true);
@@ -1464,7 +1481,7 @@ describe("explaining a passage with AI", () => {
     });
     await render("#/highlights");
     await click(button("Explain this passage"));
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     expect(dialog.textContent).toContain("I can only help discuss this saved passage.");
     expect(button("Save as note", dialog)).toBeUndefined();
   });
@@ -1486,7 +1503,7 @@ describe("explaining a passage with AI", () => {
     });
     await render("#/highlights");
     await click(button("Explain this passage"));
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     await click(button("Save as note", dialog));
     expect(button("Saved to this highlight", dialog)?.disabled).toBe(true);
     expect(dialog.textContent).toContain("was saved as a note");
@@ -1510,7 +1527,7 @@ describe("explaining a passage with AI", () => {
     });
     await render("#/highlights");
     await click(button("Explain this passage"));
-    const dialog = document.querySelector("dialog[open]")!;
+    const dialog = document.querySelector("#context-assistant")!;
     expect(dialog.querySelector("[role='alert']")?.textContent)
       .toContain("The gemini per-day request limit was reached. Try again in 45 seconds.");
     await click(button("Try again", dialog));
@@ -2357,7 +2374,8 @@ describe("command palette", () => {
     await type(">explain");
     expect(titles()).toContain("Explain this passage");
     await press("Enter");
-    expect(Array.from(document.querySelectorAll("dialog[open] h2")).map((heading) => heading.textContent)).toContain("Reading companion");
+    expect(document.querySelector("#context-assistant-tab")?.getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector("#reading-context")?.hasAttribute("hidden")).toBe(false);
   });
 
   it("imports straight from a plugged-in reader", async () => {

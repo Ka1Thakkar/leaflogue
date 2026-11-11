@@ -98,7 +98,7 @@ test.describe("appearance regression", () => {
     expect(layout.maxHeight).not.toBe("none");
   });
 
-  test("reads a long AI explanation in the reference-style side sheet", async ({ page }, testInfo) => {
+  test("reads a long AI explanation in the tabbed context panel", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "wide", "Desktop companion sheet only");
     await page.setViewportSize({ width: 1440, height: 400 });
     await open(page, "#/settings", "Storage locations");
@@ -111,12 +111,12 @@ test.describe("appearance regression", () => {
     await page.getByRole("heading", { name: "Piranesi", exact: true }).waitFor();
     await page.getByRole("article", { name: "Highlight from Piranesi" }).first().hover();
     await page.getByRole("button", { name: "Explain this passage" }).first().click();
-    const companion = page.getByRole("dialog", { name: "Reading companion" });
+    const companion = page.getByRole("complementary", { name: "Reading context" });
     const consent = companion.getByRole("button", { name: /Send to / });
     if (await consent.isVisible()) await consent.click();
     await expect(companion.getByText(/living presence/u)).toBeVisible();
     const layout = await companion.evaluate((dialog) => {
-      const answer = dialog.querySelector<HTMLElement>(".ui-companion-body")!;
+      const answer = dialog.querySelector<HTMLElement>("#context-assistant")!;
       const bounds = dialog.getBoundingClientRect();
       answer.scrollTop = answer.scrollHeight;
       return {

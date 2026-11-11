@@ -5,23 +5,8 @@
  * from the providers' own image hosts, over HTTPS.
  */
 
-export interface CatalogBook {
-  readonly provider: "google-books" | "open-library";
-  /** The provider's own ID for the record. */
-  readonly providerId: string;
-  readonly title: string;
-  readonly authors: readonly string[];
-  readonly isbn13?: string;
-  readonly description?: string;
-  readonly publisher?: string;
-  readonly language?: string;
-  readonly coverUrl?: string;
-}
-
-export interface CatalogSearch {
-  readonly items: readonly CatalogBook[];
-  readonly source: "google-books" | "open-library";
-}
+import type { CatalogBook, CatalogSearch } from "@leaflogue/contracts";
+export type { CatalogBook, CatalogSearch } from "@leaflogue/contracts";
 
 export interface CatalogOptions {
   /** Raises Google Books' anonymous quota; read from the server's environment. */

@@ -14,5 +14,8 @@
   "devDependencies": {
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@leaflogue/contracts": "^0.0.0"
   }
 }

@@ -1,3 +1,4 @@
+import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
 
@@ -48,6 +49,7 @@ function openPicker(details: HTMLDetailsElement | null): void {
 }
 
 export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly bookId: BookId; readonly focusHighlightId?: HighlightId; readonly mergeWith?: BookId }) {
+  const contextWorkspace = useContextWorkspace();
   const [confirm, confirmDialog] = useConfirm();
   const [contents, setContents] = useState<BookContents | null>();
   const [organization, setOrganization] = useState<BookOrganization>();
@@ -86,6 +88,12 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
     setContents(next ?? null);
     return next;
   }, [bookId]);
+
+  useEffect(() => {
+    const changed = () => { setPassagesVersion((value) => value + 1); void refreshBook(); };
+    window.addEventListener("leaflogue:annotations-changed", changed);
+    return () => window.removeEventListener("leaflogue:annotations-changed", changed);
+  }, [refreshBook]);
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -247,6 +255,7 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
           <h1 className={sheet.title}>{book.title}</h1>
           <p className={sheet.authors}>{authorsLabel(book.authors)}{book.series ? ` · ${book.series}${book.seriesNumber ? ` ${book.seriesNumber}` : ""}` : ""}</p>
           <div className={styles.actions}>
+            {window.leaflogue.epub && <button className="ll-button-secondary" onClick={() => contextWorkspace?.showReader(book.id, book.title)}>Read</button>}
             {!readOnly && (
               <>
                 <AddHighlight bookId={book.id} triggerRef={addHighlightTrigger} onSaved={async () => { setPassagesVersion((current) => current + 1); await refreshBook(); }} />
@@ -285,6 +294,7 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
           <BookTiles book={book} contents={contents} statistics={statistics} activeDays={timeline?.activeDays} firstDay={timeline?.firstDay} lastDay={timeline?.lastDay} />
         </div>
       </section>
+
       {timeline && (
         <div className={sheet.charts} data-columns={positions ? 3 : 2}>
           <Panel title="When you highlighted" actions={<span className="ui-sub">passages per {timeline.unit}</span>} padded>

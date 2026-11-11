@@ -1,51 +1,109 @@
-import { useState } from "react";
-import type { Book, BookMetadataField, BookMetadataSource, UpdateBookMetadata } from "@leaflogue/contracts";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CatalogBook, CatalogSearch, Book, BookMetadataField, BookMetadataSource, UpdateBookMetadata } from "@leaflogue/contracts";
 import { InlineError } from "./shared";
 import styles from "./knowledge.module.css";
 import { useAction } from "./useAction";
 
 export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
   const { pending, error, run } = useAction();
-  return (
-    <form
-      className={styles.form}
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        await run(async () => {
-          const isbn13 = String(form.get("isbn") ?? "").trim();
-          const book = await window.leaflogue.library.createBook({
-            title: String(form.get("title") ?? ""),
-            authors: String(form.get("authors") ?? "").split(/[;\n]/u).map((author) => author.trim()).filter(Boolean),
-            ...(isbn13 ? { isbn13 } : {}),
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [results, setResults] = useState<CatalogSearch>();
+  const [selected, setSelected] = useState<CatalogBook>();
+  const [created, setCreated] = useState<Book>();
+  const request = useRef(0);
+  const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [composing, setComposing] = useState(false);
+  const invalidateSearch = useCallback(() => { request.current++; clearTimeout(debounce.current); }, []);
+  const searchBooks = useCallback(async (value: string, token: number) => {
+    if (!value.trim() || !window.leaflogue.catalog) return;
+    if (new TextEncoder().encode(value).byteLength > 200) { setSearchError("Search must be at most 200 bytes. Try a shorter title or an ISBN."); return; }
+    setSearching(true); setSearchError(""); setResults(undefined);
+    try {
+      const next = await window.leaflogue.catalog.search(value.trim());
+      if (token === request.current) setResults(next);
+    } catch {
+      if (token === request.current) setSearchError("Book search is unavailable. Try again or enter the book manually below.");
+    } finally { if (token === request.current) setSearching(false); }
+  }, []);
+  useEffect(() => {
+    const token = ++request.current;
+    if (!created && !composing && query.trim().length >= 2) {
+      debounce.current = setTimeout(() => { void searchBooks(query, token); }, 400);
+    }
+    return invalidateSearch;
+  }, [query, created, composing, searchBooks, invalidateSearch]);
+  function changeQuery(value: string) {
+    request.current++; clearTimeout(debounce.current);
+    setQuery(value); setResults(undefined); setSearchError(""); setSearching(false);
+  }
+  function choose(item: CatalogBook) {
+    setSelected(item);
+  }
+  return <>
+    {window.leaflogue.catalog && <form className={styles.form} aria-label="Search book catalogue" onSubmit={(event) => {
+      event.preventDefault();
+      if (composing || created) return;
+      clearTimeout(debounce.current);
+      void searchBooks(String(new FormData(event.currentTarget).get("query") ?? ""), ++request.current);
+    }}>
+      <label className="ll-label">Search books online
+        <input className="ll-field" placeholder="Title, author, or ISBN" autoFocus name="query" value={query} onChange={(event) => changeQuery(event.target.value)} onCompositionStart={() => { request.current++; clearTimeout(debounce.current); setComposing(true); }} onCompositionEnd={() => setComposing(false)} maxLength={200} disabled={Boolean(created)} />
+      </label>
+      <p className="ll-muted">Search sends your query to Google Books, with Open Library as a fallback. Your library and notes are not sent.</p>
+      <button className="ll-button-secondary" disabled={searching || !query.trim() || Boolean(created)}>{searching ? "Searching…" : "Search books"}</button>
+      {searching && <p role="status" className="ll-muted">Searching for books…</p>}
+      <InlineError>{searchError}</InlineError>
+      {results && <div aria-live="polite">
+        <p className="ll-muted">{results.source === "google-books" ? "Google Books" : "Open Library"} · {results.items.length ? "Choose an edition to fill in the details below." : "No books found. Try another search or enter the details below."}</p>
+        <ul className={styles.catalogResults} aria-label="Book search results">
+          {results.items.map((item) => <li key={`${item.provider}:${item.providerId}`}>
+            <button type="button" disabled={pending || Boolean(created)} aria-pressed={selected?.provider === item.provider && selected.providerId === item.providerId} onClick={() => choose(item)}>
+              <strong>{item.title}</strong><span>{item.authors.join(", ") || "Unknown author"}</span>
+              <small>{[item.publisher, item.language, item.isbn13 ? `ISBN ${item.isbn13}` : undefined].filter(Boolean).join(" · ")}</small>
+            </button>
+          </li>)}
+        </ul>
+      </div>}
+    </form>}
+    <form key={selected ? `${selected.provider}:${selected.providerId}` : "manual"} className={styles.form} aria-label="Book details" onSubmit={async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const title = String(form.get("title") ?? "");
+      const authors = String(form.get("authors") ?? "");
+      const isbn = String(form.get("isbn") ?? "");
+      await run(async () => {
+        const details = { title, authors: authors.split(/[;\n]/u).map((author) => author.trim()).filter(Boolean), ...(isbn.trim() ? { isbn13: isbn.trim() } : {}) };
+        const book = created ?? await window.leaflogue.library.createBook(details);
+        setCreated(book);
+        let saved = book;
+        if (selected) {
+          saved = await window.leaflogue.library.updateBookMetadata({
+            id: book.id, expectedRevision: book.revision, ...details,
+            ...(selected.description ? { description: selected.description } : {}),
+            ...(selected.publisher ? { publisher: selected.publisher } : {}),
+            ...(selected.language ? { language: selected.language } : {}),
+            ...(selected.coverUrl ? { coverUrl: selected.coverUrl } : {}),
           });
-          onClose();
-          onSaved(book);
-        }, "The book could not be saved. Check its title and ISBN-13, then try again.");
-      }}
-    >
+        }
+        onClose(); onSaved(saved);
+      }, created ? "The book was added, but its extra details could not be saved. Retry to finish saving this book." : "The book could not be saved completely. Check its title and ISBN-13, then try again.");
+    }}>
       <fieldset disabled={pending} className={styles.fields}>
-        <label className="ll-label">
-          Title
-          <input autoFocus required name="title" className="ll-field" maxLength={1000} />
-        </label>
-        <label className="ll-label">
-          Authors
-          <textarea name="authors" className="ll-field" rows={2} />
-          <span className="ll-muted">Separate authors with a new line or semicolon.</span>
-        </label>
-        <label className="ll-label">
-          ISBN
-          <input className="ll-field" name="isbn" inputMode="numeric" />
-        </label>
+        <legend>{selected ? "Review book details" : "Or enter book details manually"}</legend>
+        <label className="ll-label">Title<input autoFocus={!window.leaflogue.catalog} required name="title" className="ll-field" maxLength={1000} defaultValue={selected?.title ?? ""} /></label>
+        <label className="ll-label">Authors<textarea name="authors" className="ll-field" rows={2} defaultValue={selected?.authors.join("\n") ?? ""} /><span className="ll-muted">Separate authors with a new line or semicolon.</span></label>
+        <label className="ll-label">ISBN<input className="ll-field" name="isbn" defaultValue={selected?.isbn13 ?? ""} /></label>
       </fieldset>
+      {created && error && <p role="status">The book already exists in your library. Retry saves its remaining details.</p>}
       <InlineError>{error}</InlineError>
       <div className={styles.actions}>
-        <button className="ll-button" disabled={pending}>{pending ? "Saving…" : "Add book"}</button>
+        <button className="ll-button" disabled={pending}>{pending ? "Saving…" : created ? "Retry saving details" : "Add book"}</button>
         <button type="button" className="ll-button-secondary" disabled={pending} onClick={onClose}>Cancel</button>
       </div>
     </form>
-  );
+  </>;
 }
 
 const METADATA_LABELS: Readonly<Record<BookMetadataField, string>> = {

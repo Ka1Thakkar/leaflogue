@@ -1,3 +1,6 @@
+import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL, type CalibreConnection, type CalibreSearch } from "@leaflogue/contracts";
+import { CATALOG_SEARCH_CHANNEL, type CatalogSearch } from "@leaflogue/contracts";
+import { EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL, type EpubDocument } from "@leaflogue/contracts";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import {
   LIBRARY_CREATE_CHANNEL,
@@ -191,6 +194,19 @@ import {
 } from "@leaflogue/contracts";
 
 const bridge: LeaflogueBridge = Object.freeze({
+  catalog: Object.freeze({ search: (query: string) => ipcRenderer.invoke(CATALOG_SEARCH_CHANNEL, query) as Promise<CatalogSearch> }),
+  calibre: Object.freeze({
+    describe: () => ipcRenderer.invoke(CALIBRE_DESCRIBE_CHANNEL) as Promise<CalibreConnection | undefined>,
+    choose: () => ipcRenderer.invoke(CALIBRE_CHOOSE_CHANNEL) as Promise<CalibreConnection | undefined>,
+    search: (id: BookId, query: string) => ipcRenderer.invoke(CALIBRE_SEARCH_CHANNEL, id, query) as Promise<CalibreSearch>,
+    link: (id: BookId, uuid: string) => ipcRenderer.invoke(CALIBRE_LINK_CHANNEL, id, uuid) as Promise<EpubDocument>,
+  }),
+  epub: Object.freeze({
+    unlink: (id: BookId) => ipcRenderer.invoke(EPUB_UNLINK_CHANNEL, id) as Promise<void>,
+    attach: (bookId: BookId) => ipcRenderer.invoke(EPUB_ATTACH_CHANNEL, bookId) as Promise<EpubDocument | undefined>,
+    open: (bookId: BookId) => ipcRenderer.invoke(EPUB_OPEN_CHANNEL, bookId) as Promise<EpubDocument | undefined>,
+    savePosition: (bookId: BookId, sha256: string, chapter: number, paragraph: number, offset?: number) => ipcRenderer.invoke(EPUB_POSITION_CHANNEL, bookId, sha256, chapter, paragraph, offset) as Promise<void>,
+  }),
   system: Object.freeze({
     describeMcp: (): Promise<McpConfiguration> => ipcRenderer.invoke(MCP_DESCRIBE_CHANNEL) as Promise<McpConfiguration>,
     configureMcp: (enabled: boolean): Promise<McpConfiguration> => ipcRenderer.invoke(MCP_CONFIGURE_CHANNEL, enabled) as Promise<McpConfiguration>,

@@ -1,4 +1,4 @@
-const sharedPolicy = "style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: leaflogue:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
+const sharedPolicy = "style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: leaflogue:; object-src 'none'; frame-src 'self'; base-uri 'none'; form-action 'none'";
 
 /**
  * Vite injects the React-refresh preamble as an inline module in development.

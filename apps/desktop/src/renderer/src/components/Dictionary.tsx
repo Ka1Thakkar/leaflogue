@@ -36,18 +36,34 @@ export function Dictionary() {
       if (open || !(event.target instanceof Element) || event.target.closest('input, textarea, [contenteditable="true"], dialog, [data-dictionary-control]')) return;
       const selected = window.getSelection();
       const word = selected?.toString().trim() ?? "";
-      if (!selected?.rangeCount || !/^[\p{L}][\p{L}\p{M}'’-]{0,59}$/u.test(word) || !event.target.closest("#content")) { setSelection(undefined); return; }
+      if (!selected?.rangeCount || !/^[\p{L}][\p{L}\p{M}'’-]{0,59}$/u.test(word) || !event.target.closest("#content, [data-reading-context]")) { setSelection(undefined); return; }
       const rect = selected.getRangeAt(0).getBoundingClientRect();
       setSelection({ word, left: Math.max(8, Math.min(rect.left, innerWidth - 190)), top: Math.max(8, Math.min(rect.bottom + 8, innerHeight - 48)) });
     };
+    const readerSelection = (event: Event) => {
+      const detail = (event as CustomEvent<{ word: string; left: number; top: number }>).detail;
+      if (!detail) { setSelection(undefined); return; }
+      if (open || typeof detail.word !== "string" || !/^[\p{L}][\p{L}\p{M}'’-]{0,59}$/u.test(detail.word) || !Number.isFinite(detail.left) || !Number.isFinite(detail.top)) return;
+      setSelection({ word: detail.word, left: Math.max(8, Math.min(detail.left, innerWidth - 190)), top: Math.max(8, Math.min(detail.top + 8, innerHeight - 48)) });
+    };
+    window.addEventListener("leaflogue:reader-selection", readerSelection);
     const clear = () => setSelection(undefined);
     document.addEventListener("mouseup", selectedWord);
     window.addEventListener("scroll", clear, true);
     window.addEventListener("resize", clear);
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") clear(); };
     window.addEventListener("keydown", escape);
-    return () => { document.removeEventListener("mouseup", selectedWord); window.removeEventListener("scroll", clear, true); window.removeEventListener("resize", clear); window.removeEventListener("keydown", escape); };
+    return () => { window.removeEventListener("leaflogue:reader-selection", readerSelection); document.removeEventListener("mouseup", selectedWord); window.removeEventListener("scroll", clear, true); window.removeEventListener("resize", clear); window.removeEventListener("keydown", escape); };
   }, [lookup, open]);
+  useEffect(() => {
+    const define = (event: Event) => {
+      const word: unknown = (event as CustomEvent<unknown>).detail;
+      if (typeof word !== "string" || !/^[\p{L}][\p{L}\p{M}'’-]{0,59}$/u.test(word)) return;
+      setQuery(word); setResult(undefined); setError(""); setSelection(undefined); setOpen(true); void search(word);
+    };
+    window.addEventListener("leaflogue:reader-define", define);
+    return () => window.removeEventListener("leaflogue:reader-define", define);
+  }, [search]);
   const close = () => { ++request.current; setPending(false); setOpen(false); setSelection(undefined); trigger.current?.focus(); };
   const show = (word = "") => { setQuery(word); setResult(undefined); setError(""); setSelection(undefined); setOpen(true); if (word) void search(word); };
   function submit(event: FormEvent) { event.preventDefault(); void search(query); }
