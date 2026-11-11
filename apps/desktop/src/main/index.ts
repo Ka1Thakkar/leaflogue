@@ -760,11 +760,20 @@ void app.whenReady().then(async () => {
     const existingSource = pending.sourceProfiles.find(({ id }) => id === input.sourceId);
     if (!existingSource && input.sourceId !== pending.newSourceId) throw new Error("Import source was not reviewed");
     if (!existingSource && !input.newSourceName) throw new Error("Import source name is required");
+    const selections = new Map(input.bookSelections?.map((selection) => [selection.providerRecordId, selection.bookId]));
+    for (const match of pending.bookMatches ?? []) {
+      if (match.links.some((link) => link.sourceId === input.sourceId)) continue;
+      if (!selections.has(match.providerRecordId)) throw new Error("Review the existing book matches before importing.");
+      const selected = selections.get(match.providerRecordId);
+      if (selected !== null && !match.candidates.some((candidate) => candidate.bookId === selected)) throw new Error("That book was not part of the import review.");
+    }
+    if (input.bookSelections?.some((selection) => !pending.bookMatches?.some((match) => match.providerRecordId === selection.providerRecordId))) throw new Error("That book was not part of the import review.");
     if (committingImports.has(input.token)) throw new Error("Import is already being committed");
     committingImports.add(input.token);
     try {
       const receipt = library.importDocument({
         document: pending.preview.document,
+        ...(input.bookSelections ? { bookSelections: input.bookSelections } : {}),
         fileName: pending.fileName,
         provider: pending.provider,
         source: {
@@ -1407,13 +1416,15 @@ function holdImport(provider: ImportProvider, preview: ImportPreview, selectedPa
     name,
     lastImportedAt,
   }));
-  const suggestedSourceId = storedProfiles.find((profile) => profile.pathHintHash === pathHintHash)?.id;
+  const suggestedSourceId = storedProfiles.find((profile) => profile.pathHintHash === pathHintHash)?.id ?? (storedProfiles.length === 1 ? storedProfiles[0]!.id : undefined);
+  const bookMatches = library.reviewImportBooks(preview.document, provider);
   const pending: PendingImport & { readonly pathHintHash: string } = {
     token,
     fileName: basename(selectedPath),
     provider,
     preview,
     sourceProfiles,
+    bookMatches,
     newSourceId: randomUUID(),
     ...(suggestedSourceId ? { suggestedSourceId } : {}),
     suggestedSourceName: suggestedImportSourceName(provider, selectedPath),
@@ -1428,6 +1439,7 @@ function holdImport(provider: ImportProvider, preview: ImportPreview, selectedPa
     provider,
     preview,
     sourceProfiles,
+    bookMatches,
     newSourceId: pending.newSourceId,
     ...(suggestedSourceId ? { suggestedSourceId } : {}),
     suggestedSourceName: pending.suggestedSourceName,

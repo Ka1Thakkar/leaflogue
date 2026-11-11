@@ -87,7 +87,7 @@ test("completes the v0.1.0 local workflow without network access", async () => {
     });
     expect(kindle).toMatch(/1 new book/u);
     const portable = await importFile(session, writePortableExport(profile.files), {
-      fileLabel: /reading-export\.json \(Portable JSON\)/u, books: 2, annotations: 2, sourceName: "Reading export", titles: ["The Glass Orchard", "Notes on Tidewater"],
+      fileLabel: /reading-export\.json \(Portable JSON\)/u, books: 2, annotations: 2, sourceName: "Reading export", titles: ["The Glass Orchard", "Notes on Tidewater"], separateCopies: ["The Glass Orchard"],
     });
     expect(portable).toMatch(/2 new books/u);
     await openRail(page, "Library");
@@ -205,10 +205,10 @@ test("completes the v0.1.0 local workflow without network access", async () => {
     await session.chooseFile(revised);
     await dialog.getByRole("button", { name: "Choose file" }).click();
     const source = dialog.getByLabel("Import source");
-    await expect(source).toContainText("Reading export (used for this file before)");
+    await expect(source).toContainText("Reading export (suggested)");
     await expect(dialog.getByLabel("Name this source")).toHaveCount(0);
     await dialog.getByRole("button", { name: "Import highlights and notes" }).click();
-    await expect(dialog.getByRole("status")).toContainText("Import complete: 0 added, 0 updated.");
+    await expect(dialog.getByRole("status")).toContainText("Import complete: 0 added, 0 updated, 2 existing books kept.");
     await dialog.getByRole("status").getByRole("link", { name: "1 conflicting version saved for review" }).click();
 
     await expect(page.getByRole("heading", { level: 1, name: "Review import changes" })).toBeVisible();

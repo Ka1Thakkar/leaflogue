@@ -29,6 +29,8 @@ import type {
   HighlightQuery,
   HighlightSource,
   ImportBook,
+  ImportBookMatch,
+  ImportBookSelection,
   ImportDocument,
   ImportAnnotation,
   ImportConflict,
@@ -88,7 +90,7 @@ import type {
 } from "@leaflogue/contracts";
 import { dailySelectionWins, MAX_HIGHLIGHT_PAGE, MAX_HIGHLIGHT_SEARCH_LENGTH, MAX_NOTE_BYTES, MAX_NOTES_PER_HIGHLIGHT, MAX_SYNC_CHANGE_PAGE, MAX_SYNC_CONFLICT_PAGE, MAX_STATUS_EVENTS_PER_BOOK, MAX_SYNC_ORGANIZATION_MEMBERSHIPS, MAX_SYNCED_STATUS_EVENTS_PER_BOOK, MAX_THREADS_PER_HIGHLIGHT, assertSyncAcknowledgement, normalizeOrganizationName } from "@leaflogue/contracts";
 import type { SyncAcknowledgement } from "@leaflogue/contracts";
-import { assertUniqueImportIds, chooseDailyHighlightId, normalizeBookMetadata, normalizeIsbn13, resolveLocalDay, validateCompletionDate, type NormalizedBookMetadata } from "@leaflogue/domain";
+import { assertUniqueImportIds, chooseDailyHighlightId, normalizeBookText, normalizeBookMetadata, normalizeIsbn13, resolveLocalDay, validateCompletionDate, type NormalizedBookMetadata } from "@leaflogue/domain";
 import { applyMigrations, latestSchemaVersion, migrations } from "./migrations";
 
 export { recoverInterruptedFileReplacement, replaceFileWithRollback } from "./file-replacement";
@@ -2959,8 +2961,41 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     }
   }
 
+  /** Candidate selection is reviewed by the reader; metadata alone never merges books. */
+  reviewImportBooks(document: ImportDocument, provider: ImportProvider): ImportBookMatch[] {
+    const byTitle = new Map<string, Book[]>();
+    const byIsbn = new Map<string, Book[]>();
+    const all = new Map<BookId, Book>();
+    for (const book of this.listBooks({ includeArchived: true })) {
+      all.set(book.id, book);
+      const title = normalizeBookText(book.title);
+      byTitle.set(title, [...(byTitle.get(title) ?? []), book]);
+      if (book.isbn13) byIsbn.set(book.isbn13, [...(byIsbn.get(book.isbn13) ?? []), book]);
+    }
+    const incomingIds = new Set(document.books.map((book) => book.providerRecordId));
+    const sourceLinks = new Map<string, { sourceId: string; bookId: BookId }[]>();
+    for (const row of this.#database.prepare("SELECT provider_record_id, source_id, book_id FROM source_books JOIN import_sources ON import_sources.id=source_books.source_id WHERE import_sources.provider=?").iterate(provider) as Iterable<{ provider_record_id: string; source_id: string; book_id: BookId }>) {
+      if (!incomingIds.has(row.provider_record_id) || !all.has(row.book_id)) continue;
+      sourceLinks.set(row.provider_record_id, [...(sourceLinks.get(row.provider_record_id) ?? []), { sourceId: row.source_id, bookId: row.book_id }]);
+    }
+    return document.books.flatMap((incoming) => {
+      const links = sourceLinks.get(incoming.providerRecordId) ?? [];
+      const authors = new Set(incoming.authors.map(normalizeBookText));
+      const isbn = incoming.isbn13 ? normalizeIsbn13(incoming.isbn13) : undefined;
+      const candidates = new Map<BookId, Book>();
+      for (const book of [...(isbn ? byIsbn.get(isbn) ?? [] : []), ...(byTitle.get(normalizeBookText(incoming.title)) ?? [])]) {
+        if (isbn && book.isbn13 && isbn !== book.isbn13) continue;
+        if (!(isbn && isbn === book.isbn13) && (!authors.size || !book.authors.some((author) => authors.has(normalizeBookText(author))))) continue;
+        candidates.set(book.id, book);
+      }
+      for (const link of links) candidates.set(link.bookId, all.get(link.bookId)!);
+      return candidates.size ? [{ providerRecordId: incoming.providerRecordId, links, candidates: [...candidates.values()].slice(0, 20).map(({ id, title, authors, archived }) => ({ bookId: id, title, authors, archived })) }] : [];
+    });
+  }
+
   importDocument(input: {
     readonly document: ImportDocument;
+    readonly bookSelections?: readonly ImportBookSelection[];
     readonly fileName: string;
     readonly provider: ImportProvider;
     readonly source: {
@@ -2984,6 +3019,16 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     try {
       const sourceId = this.#sourceId(input.provider, input.source, now);
       const localBooks = new Map<string, BookId>();
+      const selections = new Map((input.bookSelections ?? []).map((selection) => [selection.providerRecordId, selection.bookId]));
+      if (selections.size !== (input.bookSelections?.length ?? 0) || [...selections.keys()].some((id) => !input.document.books.some((book) => book.providerRecordId === id))) throw new Error("Import book selection is invalid.");
+      const recoveredBooks = new Set<BookId>();
+      const adoptedHighlights = new Set<string>();
+      const adoptedNotes = new Set<string>();
+      const incomingPassages = new Map<string, number>();
+      for (const annotation of input.document.annotations) {
+        const key = fingerprint([annotation.bookProviderRecordId, annotation.text, annotation.createdAt]);
+        incomingPassages.set(key, (incomingPassages.get(key) ?? 0) + 1);
+      }
 
       for (const incoming of input.document.books) {
         const linked = this.#database
@@ -3000,6 +3045,13 @@ export class LocalLibrary implements Disposable, LibraryRepository {
              WHERE source_id = ? AND provider_record_id = ?`,
           ).run(fingerprint(incoming), JSON.stringify(incoming), now, sourceId, incoming.providerRecordId);
         } else {
+          const selected = selections.get(incoming.providerRecordId);
+          if (selected) {
+            if (!isUuid(selected) || !this.#database.prepare("SELECT id FROM books WHERE id=? AND deleted_at IS NULL").get(selected)) throw new Error("The reviewed book is no longer available.");
+            bookId = selected;
+            recoveredBooks.add(bookId);
+            receipt.booksReused += 1;
+          } else {
           bookId = randomUUID() as BookId;
           this.#database.prepare(
             `INSERT INTO books
@@ -3020,6 +3072,8 @@ export class LocalLibrary implements Disposable, LibraryRepository {
             now,
             now,
           );
+          receipt.booksCreated += 1;
+          }
           this.#database.prepare(
             `INSERT INTO source_books
               (source_id, provider_record_id, book_id, source_fingerprint, canonical_json, last_seen_at)
@@ -3032,7 +3086,6 @@ export class LocalLibrary implements Disposable, LibraryRepository {
             JSON.stringify(incoming),
             now,
           );
-          receipt.booksCreated += 1;
         }
         localBooks.set(incoming.providerRecordId, bookId);
       }
@@ -3098,6 +3151,41 @@ export class LocalLibrary implements Disposable, LibraryRepository {
           this.#updateSourceAnnotation(sourceId, incoming.providerRecordId, incomingFingerprint, incoming, now);
           receipt.annotationsUpdated += 1;
           continue;
+        }
+
+        // A synced book has no local import provenance on a new installation.
+        // Adopt a unique quotation/source-date match; keep any local location edit.
+        // Repeated passages need a unique exact location as well.
+        if (recoveredBooks.has(bookId) && incoming.text && incoming.createdAt !== undefined) {
+          type ExistingPassage = { id: string; deleted: number; source_location: string | null };
+          const exact = this.#database.prepare(
+            "SELECT id, deleted, source_location FROM highlights WHERE book_id=? AND text=? AND source_created_at=? AND source_location IS ? LIMIT 2",
+          ).all(bookId, incoming.text, incoming.createdAt, incoming.location ?? null) as ExistingPassage[];
+          const fallback = exact.length === 0 && incomingPassages.get(fingerprint([incoming.bookProviderRecordId, incoming.text, incoming.createdAt])) === 1
+            ? this.#database.prepare("SELECT id, deleted, source_location FROM highlights WHERE book_id=? AND text=? AND source_created_at=? LIMIT 2").all(bookId, incoming.text, incoming.createdAt) as ExistingPassage[] : [];
+          const match = exact.length === 1 ? exact[0] : fallback.length === 1 ? fallback[0] : undefined;
+          if (match && !adoptedHighlights.has(match.id)) {
+            adoptedHighlights.add(match.id);
+            const notes = importedNoteBody(incoming.note) ? this.#database.prepare(
+              "SELECT id FROM notes WHERE book_id=? AND highlight_id=? AND markdown=? AND origin='import' AND deleted=0 LIMIT 2",
+            ).all(bookId, match.id, importedNoteBody(incoming.note)!) as { id: string }[] : [];
+            const attachedNoteId = notes.length === 1 && !adoptedNotes.has(notes[0]!.id) ? notes[0]!.id : match.deleted ? null : this.#reconcileImportedNote(bookId, match.id, null, incoming.note, now, receipt);
+            if (attachedNoteId) adoptedNotes.add(attachedNoteId);
+            this.#insertSourceAnnotation(sourceId, incoming.providerRecordId, match.id, null, attachedNoteId, incomingFingerprint, incoming, now);
+            if (match.source_location !== (incoming.location ?? null)) this.#database.prepare("UPDATE source_annotations SET detached=1 WHERE source_id=? AND provider_record_id=?").run(sourceId, incoming.providerRecordId);
+            continue;
+          }
+        }
+
+        if (recoveredBooks.has(bookId) && !incoming.text && importedNoteBody(incoming.note)) {
+          const notes = this.#database.prepare(
+            "SELECT id FROM notes WHERE book_id=? AND highlight_id IS NULL AND markdown=? AND origin='import' LIMIT 2",
+          ).all(bookId, importedNoteBody(incoming.note)!) as { id: string }[];
+          if (notes.length === 1 && !adoptedNotes.has(notes[0]!.id)) {
+            adoptedNotes.add(notes[0]!.id);
+            this.#insertSourceAnnotation(sourceId, incoming.providerRecordId, null, notes[0]!.id, null, incomingFingerprint, incoming, now);
+            continue;
+          }
         }
 
         if (incoming.text) {

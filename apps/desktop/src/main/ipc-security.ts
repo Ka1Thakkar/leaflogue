@@ -52,9 +52,22 @@ export function validateCommitImport(value: unknown): CommitImport {
       (typeof input.newSourceName !== "string" || !input.newSourceName.trim() || input.newSourceName.length > 200)) {
     throw new Error("Import source name is invalid");
   }
+  let bookSelections: CommitImport["bookSelections"];
+  if (input.bookSelections !== undefined) {
+    if (!Array.isArray(input.bookSelections) || input.bookSelections.length > 100_000) throw new Error("Import book selections are invalid");
+    const seen = new Set<string>();
+    bookSelections = input.bookSelections.map((selection: unknown) => {
+      if (!selection || typeof selection !== "object" || Array.isArray(selection)) throw new Error("Import book selection is invalid");
+      const row = selection as Record<string, unknown>;
+      if (typeof row.providerRecordId !== "string" || !row.providerRecordId || row.providerRecordId.length > 2000 || seen.has(row.providerRecordId) || (row.bookId !== null && (typeof row.bookId !== "string" || !isUuid(row.bookId)))) throw new Error("Import book selection is invalid");
+      seen.add(row.providerRecordId);
+      return { providerRecordId: row.providerRecordId, bookId: row.bookId as NonNullable<CommitImport["bookSelections"]>[number]["bookId"] };
+    });
+  }
   return {
     token: input.token,
     sourceId: input.sourceId,
+    ...(bookSelections ? { bookSelections } : {}),
     ...(typeof input.newSourceName === "string" ? { newSourceName: input.newSourceName.trim() } : {}),
   };
 }

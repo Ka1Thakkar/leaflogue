@@ -1065,6 +1065,13 @@ export interface ImportSourceProfile {
   readonly lastImportedAt: number;
 }
 
+export interface ImportBookMatch {
+  readonly providerRecordId: string;
+  readonly candidates: readonly { readonly bookId: BookId; readonly title: string; readonly authors: readonly string[]; readonly archived: boolean }[];
+  readonly links: readonly { readonly sourceId: string; readonly bookId: BookId }[];
+}
+export interface ImportBookSelection { readonly providerRecordId: string; readonly bookId: BookId | null }
+
 export interface PendingImport {
   readonly token: string;
   readonly fileName: string;
@@ -1072,11 +1079,13 @@ export interface PendingImport {
   readonly preview: ImportPreview;
   readonly sourceProfiles: readonly ImportSourceProfile[];
   readonly newSourceId: string;
+  readonly bookMatches?: readonly ImportBookMatch[];
   readonly suggestedSourceId?: string;
   readonly suggestedSourceName: string;
 }
 
 export interface CommitImport {
+  readonly bookSelections?: readonly ImportBookSelection[];
   readonly token: string;
   readonly sourceId: string;
   readonly newSourceName?: string;
