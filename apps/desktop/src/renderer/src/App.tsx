@@ -1,3 +1,4 @@
+import { ContextPanel, ContextPanelToggle, ContextWorkspaceProvider } from "./components/ContextPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Leaf, RefreshCw } from "./components/icons";
 import type { SyncStatus, SystemCapabilities } from "@leaflogue/contracts";
@@ -94,6 +95,10 @@ function useSidebar() {
 }
 
 export function App() {
+  return <ContextWorkspaceProvider><Application /></ContextWorkspaceProvider>;
+}
+
+function Application() {
   const sidebar = useSidebar();
   const hash = useHash();
   const route = parseRoute(hash);
@@ -209,6 +214,7 @@ export function App() {
           onOpenImport={openImport}
           onDismiss={(id) => setDismissed((current) => new Set([...current, ...(id ? [id] : notifications.map((record) => record.id))]))}
         />
+        <ContextPanelToggle />
       </AppHeader>
       <div className="ui-frame">
         <NavRail
@@ -241,6 +247,7 @@ export function App() {
             {route.name === "sync-conflicts" && <SyncConflictsPage onChanged={countSyncConflicts} />}
           </Page>
         </div>
+        <ContextPanel />
       </div>
       {capabilities?.setupRequired && (
         <FirstRunSetup capabilities={capabilities} onComplete={completeSetup} />

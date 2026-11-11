@@ -23,7 +23,7 @@ describe("main-process IPC security", () => {
     expect(() => assertTrustedSenderUrl("leaflogue://app/index.html", true)).not.toThrow();
     expect(() => assertTrustedSenderUrl("http://localhost:5173/", false)).not.toThrow();
     expect(() => assertTrustedSenderUrl("https://127.0.0.1:5173/", false)).not.toThrow();
-    for (const untrusted of [undefined, "not a URL", "https://example.com", "file:///tmp/app.html", "http://localhost.attacker.test"]) {
+    for (const untrusted of [undefined, "not a URL", "https://example.com", "about:srcdoc", "file:///tmp/app.html", "http://localhost.attacker.test"]) {
       expect(() => assertTrustedSenderUrl(untrusted, false)).toThrow(/Untrusted/);
     }
     expect(() => assertTrustedSenderUrl("http://localhost:5173/", true)).toThrow(/Untrusted/);

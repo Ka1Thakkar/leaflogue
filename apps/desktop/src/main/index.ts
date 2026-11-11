@@ -1,3 +1,9 @@
+import { CalibreLibrary } from "./calibre";
+import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL } from "@leaflogue/contracts";
+import { searchCatalog } from "@leaflogue/catalog";
+import { CATALOG_SEARCH_CHANNEL } from "@leaflogue/contracts";
+import { EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL } from "@leaflogue/contracts";
+import { EpubStore } from "./epub";
 import { mcpAccessEnabled, mcpAccessFile, saveMcpAccess } from "./mcp-access";
 import { serveLocalMcp } from "./mcp-server";
 import { chmodSync, closeSync, copyFileSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -479,6 +485,51 @@ void app.whenReady().then(async () => {
       } } : {}),
     } } }, null, 2),
   });
+  registerTrustedHandler(ipcMain, CATALOG_SEARCH_CHANNEL, () => app.isPackaged, (query: unknown) => {
+    if (typeof query !== "string") throw new Error("Enter a title, author, or ISBN.");
+    return searchCatalog(query);
+  });
+  const epubStore = () => {
+    if (!libraryPath) throw new Error("Local library unavailable");
+    return new EpubStore(`${libraryPath}.epubs`, (reference) => calibre().resolve(reference));
+  };
+  const epubBook = (id: unknown) => {
+    if (!library || typeof id !== "string" || !isUuid(id) || !library.getBookContents(id as BookId)) throw new Error("Book request is invalid");
+    return id as BookId;
+  };
+  const calibre = () => {
+    if (!libraryPath) throw new Error("Local library unavailable");
+    return new CalibreLibrary(`${libraryPath}.calibre.json`);
+  };
+  registerTrustedHandler(ipcMain, CALIBRE_DESCRIBE_CHANNEL, () => app.isPackaged, () => calibre().describe());
+  registerTrustedHandler(ipcMain, CALIBRE_CHOOSE_CHANNEL, () => app.isPackaged, async () => {
+    const service = calibre();
+    const selected = await dialog.showOpenDialog({ title: "Choose your Calibre library folder", properties: ["openDirectory"] });
+    return selected.canceled || !selected.filePaths[0] ? undefined : service.connect(selected.filePaths[0]);
+  });
+  registerTrustedHandler(ipcMain, CALIBRE_SEARCH_CHANNEL, () => app.isPackaged, (id: unknown, query: unknown) => {
+    const bookId = epubBook(id);
+    if (typeof query !== "string") throw new Error("Invalid Calibre search.");
+    return calibre().search(query, library!.getBookContents(bookId)!.book);
+  });
+  registerTrustedHandler(ipcMain, CALIBRE_LINK_CHANNEL, () => app.isPackaged, async (id: unknown, uuid: unknown) => {
+    const bookId = epubBook(id); const store = epubStore(); const service = calibre();
+    if (typeof uuid !== "string") throw new Error("Choose a Calibre book.");
+    const linked = await service.reference(uuid);
+    return store.attach(bookId, linked.path, linked.reference);
+  });
+  registerTrustedHandler(ipcMain, EPUB_UNLINK_CHANNEL, () => app.isPackaged, (id: unknown) => epubStore().unlink(epubBook(id)));
+  registerTrustedHandler(ipcMain, EPUB_OPEN_CHANNEL, () => app.isPackaged, (id: unknown) => epubStore().open(epubBook(id)));
+  registerTrustedHandler(ipcMain, EPUB_ATTACH_CHANNEL, () => app.isPackaged, async (id: unknown) => {
+    const bookId = epubBook(id);
+    const store = epubStore();
+    const chosen = await dialog.showOpenDialog({ title: "Attach a local DRM-free EPUB", properties: ["openFile"], filters: [{ name: "EPUB books", extensions: ["epub"] }] });
+    if (chosen.canceled || !chosen.filePaths[0]) return undefined;
+    const path = chosen.filePaths[0];
+    if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
+    return store.attach(bookId, path);
+  });
+  registerTrustedHandler(ipcMain, EPUB_POSITION_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, chapter: unknown, paragraph: unknown, offset: unknown) => epubStore().savePosition(epubBook(id), hash, chapter, paragraph, offset));
   registerTrustedHandler(ipcMain, MCP_DESCRIBE_CHANNEL, () => app.isPackaged, describeMcp);
   registerTrustedHandler(ipcMain, MCP_CONFIGURE_CHANNEL, () => app.isPackaged, (enabled: unknown) => {
     if (typeof enabled !== "boolean") throw new Error("MCP access must be enabled or disabled");

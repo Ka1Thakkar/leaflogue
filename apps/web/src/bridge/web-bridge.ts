@@ -1,3 +1,4 @@
+import type { CatalogSearch } from "@leaflogue/contracts";
 import type {
   BookId,
   ImportAnnotation,
@@ -83,6 +84,7 @@ export function createWebBridge(options: WebBridgeOptions): LeaflogueBridge {
         return true;
       },
     },
+    catalog: { search: (query: string) => client.action<CatalogSearch>("catalogRuntime:search", { query }) },
     library,
     covers: {
       // The browser loads the image itself; only https covers are shown.

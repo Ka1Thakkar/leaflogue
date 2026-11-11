@@ -534,6 +534,7 @@ function AiSection({ onDirtyChange }: { readonly onDirtyChange: (dirty: boolean)
               ...(clearSavedKey ? { clearSavedApiKey: true } : {}),
             });
             setConfig(result);
+            window.dispatchEvent(new Event("leaflogue:ai-saved"));
             setApiKey("");
             setClearSavedKey(false);
             setMessage(desktop ? "AI preferences saved. The API key was not returned to the interface." : "AI preferences saved.");

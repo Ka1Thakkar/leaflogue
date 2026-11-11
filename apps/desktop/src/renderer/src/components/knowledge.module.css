@@ -747,3 +747,10 @@
 .companionComposer textarea { min-width: 0; max-height: 8rem; resize: vertical; padding: 8px 10px; color: var(--ui-text); background: var(--ui-bg); border: 1px solid var(--ui-control); border-radius: var(--ui-radius-sm); font: inherit; }
 .companionComposer textarea:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 .companionFooter { margin: 8px 0 0; color: var(--ui-dim); font: var(--ui-text-xs)/1.4 var(--ui-font); }
+
+.catalogResults { display: grid; gap: 6px; max-height: 18rem; overflow-y: auto; margin-block: 10px 16px; }
+.catalogResults button { display: grid; gap: 3px; width: 100%; padding: 10px 12px; text-align: left; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius); background: var(--ui-bg); cursor: pointer; }
+.catalogResults button:hover, .catalogResults button[aria-pressed="true"] { background: var(--ui-raised); }
+.catalogResults span, .catalogResults small { color: var(--ui-dim); }
+.contextLink { display: inline-flex; align-items: center; gap: 5px; width: fit-content; margin-block: 6px; padding: 4px 0; border: 0; background: transparent; color: var(--ui-dim); font: 500 12px var(--ui-font); cursor: pointer; }
+.contextLink:hover { color: var(--ui-text); text-decoration: underline; text-underline-offset: 3px; }

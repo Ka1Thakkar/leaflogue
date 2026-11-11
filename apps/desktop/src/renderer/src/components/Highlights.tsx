@@ -1,3 +1,4 @@
+import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
 
@@ -15,11 +16,12 @@ import { countOf, Dialog, Empty, FilterToggle, ImportTrigger, InlineError, Loadi
 import styles from "./knowledge.module.css";
 import sheet from "./highlights.module.css";
 import { HighlightForm, NoteCard, NoteForm } from "./PassageForms";
-import { ExplainPassage, HighlightTags, HighlightThreads, ImportedOriginal, PassageContext } from "./PassageActions";
+import { HighlightTags, HighlightThreads, ImportedOriginal, PassageContext } from "./PassageActions";
 
 const PAGE_SIZE = 20;
 
 function Annotation({ highlight, showBook, focused = false }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean }) {
+  const contextWorkspace = useContextWorkspace();
   const { tags, reload, readOnly, aiEnabled, activeId, setActiveId } = useContext(PassageContext);
   const [confirm, confirmDialog] = useConfirm();
   const [editing, setEditing] = useState(false);
@@ -89,15 +91,14 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
             <blockquote className={styles.quote}>
               <PassageText text={highlight.text} />
             </blockquote>
+            {window.leaflogue.epub && contextWorkspace && <button className={styles.contextLink} onClick={() => contextWorkspace.showPassage(highlight)}><BookOpen size={15} aria-hidden="true" />Read in context</button>}
             {highlight.notes.map((note) => <NoteCard key={note.id} note={note} readOnly={readOnly} onSaved={reload} />)}
             {tagNames.length > 0 && <ul className={styles.tagChips} aria-label="Tags">{tagNames.map((tag) => <li key={tag.id}>{tag.name}</li>)}</ul>}
           </div>
           {!readOnly && !deleted && (
             <div className={styles.actions}>
               {aiEnabled && (
-                <Dialog label="Explain this passage" title="Reading companion" icon={Sparkles} iconOnly presentation="sidebar" triggerRef={explainTrigger}>
-                  {(close) => <ExplainPassage highlight={highlight} onClose={close} />}
-                </Dialog>
+                <button className="ll-icon-button" aria-label="Explain this passage" title="Explain this passage" ref={explainTrigger} onClick={() => contextWorkspace?.showAssistant({ highlight, reload, readOnly })}><Sparkles size={18} aria-hidden="true" /></button>
               )}
               <Dialog label="Add to thematic thread" title="Thematic threads" icon={Network} iconOnly>
                 {(close) => <HighlightThreads highlight={highlight} onClose={close} />}
@@ -252,6 +253,7 @@ export function HighlightList({
   const reload = useCallback(async () => {
     await load(Math.max(PAGE_SIZE, loaded.current), true);
     onChanged?.();
+    window.dispatchEvent(new Event("leaflogue:annotations-changed"));
   }, [load, onChanged]);
 
   // Appends the next page instead of re-reading everything already shown.

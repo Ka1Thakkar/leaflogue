@@ -1,3 +1,4 @@
+import { CATALOG_SEARCH_CHANNEL } from "@leaflogue/contracts";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BACKUP_CREATE_CHANNEL,
@@ -128,7 +129,15 @@ describe("preload IPC bridge", () => {
     expect(Object.keys(bridge.widgets).sort()).toEqual(["delete", "evaluate", "export", "import", "save"]);
     expect(Object.keys(bridge.ai).sort()).toEqual(["acceptTerms", "cancel", "describe", "describeExplainTask", "explainPassage", "save"]);
     expect(Object.keys(bridge.appearance).sort()).toEqual(["describe", "exportTheme", "importTheme", "onChanged", "openThemesFolder", "save"]);
-    expect(Object.keys(bridge).sort()).toEqual(["ai", "appearance", "backups", "covers", "daily", "dashboards", "exports", "imports", "library", "organization", "remote", "statistics", "sync", "system", "threads", "updates", "widgets"]);
+    expect(Object.isFrozen(bridge.epub)).toBe(true);
+    expect(Object.keys(bridge.epub!)).toEqual(["unlink", "attach", "open", "savePosition"]);
+    expect(Object.keys(bridge).sort()).toEqual(["ai", "appearance", "backups", "calibre", "catalog", "covers", "daily", "dashboards", "epub", "exports", "imports", "library", "organization", "remote", "statistics", "sync", "system", "threads", "updates", "widgets"]);
+  });
+
+  it("routes catalogue searches through a fixed channel without exposing raw IPC", async () => {
+    expect(Object.isFrozen(bridge.catalog)).toBe(true);
+    await bridge.catalog!.search("A quiet beginning");
+    expect(electron.invoke).toHaveBeenCalledWith(CATALOG_SEARCH_CHANNEL, "A quiet beginning");
   });
 
   it("subscribes to appearance changes without exposing raw IPC", () => {

@@ -25,7 +25,7 @@ async function focusedName(page: Page): Promise<string> {
 }
 
 /** Press Tab until the focused control has `name`, failing after `limit` presses. */
-async function tabTo(page: Page, name: string | RegExp, limit = 30, key: "Tab" | "Shift+Tab" = "Tab"): Promise<void> {
+async function tabTo(page: Page, name: string | RegExp, limit = 40, key: "Tab" | "Shift+Tab" = "Tab"): Promise<void> {
   const matches = (value: string) => typeof name === "string" ? value === name : name.test(value);
   const reached: string[] = [];
   for (let step = 0; step < limit; step += 1) {
@@ -151,7 +151,7 @@ test("completes setup and core navigation with the keyboard alone", async () => 
     await tabTo(page, "Add book");
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: "Add a book" });
-    await expect(dialog.getByLabel("Title")).toBeFocused();
+    await expect(dialog.getByLabel("Search books online")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
@@ -160,7 +160,9 @@ test("completes setup and core navigation with the keyboard alone", async () => 
     await expect(page.locator("dialog input[name='title']")).toHaveCount(0);
 
     await page.keyboard.press("Enter");
-    await expect(dialog.getByLabel("Title")).toBeFocused();
+    await expect(dialog.getByLabel("Search books online")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByLabel("Title", { exact: true })).toBeFocused();
     await page.keyboard.type("Keyboard Almanac");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { level: 1, name: "Keyboard Almanac" })).toBeVisible();
@@ -333,7 +335,7 @@ test("reports a rejected book without disturbing the imported shelf", async () =
   await form.getByLabel("Title").fill("An invalid identifier");
   await form.getByLabel("ISBN").fill("not-an-isbn");
   await form.getByRole("button", { name: "Add book" }).click();
-  await expect(form.getByRole("alert")).toHaveText("The book could not be saved. Check its title and ISBN-13, then try again.");
+  await expect(form.getByRole("alert")).toHaveText("The book could not be saved completely. Check its title and ISBN-13, then try again.");
   await form.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByText("2 books", { exact: true })).toBeVisible();
   await session.close();

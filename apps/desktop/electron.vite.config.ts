@@ -6,7 +6,7 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ["@leaflogue/ai", "@leaflogue/appearance", "@leaflogue/contracts", "@leaflogue/domain", "@leaflogue/importers", "@leaflogue/remote", "@leaflogue/storage", "@leaflogue/ui"],
+        exclude: ["@leaflogue/catalog", "@leaflogue/ai", "@leaflogue/appearance", "@leaflogue/contracts", "@leaflogue/domain", "@leaflogue/importers", "@leaflogue/remote", "@leaflogue/storage", "@leaflogue/ui"],
       }),
     ],
     build: {

@@ -77,6 +77,24 @@ export interface Book {
   readonly highlightCount: number;
 }
 
+export interface CatalogBook {
+  readonly provider: "google-books" | "open-library";
+  /** The provider's own ID for the record. */
+  readonly providerId: string;
+  readonly title: string;
+  readonly authors: readonly string[];
+  readonly isbn13?: string;
+  readonly description?: string;
+  readonly publisher?: string;
+  readonly language?: string;
+  readonly coverUrl?: string;
+}
+
+export interface CatalogSearch {
+  readonly items: readonly CatalogBook[];
+  readonly source: "google-books" | "open-library";
+}
+
 export interface NewBook {
   readonly title: string;
   readonly authors?: readonly string[];
@@ -1819,7 +1837,43 @@ export interface McpConfiguration {
   readonly clientConfiguration: string;
 }
 
+export const CATALOG_SEARCH_CHANNEL = "catalog:search";
+
+export const CALIBRE_DESCRIBE_CHANNEL = "calibre:describe";
+export const CALIBRE_CHOOSE_CHANNEL = "calibre:choose";
+export const CALIBRE_SEARCH_CHANNEL = "calibre:search";
+export const CALIBRE_LINK_CHANNEL = "calibre:link";
+export const EPUB_UNLINK_CHANNEL = "epub:unlink";
+export interface CalibreReference { readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
+export interface CalibreConnection { readonly libraryId: string; readonly name: string; readonly epubCount: number }
+export interface CalibreBook { readonly uuid: string; readonly title: string; readonly authors: readonly string[]; readonly isbn13?: string; readonly match: "isbn" | "title-author" | "none" }
+export interface CalibreSearch { readonly books: readonly CalibreBook[]; readonly hasMore: boolean }
+
+export const EPUB_ATTACH_CHANNEL = "epub:attach";
+export const EPUB_OPEN_CHANNEL = "epub:open";
+export const EPUB_POSITION_CHANNEL = "epub:position";
+
+export interface EpubDocument {
+  readonly sha256: string;
+  readonly chapters: readonly { readonly id: string; readonly title: string; readonly text: string; readonly html?: string; readonly styles?: string; readonly paragraphs?: readonly string[] }[];
+  readonly position: { readonly chapter: number; readonly paragraph: number; readonly offset?: number };
+}
+
 export interface LeaflogueBridge {
+  readonly calibre?: {
+    describe(): Promise<CalibreConnection | undefined>;
+    choose(): Promise<CalibreConnection | undefined>;
+    search(bookId: BookId, query: string): Promise<CalibreSearch>;
+    link(bookId: BookId, bookUuid: string): Promise<EpubDocument>;
+  };
+  readonly catalog?: { search(query: string): Promise<CatalogSearch> };
+  /** Desktop-only, local book files. Never automatically uploaded with library sync. */
+  readonly epub?: {
+    unlink?(bookId: BookId): Promise<void>;
+    attach(bookId: BookId): Promise<EpubDocument | undefined>;
+    open(bookId: BookId): Promise<EpubDocument | undefined>;
+    savePosition(bookId: BookId, sha256: string, chapter: number, paragraph: number, offset?: number): Promise<void>;
+  };
   readonly system: {
     getCapabilities(): Promise<SystemCapabilities>;
     completeSetup(): Promise<SystemCapabilities>;
