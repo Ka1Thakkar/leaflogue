@@ -2,7 +2,8 @@ name: Beta artifact verification
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  # GitHub requires write permission to download unpublished draft assets.
+  contents: write
 jobs:
   verify:
     runs-on: ubuntu-24.04
