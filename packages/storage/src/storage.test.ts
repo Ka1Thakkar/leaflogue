@@ -3105,3 +3105,32 @@ it("keeps a local location edit when an identical source quotation and date reco
     expect(library.getBookContents(book.id)).toEqual(original);
   } finally { library.close(); }
 });
+
+it("does not let retained tombstone rows reserve an ISBN after duplicate cleanup", () => {
+  const directory = mkdtempSync(join(tmpdir(), "leaflogue-tombstone-isbn-"));
+  const path = join(directory, "library.sqlite");
+  const library = new LocalLibrary(path);
+  try {
+    const removed = library.createBook({ title: "Removed duplicate", isbn13: "9780306406157" });
+    const survivor = library.createBook({ title: "Surviving book" });
+    const live = library.createBook({ title: "Another live edition", isbn13: "9781635575637" });
+    // Match scripted duplicate cleanup: retain the row and ISBN for sync,
+    // but mark the book deleted instead of deleting its history physically.
+    const database = new DatabaseSync(path);
+    database.prepare("UPDATE books SET deleted_at=1234, revision=revision+1 WHERE id=?").run(removed.id);
+    database.prepare("INSERT INTO sync_tombstones(entity_type,entity_id,book_id,revision,deleted_at) VALUES('book',?,?,2,1234)").run(removed.id, removed.id);
+    database.close();
+    expect(library.getBook(removed.id)).toBeUndefined();
+    const claimed = library.updateBookMetadata({ id: survivor.id, expectedRevision: survivor.revision, title: survivor.title, authors: [], isbn13: removed.isbn13 });
+    expect(claimed.isbn13).toBe(removed.isbn13);
+    const edited = library.updateBookMetadata({ id: claimed.id, expectedRevision: claimed.revision, title: "Edited after cleanup", authors: [], isbn13: claimed.isbn13 });
+    expect(edited.title).toBe("Edited after cleanup");
+    expect(() => library.updateBookMetadata({ id: edited.id, expectedRevision: edited.revision, title: edited.title, authors: [], isbn13: live.isbn13 })).toThrow(/Another book already has that ISBN-13/u);
+    expect(() => library.updateBookMetadata({ id: removed.id, expectedRevision: 2, title: "Must stay deleted", authors: [] })).toThrow(/changed elsewhere or no longer exists/u);
+    expect(library.getBook(removed.id)).toBeUndefined();
+    const inspection = new DatabaseSync(path, { readOnly: true });
+    expect(inspection.prepare("SELECT isbn13,deleted_at FROM books WHERE id=?").get(removed.id)).toMatchObject({ isbn13: removed.isbn13, deleted_at: 1234 });
+    expect(inspection.prepare("SELECT count(*) count FROM sync_tombstones WHERE entity_type='book' AND entity_id=?").get(removed.id)).toMatchObject({ count: 1 });
+    inspection.close();
+  } finally { library.close(); rmSync(directory, { recursive: true, force: true }); }
+});

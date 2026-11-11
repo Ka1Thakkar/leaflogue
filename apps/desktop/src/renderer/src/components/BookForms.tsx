@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CatalogBook, CatalogSearch, Book, BookMetadataField, BookMetadataSource, UpdateBookMetadata } from "@leaflogue/contracts";
+import { normalizeBookMetadata } from "@leaflogue/domain";
 import { InlineError } from "./shared";
 import styles from "./knowledge.module.css";
 import { useAction } from "./useAction";
@@ -145,10 +146,32 @@ export function resettableFields(book: Book, source: BookMetadataSource | undefi
     .filter((field) => metadataValue(current, field) !== metadataValue(source.values, field));
 }
 
-export function MetadataForm({ book, onClose, onSaved }: { readonly book: Book; readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
+function metadataSaveError(error: unknown): string {
+  const messages: Record<string, string> = {
+    "Another book already has that ISBN-13": "Another book already uses this ISBN-13. Review the duplicate book or choose a different ISBN.",
+    "Book changed elsewhere or no longer exists": "This book changed while the editor was open. Your edits are still here; review the latest book details before saving again.",
+    "ISBN-13 is invalid": "Enter a valid 13-digit ISBN, or leave the ISBN empty.",
+    "Book title is required": "Enter a book title.",
+    "Book title is too long": "The title must be no longer than 1,000 characters.",
+    "Book authors are invalid": "Enter up to 50 authors, separated by a new line or semicolon.",
+    "Book author is too long": "Each author name must be no longer than 500 characters.",
+    "Book description is too long": "The description must be no longer than 20,000 characters.",
+    "Book publisher is too long": "The publisher must be no longer than 500 characters.",
+    "Book series is too long": "The series must be no longer than 500 characters.",
+    "Book series number is too long": "The series number must be no longer than 40 characters.",
+    "Book cover URL is too long": "The cover image URL must be no longer than 2,048 characters.",
+    "Book cover URL must be an HTTPS URL without embedded credentials": "Use an HTTPS cover image URL without a username or password.",
+  };
+  if (error instanceof Error) for (const [suffix, message] of Object.entries(messages)) if (error.message.includes(suffix)) return message;
+  return "The metadata could not be saved. Your edits are still here. Try again.";
+}
+
+export function MetadataForm({ book: initialBook, onClose, onSaved }: { readonly book: Book; readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
+  const [book] = useState(initialBook);
   const { pending, setPending, error, setError } = useAction();
   return (
     <form
+      aria-label="Edit book metadata"
       className={styles.form}
       onSubmit={async (event) => {
         event.preventDefault();
@@ -157,7 +180,7 @@ export function MetadataForm({ book, onClose, onSaved }: { readonly book: Book; 
         setPending(true);
         setError("");
         try {
-          const saved = await window.leaflogue.library.updateBookMetadata({
+          const input: UpdateBookMetadata = {
             id: book.id,
             expectedRevision: book.revision,
             title: String(form.get("title") ?? ""),
@@ -169,11 +192,22 @@ export function MetadataForm({ book, onClose, onSaved }: { readonly book: Book; 
             ...(optional("isbn13") ? { isbn13: optional("isbn13") } : {}),
             ...(optional("coverUrl") ? { coverUrl: optional("coverUrl") } : {}),
             ...(book.language ? { language: book.language } : {}),
-          });
+          };
+          normalizeBookMetadata(input);
+          let saved: Book;
+          try { saved = await window.leaflogue.library.updateBookMetadata(input); }
+          catch (error) {
+            if (!(error instanceof Error) || !error.message.includes("Book changed elsewhere or no longer exists")) throw error;
+            const latest = await window.leaflogue.library.getBookContents(book.id);
+            // A highlight/note or sync can advance the revision without changing
+            // metadata. Retry only that case; never overwrite changed fields.
+            if (!latest || (Object.keys(METADATA_LABELS) as BookMetadataField[]).some((field) => metadataValue(metadataOf(book), field) !== metadataValue(metadataOf(latest.book), field))) throw error;
+            saved = await window.leaflogue.library.updateBookMetadata({ ...input, expectedRevision: latest.book.revision });
+          }
           onSaved(saved);
           onClose();
-        } catch {
-          setError("The metadata could not be saved. Check the title and ISBN-13; the book may also have changed elsewhere.");
+        } catch (error) {
+          setError(metadataSaveError(error));
         } finally {
           setPending(false);
         }
@@ -204,7 +238,7 @@ export function MetadataForm({ book, onClose, onSaved }: { readonly book: Book; 
         <label className="ll-label">
           Cover image URL
           <input className="ll-field" name="coverUrl" type="url" inputMode="url" defaultValue={book.coverUrl} maxLength={2_048} placeholder="https://…" />
-          <span className="ll-muted">HTTPS cover images from Google Books, Open Library, and Internet Archive are loaded through Leaflogue's private cache.</span>
+          <span className="ll-muted">Public HTTPS cover images are loaded through Leaflogue's private cache.</span>
         </label>
       </fieldset>
       <InlineError>{error}</InlineError>

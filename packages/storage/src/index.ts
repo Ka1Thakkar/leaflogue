@@ -1288,8 +1288,11 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     const now = Date.now();
     this.#database.exec("BEGIN IMMEDIATE");
     try {
+      const current = this.#database.prepare("SELECT isbn13 FROM books WHERE id=? AND revision=? AND archived=0 AND deleted_at IS NULL").get(input.id, input.expectedRevision) as { isbn13: string | null } | undefined;
+      if (!current) throw new Error("Book changed elsewhere or no longer exists");
+      // Retained tombstones are sync history, not live ISBN owners.
       if (metadata.isbn13) {
-        const holder = this.#database.prepare("SELECT id FROM books WHERE isbn13 = ? AND id != ?").get(metadata.isbn13, input.id);
+        const holder = this.#database.prepare("SELECT id FROM books WHERE isbn13 = ? AND id != ? AND deleted_at IS NULL").get(metadata.isbn13, input.id);
         if (holder) throw new Error("Another book already has that ISBN-13");
       }
       const result = this.#database.prepare(
