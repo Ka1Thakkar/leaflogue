@@ -70,7 +70,7 @@ in [`tests/marketing`](tests/marketing/README.md); dictionary credits are in
 
 ## Get Leaflogue
 
-**[0.1.1-beta.2 is available as an experimental beta](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.2).**
+**[0.1.1-beta.3 is available as an experimental beta](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.3).**
 Automated checks and signed update-feed validation pass. Clean-desktop
 installation, manual updates/uninstall,
 and actual Orca, VoiceOver, and Narrator acceptance are still pending.
@@ -115,7 +115,7 @@ Deployment variables are documented in
 
 ## Reader beta and next steps
 
-**0.1.1-beta.2** adds a paged local EPUB reader, a right context sidebar,
+**0.1.1-beta.3** adds a paged local EPUB reader, a right context sidebar,
 read-only Calibre linking with EPUB/KEPUB choice and no duplicate files, shared library
 highlights and notes, and navigation between a passage and its EPUB context.
 Add book searches Google Books as you type, with Open Library fallback.

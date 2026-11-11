@@ -3,7 +3,7 @@ title: Link your Calibre library
 description: Read Calibre-managed EPUBs without copying them or changing your Calibre library.
 ---
 
-Calibre linking is included in the experimental **0.1.1-beta.2** desktop
+Calibre linking is included in the experimental **0.1.1-beta.3** desktop
 release. See the [release notes](/start/release-notes/).
 
 
