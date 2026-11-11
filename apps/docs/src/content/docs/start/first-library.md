@@ -18,8 +18,16 @@ Choose **Import** on the library page. Pick your e-reader's highlights file,
 review what Leaflogue found, name the source, and confirm the import. The
 [importing guide](/library/importing/) shows where each reader keeps its files.
 
-To start with a paper book instead, choose **Add book**, enter its title and
-author, and open the book to add your first highlight.
+You can also choose **Add book** and enter its title and author manually.
+In 0.1.1 development builds, **Search books online** finds editions by title,
+author, or ISBN. Search starts after you type at least two characters and
+pause briefly; **Search books** or Enter searches immediately. Queries go to
+Google Books, with Open Library as a fallback. Choose an edition, review its
+details, and save. Manual entry remains available offline.
+
+In those builds, **Read** on a desktop book page opens the
+[EPUB reader](/library/epub/). Link your file directly or
+[choose it from Calibre](/library/calibre/); no duplicate EPUB is created.
 
 ## 3. Keep a thought beside a passage
 

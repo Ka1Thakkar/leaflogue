@@ -42,7 +42,7 @@ export default defineConfig({
       },
       sidebar: [
         { label: "Start here", items: ["start/install", "start/first-library", "start/navigation", "start/files-and-settings", "start/release-notes"] },
-        { label: "Your library", items: ["library/importing", "library/reading", "library/dictionary", "library/dashboards", "library/backups", "library/exporting"] },
+        { label: "Your library", items: ["library/importing", "library/reading", "library/epub", "library/calibre", "library/dictionary", "library/dashboards", "library/backups", "library/exporting"] },
         { label: "Widgets", items: ["widgets/custom-widgets", "widgets/plugins"] },
         { label: "Sync (optional)", items: ["sync/overview", "sync/convex", "sync/postgresql", "sync/conflicts"] },
         { label: "AI and agents (optional)", items: ["ai/gemini", "ai/mcp"] },

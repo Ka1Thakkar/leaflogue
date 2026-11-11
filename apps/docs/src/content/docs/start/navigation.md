@@ -50,6 +50,20 @@ Windows and Linux). Drag the sidebar's right edge to make it wider or
 narrower; drag it most of the way closed, or double-click the edge, to fold
 it back to icons. Leaflogue remembers your choice.
 
+## Reader and Assistant panel
+
+In 0.1.1 development builds, the header's rightmost button opens or closes a
+right-hand context panel with **Reader** and **Assistant** tabs. **Read** on
+a desktop book opens the Reader; **Explain this passage** opens the Assistant.
+Drag the panel's left edge to resize it. Its expand control fills the workspace;
+restore split view to see the book page beside it. Narrow windows show the
+panel across the available workspace.
+
+Switching tabs or closing the panel keeps the current session in that window.
+Reader position is saved across restarts; assistant conversations are not.
+Use Left/Right or Home/End while a tab is focused to switch tabs. Reader page
+controls are listed in [Read an EPUB](/library/epub/#turn-pages-and-change-the-display).
+
 ## Keyboard shortcuts
 
 | Press | To |

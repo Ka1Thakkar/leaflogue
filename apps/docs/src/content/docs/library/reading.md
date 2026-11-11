@@ -3,6 +3,14 @@ title: Read and organise
 description: Work with passages and notes, follow threads, and explore your reading activity.
 ---
 
+## Read a local EPUB
+
+In 0.1.1 development builds, choose **Read** on a desktop book page to link a
+DRM-free EPUB or a Calibre-managed file. See [Read an EPUB](/library/epub/)
+and [Link your Calibre library](/library/calibre/) for page controls,
+highlights, notes, and local-file limits. These features are not in the
+published 0.1.0-beta.3 download yet.
+
 ## Work with a passage
 
 Passages use the full width of the page, on a book's page and in Highlights.
