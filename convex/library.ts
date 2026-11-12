@@ -633,7 +633,8 @@ export const updateBookMetadata = internalMutation({
       throw new Error("Book changed elsewhere or no longer exists");
     }
     if (metadata.isbn13) {
-      const holders = await ctx.db.query("books").withIndex("by_library_and_isbn13", (q) => q.eq("libraryId", args.libraryId).eq("isbn13", metadata.isbn13)).take(2);
+      const holders = await ctx.db.query("books").withIndex("by_library_and_isbn13", (q) => q.eq("libraryId", args.libraryId).eq("isbn13", metadata.isbn13))
+        .filter((q) => q.eq(q.field("deletedAt"), undefined)).take(2);
       if (holders.some((holder) => holder.id !== args.id && holder.deletedAt === undefined)) throw new Error("Another book already has that ISBN-13");
     }
     const now = Date.now();

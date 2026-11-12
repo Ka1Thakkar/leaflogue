@@ -1,4 +1,4 @@
-import type { NoteId, SyncRunOptions, SyncRunResult } from "@leaflogue/contracts";
+import type { NoteId, SyncProgress, SyncRunOptions, SyncRunResult } from "@leaflogue/contracts";
 import {
   PostgresSyncTransport,
   assertCurrentPostgresSchema,
@@ -25,6 +25,7 @@ export function createDesktopSyncService(options: {
   readonly getLibrary: () => LocalLibrary | undefined;
   readonly readConfig: () => RemoteConfig | undefined;
   readonly createPostgresClient: (connectionString: string) => PostgresClient;
+  readonly onProgress?: (progress: SyncProgress) => void;
   /** Key-authorized Convex transport for this device; its failures carry sync problem codes. */
   readonly createConvexTransport?: (
     config: Extract<RemoteConfig, { provider: "convex" }>,
@@ -42,12 +43,14 @@ export function createDesktopSyncService(options: {
   let activePreparation: AbortController | undefined;
   let shuttingDown = false;
 
+  const report = (progress: SyncProgress) => { try { options.onProgress?.(progress); } catch { /* Status observers cannot stop sync. */ } };
   const fail = (problem: SyncRunResult & { status: "failed" }): SyncRunResult => problem;
   const pass = async (runOptions: SyncRunOptions): Promise<SyncRunResult> => {
     const library = options.getLibrary();
     if (!library) return fail({ ...EMPTY_COUNTS, status: "failed", problem: {
       phase: "connect", kind: "stopped", message: "The local library is unavailable.",
     } });
+    report({ ...EMPTY_COUNTS, phase: "connect", remaining: library.countPendingSyncChanges() });
     let config: RemoteConfig | undefined;
     try {
       config = options.readConfig();
@@ -77,12 +80,13 @@ export function createDesktopSyncService(options: {
     try {
       await client.connect();
       if (shuttingDown) return { ...EMPTY_COUNTS, status: "cancelled" };
+      report({ ...EMPTY_COUNTS, phase: "prepare", remaining: library.countPendingSyncChanges() });
       await assertCurrentPostgresSchema(client);
       if (shuttingDown) return { ...EMPTY_COUNTS, status: "cancelled" };
       const libraryId = await ensurePostgresSyncLibrary(client, library.getSyncState().deviceId);
       if (shuttingDown) return { ...EMPTY_COUNTS, status: "cancelled" };
       const transport = new PostgresSyncTransport(client, libraryId);
-      runner = createSyncRunner({ ledger: library, transport });
+      runner = createSyncRunner({ ledger: library, transport, onProgress: report });
       const result = await runUntilSettled(runner);
       return result;
     } catch (error) {
@@ -103,6 +107,7 @@ export function createDesktopSyncService(options: {
     if (!options.createConvexTransport) return fail({ ...EMPTY_COUNTS, status: "failed", problem: {
       phase: "connect", kind: "configuration", message: "Convex synchronization is unavailable in this build.",
     } });
+    report({ ...EMPTY_COUNTS, phase: "prepare", remaining: library.countPendingSyncChanges() });
     let prepared: Awaited<ReturnType<NonNullable<typeof options.createConvexTransport>>>;
     const preparation = new AbortController();
     activePreparation = preparation;
@@ -131,7 +136,7 @@ export function createDesktopSyncService(options: {
         reviewReason: prepared.migration.reviewReason,
       } };
     }
-    runner = createSyncRunner({ ledger: library, transport: prepared.transport });
+    runner = createSyncRunner({ ledger: library, transport: prepared.transport, onProgress: report });
     try {
       const result = await runUntilSettled(runner);
       return prepared.migration.updated > 0 || prepared.migration.detached > 0

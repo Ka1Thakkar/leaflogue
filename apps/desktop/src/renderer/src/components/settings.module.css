@@ -142,3 +142,7 @@
 @container workspace (min-width: 821px) {
   .fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
 }
+
+.syncProgress { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: var(--ui-bg); }
+.syncProgress p { margin: 0; font-variant-numeric: tabular-nums; }
+.syncProgress progress { width: 100%; height: 5px; accent-color: var(--ui-accent); }

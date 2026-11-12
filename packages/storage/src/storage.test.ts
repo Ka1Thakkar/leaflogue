@@ -3036,3 +3036,101 @@ describe("thread synchronization", () => {
     }
   });
 });
+
+describe("importing on a second synced installation", () => {
+  const document = {
+    formatVersion: 1 as const,
+    books: [{ providerRecordId: "file:///mnt/onboard/glass.epub", title: "The Glass Orchard", authors: ["Imogen Vale"] }],
+    annotations: [
+      { providerRecordId: "kobo-mark-1", bookProviderRecordId: "file:///mnt/onboard/glass.epub", text: "Every pane held a different season.", location: "/chapter/1", createdAt: 1700000000000, note: "A note from Kobo." },
+      { providerRecordId: "kobo-note-1", bookProviderRecordId: "file:///mnt/onboard/glass.epub", note: "A standalone Kobo note." },
+    ],
+  };
+  const source = { id: "11111111-1111-4111-8111-111111111111", name: "My Kobo" };
+  const laptopSource = { id: "22222222-2222-4222-8222-222222222222", name: "My Kobo on laptop" };
+  it("reattaches reviewed synced books and exact annotations without changing their IDs or notes", () => {
+    const first = new LocalLibrary(":memory:"), laptop = new LocalLibrary(":memory:");
+    try {
+      first.importDocument({ document, source, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [] });
+      const editedBook = first.listBooks()[0]!;
+      first.updateBookMetadata({ id: editedBook.id, expectedRevision: editedBook.revision, title: "My renamed edition", authors: ["My corrected author"] });
+      laptop.bootstrapSync({ generation: 1, afterSequence: 0 });
+      let sequence = 0;
+      for (const { change } of first.resolvePendingSyncChanges().changes) {
+        laptop.applyIncomingSyncedChange({ change, sequence: sequence + 1, expectedCursor: { generation: 1, afterSequence: sequence }, nextCursor: { generation: 1, afterSequence: ++sequence } });
+      }
+      expect(laptop.listImportSources("kobo")).toEqual([]);
+      const book = laptop.listBooks()[0]!;
+      const original = laptop.getBookContents(book.id)!;
+      const review = laptop.reviewImportBooks(document, "kobo");
+      expect(review).toMatchObject([{ providerRecordId: document.books[0]!.providerRecordId, candidates: [{ bookId: book.id }], links: [] }]);
+      const input = { document, source: laptopSource, provider: "kobo" as const, fileName: "KoboReader.sqlite", warnings: [], bookSelections: [{ providerRecordId: document.books[0]!.providerRecordId, bookId: book.id }] };
+      expect(laptop.importDocument(input)).toMatchObject({ booksCreated: 0, booksReused: 1, highlightsCreated: 0, notesCreated: 0 });
+      expect(laptop.listBooks()).toHaveLength(1);
+      expect(laptop.getBookContents(book.id)).toEqual(original);
+      expect(laptop.importDocument({ ...input, bookSelections: undefined })).toMatchObject({ booksCreated: 0, highlightsCreated: 0, notesCreated: 0 });
+      const extra = { ...document.annotations[0]!, providerRecordId: "kobo-mark-2", text: "A newly highlighted sentence.", note: undefined };
+      expect(laptop.importDocument({ ...input, document: { ...document, annotations: [...document.annotations, extra] } })).toMatchObject({ booksCreated: 0, highlightsCreated: 1, notesCreated: 0 });
+      const passage = laptop.getBookContents(book.id)!.highlights[0]!;
+      laptop.updateHighlight({ id: passage.id, bookId: book.id, expectedRevision: passage.revision, text: "My local correction." });
+      expect(laptop.importDocument({ ...input, document: { ...document, annotations: [{ ...document.annotations[0]!, text: "Changed on Kobo." }, document.annotations[1]!] } })).toMatchObject({ conflictsCreated: 1, highlightsCreated: 0 });
+      expect(laptop.getBookContents(book.id)!.highlights.find((item) => item.id === passage.id)?.text).toBe("My local correction.");
+    } finally { first.close(); laptop.close(); }
+  });
+  it("keeps ambiguous editions explicit and permits an intentional separate copy", () => {
+    const library = new LocalLibrary(":memory:");
+    try {
+      const first = library.createBook({ title: document.books[0]!.title, authors: ["Imogen Vale"] });
+      library.createBook({ title: document.books[0]!.title, authors: ["Imogen Vale"] });
+      expect(library.reviewImportBooks(document, "kobo")[0]?.candidates).toHaveLength(2);
+      expect(library.importDocument({ document, source, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [], bookSelections: [{ providerRecordId: document.books[0]!.providerRecordId, bookId: null }] })).toMatchObject({ booksCreated: 1, booksReused: 0 });
+      expect(library.listBooks()).toHaveLength(3);
+      expect(() => library.importDocument({ document, source: laptopSource, provider: "kobo", fileName: "KoboReader.sqlite", warnings: [], bookSelections: [{ providerRecordId: "unknown", bookId: first.id }] })).toThrow(/selection/u);
+    } finally { library.close(); }
+  });
+});
+
+it("keeps a local location edit when an identical source quotation and date reconnect on another source", () => {
+  const library = new LocalLibrary(":memory:");
+  try {
+    const document = { formatVersion: 1 as const, books: [{ providerRecordId: "book", title: "A book", authors: ["A Reader"] }], annotations: [{ providerRecordId: "mark", bookProviderRecordId: "book", text: "A passage with a stable source timestamp.", createdAt: 1700000000000, location: "/old-location" }] };
+    library.importDocument({ document, provider: "kobo", fileName: "KoboReader.sqlite", source: { id: "11111111-1111-4111-8111-111111111111", name: "Kobo" }, warnings: [] });
+    const book = library.listBooks()[0]!;
+    const original = library.getBookContents(book.id)!;
+    const changed = { ...document, annotations: [{ ...document.annotations[0]!, location: "Chapter one · 10%" }] };
+    const input = { document: changed, provider: "kobo" as const, fileName: "KoboReader.sqlite", source: { id: "22222222-2222-4222-8222-222222222222", name: "Same Kobo" }, warnings: [], bookSelections: [{ providerRecordId: "book", bookId: book.id }] };
+    expect(library.importDocument(input)).toMatchObject({ booksCreated: 0, highlightsCreated: 0 });
+    expect(library.getBookContents(book.id)).toEqual(original);
+    expect(library.importDocument({ ...input, document: { ...changed, annotations: [{ ...changed.annotations[0]!, text: "Changed later on the source." }] } })).toMatchObject({ conflictsCreated: 1 });
+    expect(library.getBookContents(book.id)).toEqual(original);
+  } finally { library.close(); }
+});
+
+it("does not let retained tombstone rows reserve an ISBN after duplicate cleanup", () => {
+  const directory = mkdtempSync(join(tmpdir(), "leaflogue-tombstone-isbn-"));
+  const path = join(directory, "library.sqlite");
+  const library = new LocalLibrary(path);
+  try {
+    const removed = library.createBook({ title: "Removed duplicate", isbn13: "9780306406157" });
+    const survivor = library.createBook({ title: "Surviving book" });
+    const live = library.createBook({ title: "Another live edition", isbn13: "9781635575637" });
+    // Match scripted duplicate cleanup: retain the row and ISBN for sync,
+    // but mark the book deleted instead of deleting its history physically.
+    const database = new DatabaseSync(path);
+    database.prepare("UPDATE books SET deleted_at=1234, revision=revision+1 WHERE id=?").run(removed.id);
+    database.prepare("INSERT INTO sync_tombstones(entity_type,entity_id,book_id,revision,deleted_at) VALUES('book',?,?,2,1234)").run(removed.id, removed.id);
+    database.close();
+    expect(library.getBook(removed.id)).toBeUndefined();
+    const claimed = library.updateBookMetadata({ id: survivor.id, expectedRevision: survivor.revision, title: survivor.title, authors: [], isbn13: removed.isbn13 });
+    expect(claimed.isbn13).toBe(removed.isbn13);
+    const edited = library.updateBookMetadata({ id: claimed.id, expectedRevision: claimed.revision, title: "Edited after cleanup", authors: [], isbn13: claimed.isbn13 });
+    expect(edited.title).toBe("Edited after cleanup");
+    expect(() => library.updateBookMetadata({ id: edited.id, expectedRevision: edited.revision, title: edited.title, authors: [], isbn13: live.isbn13 })).toThrow(/Another book already has that ISBN-13/u);
+    expect(() => library.updateBookMetadata({ id: removed.id, expectedRevision: 2, title: "Must stay deleted", authors: [] })).toThrow(/changed elsewhere or no longer exists/u);
+    expect(library.getBook(removed.id)).toBeUndefined();
+    const inspection = new DatabaseSync(path, { readOnly: true });
+    expect(inspection.prepare("SELECT isbn13,deleted_at FROM books WHERE id=?").get(removed.id)).toMatchObject({ isbn13: removed.isbn13, deleted_at: 1234 });
+    expect(inspection.prepare("SELECT count(*) count FROM sync_tombstones WHERE entity_type='book' AND entity_id=?").get(removed.id)).toMatchObject({ count: 1 });
+    inspection.close();
+  } finally { library.close(); rmSync(directory, { recursive: true, force: true }); }
+});

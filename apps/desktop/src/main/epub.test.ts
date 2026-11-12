@@ -6,13 +6,13 @@ import { describe, expect, it } from "vitest";
 import { EpubStore, epubText, parseEpub } from "./epub";
 
 /** Minimal ZIP fixtures with real central directory and CRCs, no external tools. */
-function zip(files: Record<string, string>): Buffer {
+function zip(files: Record<string, string | Buffer>): Buffer {
   const local: Buffer[] = [];
   const directory: Buffer[] = [];
   let offset = 0;
   for (const [path, text] of Object.entries(files)) {
     const name = Buffer.from(path);
-    const bytes = Buffer.from(text);
+    const bytes = Buffer.isBuffer(text) ? text : Buffer.from(text);
     const header = Buffer.alloc(30);
     header.writeUInt32LE(0x04034b50); header.writeUInt16LE(20, 4);
     header.writeUInt32LE(crc32(bytes), 14);
@@ -41,6 +41,13 @@ const files = {
 };
 
 describe("local EPUB reader", () => {
+  it("reads Kobo KEPUB spans and emphasis through the same inert EPUB parser", async () => {
+    const bytes = await readFile(new URL("../../../../tests/fixtures/local-reader.kepub", import.meta.url));
+    const book = await parseEpub(bytes);
+    expect(book.chapters[0]?.text).toContain("A small passage with emphasis stays readable.");
+    expect(book.chapters[0]?.html).toContain("<em");
+    expect(book.chapters[0]?.html).not.toContain("<script");
+  });
   it("follows the spine, preserves original file identity, and returns only inert text", async () => {
     const result = await parseEpub(zip(files));
     expect(result.sha256).toMatch(/^[a-f0-9]{64}$/u);
@@ -51,7 +58,7 @@ describe("local EPUB reader", () => {
   it("rejects entities, malformed XML, encryption, traversal and oversized content", async () => {
     expect(() => epubText('<!DOCTYPE html [<!ENTITY x SYSTEM "file:///etc/passwd">]><html><body>&x;</body></html>')).toThrow();
     expect(() => epubText("<html><body><p>Broken</html>")).toThrow();
-    await expect(parseEpub(zip({ ...files, "META-INF/encryption.xml": "<encryption/>" }))).rejects.toThrow(/Encrypted/u);
+    await expect(parseEpub(zip({ ...files, "META-INF/encryption.xml": '<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#"><enc:EncryptedData><enc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes128-cbc"/><enc:CipherData><enc:CipherReference URI="OPS/first.xhtml"/></enc:CipherData></enc:EncryptedData></encryption>' }))).rejects.toThrow(/DRM/u);
     await expect(parseEpub(zip({ ...files, "../outside": "escape" }))).rejects.toThrow();
     await expect(parseEpub(zip({ ...files, "OPS/large": "x".repeat(8 * 1024 * 1024 + 1) }))).rejects.toThrow(/expanded/u);
     await expect(parseEpub(Buffer.from("not a zip"))).rejects.toThrow();
@@ -85,3 +92,68 @@ describe("local EPUB reader", () => {
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 });
+
+describe("Calibre KEPUB conversions", () => {
+  it("opens a KEPUB that links Adobe's page template as a stylesheet", async () => {
+    const kepub = zip({
+      mimetype: "application/epub+zip",
+      "META-INF/container.xml": '<container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+      "OEBPS/content.opf": '<package><manifest><item id="t" href="page-template.xpgt" media-type="application/vnd.adobe-page-template+xml"/><item id="s" href="stylesheet.css" media-type="text/css"/><item id="c" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c"/></spine></package>',
+      "OEBPS/page-template.xpgt": "<?xml version='1.0' encoding='utf-8'?>\n<ade:template xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:ade=\"http://ns.adobe.com/2006/ade\" xmlns:fo=\"http://www.w3.org/1999/XSL/Format\"><fo:layout-master-set/></ade:template>",
+      "OEBPS/stylesheet.css": "p { text-indent: 1em }",
+      "OEBPS/chapter.xhtml": '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="stylesheet.css"/><link rel="stylesheet" type="application/vnd.adobe-page-template+xml" href="page-template.xpgt"/><style type="text/css" id="kobostylehacks">div#book-inner p, div#book-inner div { font-size: 1.0em; }</style></head><body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Linked at last.</span></p></div></div></body></html>',
+    });
+    const document = await parseEpub(kepub);
+    expect(JSON.stringify(document)).toContain("Linked at last.");
+    expect(JSON.stringify(document)).toContain("text-indent");
+    expect(JSON.stringify(document)).not.toContain("ade:template");
+  });
+  it("embeds a font shared by every chapter once instead of once per chapter", async () => {
+    const chapters = Array.from({ length: 30 }, (_, index) => index);
+    const kepub = zip({
+      mimetype: "application/epub+zip",
+      "META-INF/container.xml": '<container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+      "OEBPS/content.opf": `<package><manifest><item id="s" href="style.css" media-type="text/css"/><item id="f" href="book.ttf" media-type="font/ttf"/>${chapters.map((index) => `<item id="c${index}" href="c${index}.xhtml" media-type="application/xhtml+xml"/>`).join("")}</manifest><spine>${chapters.map((index) => `<itemref idref="c${index}"/>`).join("")}</spine></package>`,
+      "OEBPS/style.css": "@font-face { font-family: Book; src: url(book.ttf) } body { font-family: Book }",
+      "OEBPS/book.ttf": "f".repeat(2 * 1024 * 1024),
+      ...Object.fromEntries(chapters.map((index) => [`OEBPS/c${index}.xhtml`, `<html><head><link rel="stylesheet" href="style.css"/></head><body><p><span class="koboSpan" id="kobo.1.1">Chapter ${index + 1}.</span></p></body></html>`])),
+    });
+    const document = await parseEpub(kepub);
+    expect(document.chapters).toHaveLength(30);
+    const styles = document.chapters.map((chapter) => chapter.styles ?? "").join("");
+    expect(styles.match(/data:font\/ttf;base64,/gu)).toHaveLength(1);
+    expect(document.chapters[29]!.text).toBe("Chapter 30.");
+  });
+  it("restores fonts obfuscated with the IDPF and Adobe schemes, as Calibre KEPUBs carry them", async () => {
+    const { createHash } = await import("node:crypto");
+    const font = Buffer.from(Array.from({ length: 1500 }, (_, index) => index % 251));
+    const mask = (bytes: Buffer, key: Buffer, length: number) => { const out = Buffer.from(bytes); for (let index = 0; index < Math.min(out.length, length); index++) out[index]! ^= key[index % key.length]!; return out; };
+    const book = (identifier: string, algorithm: string, masked: Buffer) => zip({
+      mimetype: "application/epub+zip",
+      "META-INF/container.xml": '<container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+      "META-INF/encryption.xml": `<encryption xmlns:enc="http://www.w3.org/2001/04/xmlenc#"><enc:EncryptedData><enc:EncryptionMethod Algorithm="${algorithm}"/><enc:CipherData><enc:CipherReference URI="OEBPS/fonts/Book%20Face.ttf"/></enc:CipherData></enc:EncryptedData></encryption>`,
+      "OEBPS/content.opf": `<package unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="isbn">9781423155164</dc:identifier><dc:identifier id="uid">${identifier}</dc:identifier></metadata><manifest><item id="f" href="fonts/Book%20Face.ttf" media-type="font/ttf"/><item id="s" href="style.css" media-type="text/css"/><item id="c" href="c.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c"/></spine></package>`,
+      "OEBPS/fonts/Book Face.ttf": masked,
+      "OEBPS/style.css": '@font-face { font-family: Book; src: url("fonts/Book%20Face.ttf") }',
+      "OEBPS/c.xhtml": '<html><head><link rel="stylesheet" href="style.css"/></head><body><p>Readable.</p></body></html>',
+    });
+    const embedded = (document: Awaited<ReturnType<typeof parseEpub>>) => Buffer.from(/data:font\/ttf;base64,([A-Za-z\d+/=]+)/u.exec(document.chapters[0]!.styles ?? "")![1]!, "base64");
+    const idpfId = " urn:uuid:6f1c3b0e-8d2a-4f5b-9c1e-2a7b3c4d5e6f\n";
+    const idpfKey = createHash("sha1").update(idpfId.replace(/[ \t\r\n]/gu, "")).digest();
+    expect(embedded(await parseEpub(book(idpfId, "http://www.idpf.org/2008/embedding", mask(font, idpfKey, 1040))))).toEqual(font);
+    const adobeId = "urn:uuid:6f1c3b0e-8d2a-4f5b-9c1e-2a7b3c4d5e6f";
+    const adobeKey = Buffer.from("6f1c3b0e8d2a4f5b9c1e2a7b3c4d5e6f", "hex");
+    const adobe = await parseEpub(book(adobeId, "http://ns.adobe.com/pdf/enc#RC", mask(font, adobeKey, 1024)));
+    expect(embedded(adobe)).toEqual(font);
+    expect(adobe.chapters[0]!.text).toBe("Readable.");
+  });
+  it("opens the book without a masked font it cannot restore", async () => {
+    const document = await parseEpub(zip({
+      ...files,
+      "META-INF/encryption.xml": '<encryption xmlns:enc="http://www.w3.org/2001/04/xmlenc#"><enc:EncryptedData><enc:EncryptionMethod Algorithm="http://ns.adobe.com/pdf/enc#RC"/><enc:CipherData><enc:CipherReference URI="OPS/font.ttf"/></enc:CipherData></enc:EncryptedData></encryption>',
+      "OPS/font.ttf": "scrambled",
+    }));
+    expect(document.chapters[0]!.text).toContain("First chapter");
+  });
+});
+

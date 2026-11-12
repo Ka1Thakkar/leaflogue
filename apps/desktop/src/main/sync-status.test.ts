@@ -38,3 +38,19 @@ describe("sync status", () => {
     expect(tracker.current()).toEqual({ state: "idle" });
   });
 });
+
+it("publishes live progress only during the active sync and clears it on completion", async () => {
+  let finish!: (result: SyncRunResult) => void;
+  const tracker = createSyncStatusTracker({ run: () => new Promise((resolve) => { finish = resolve; }), isConfigured: () => true, publish: () => undefined });
+  const progress = { phase: "pull" as const, bootstrapped: 0, pushed: 4, pulled: 120, superseded: 0, remaining: 0 };
+  tracker.progress(progress);
+  expect(tracker.current().progress).toBeUndefined();
+  const running = tracker.run();
+  tracker.progress(progress);
+  expect(tracker.current()).toMatchObject({ state: "syncing", progress });
+  finish(complete); await running;
+  expect(tracker.current().progress).toBeUndefined();
+  tracker.progress(progress);
+  expect(tracker.current().state).toBe("idle");
+  expect(tracker.current().progress).toBeUndefined();
+});
