@@ -3,7 +3,7 @@ title: Read an EPUB
 description: Link a local EPUB, turn pages, and keep highlights and notes beside your book.
 ---
 
-The EPUB reader is included in the experimental **0.1.1-beta.3** desktop
+The EPUB reader is included in the experimental **0.1.1-beta.4** desktop
 release. See the [release notes](/start/release-notes/) for downloads and
 known limitations.
 
@@ -80,7 +80,9 @@ highlights, and notes. Unlink before attaching another edition. Existing
 edition-specific highlight anchors may not match a replacement file.
 
 The reader preserves supported publisher formatting, images, and fonts while
-blocking scripts and external resources. DRM, encrypted or obfuscated fonts,
-fixed-layout fidelity, audio/video, PDFs, and book-file sync are not supported
+blocking scripts and external resources. IDPF and Adobe font obfuscation is
+restored locally when the book identifier permits it; otherwise the reader
+uses fallback fonts. Adobe page templates are ignored. DRM, fixed-layout
+fidelity, audio/video, PDFs, and book-file sync are not supported
 in this version. EPUBs must be no larger than 50 MB; malformed or oversized
 resources may also be rejected.

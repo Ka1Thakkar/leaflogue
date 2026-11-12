@@ -46,7 +46,7 @@ key) can read and change your library. Keep them like a password.
 
 ## Follow sync progress
 
-Starting in **0.1.1-beta.3**, Settings shows live progress in **Settings → Sync → Remote library**,
+Starting in **0.1.1-beta.4**, Settings shows live progress in **Settings → Sync → Remote library**,
 including connecting/preparing, sending changes, receiving changes, sent and
 received counts, and how many local edits remain queued. Background sync from
 the header uses the same status. A finished run keeps its result and finish time.

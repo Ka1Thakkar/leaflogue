@@ -4,10 +4,10 @@ Notable changes to Leaflogue are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 the policy in [`docs/release-process.md`](docs/release-process.md).
 
-Current experimental beta: `v0.1.1-beta.3`. Release
+Current experimental beta: `v0.1.1-beta.4`. Release
 gates are in [`docs/release-readiness.md`](docs/release-readiness.md).
 
-## 0.1.1-beta.3 — 2026-11-11
+## 0.1.1-beta.4 — 2026-11-12
 
 - Add a local paged EPUB reader with keyboard navigation, saved position,
   publisher formatting, an in-app options overlay, and dark/theme colours.
@@ -21,6 +21,8 @@ gates are in [`docs/release-readiness.md`](docs/release-readiness.md).
 - Review matching existing books when importing on a second synced desktop,
   reattaching exact source highlights/notes without duplicating the book.
 - Show live sync phases, sent/received counts, and queued edits in Settings.
+- Open EPUBs with Adobe page templates and IDPF/Adobe-obfuscated fonts;
+  reuse shared resources so repeated chapter links do not inflate the size limit.
 - Ignore retained tombstones in ISBN ownership checks, filter deleted Convex
   holders before applying limits, and clarify metadata validation errors.
 

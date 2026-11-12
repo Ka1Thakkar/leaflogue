@@ -1,6 +1,6 @@
 # Project status
 
-Leaflogue 0.1.1-beta.3 is the experimental desktop reader beta.
+Leaflogue 0.1.1-beta.4 is the experimental desktop reader beta.
 Automated checks pass; clean-desktop and actual screen-reader acceptance remain
 pending. The maintainer explicitly approved experimental publication with
 these limitations disclosed on 10 November 2026.

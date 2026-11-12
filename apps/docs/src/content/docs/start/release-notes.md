@@ -1,14 +1,14 @@
 ---
-title: 0.1.1-beta.3 release notes
+title: 0.1.1-beta.4 release notes
 description: What the reader beta adds, its known limits, and where to get it.
 ---
 
-**Release status: experimental public beta, `0.1.1-beta.3`.** Automated
+**Release status: experimental public beta, `0.1.1-beta.4`.** Automated
 source, native package, and MCP checks pass. Clean-desktop installation,
 manual updates/uninstall, and actual Orca, VoiceOver, and Narrator checks
 remain pending. The maintainer approved experimental publication with these
 limitations disclosed. Back up your library before testing.
-Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.3).
+Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.4).
 This prerelease is not a signed stable update feed.
 
 ## Included
@@ -37,7 +37,7 @@ first version is read-only. Source and packaged-client automation passed on Mac,
 the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
-## New in 0.1.1-beta.3
+## New in 0.1.1-beta.4
 
 This release adds:
 
@@ -55,10 +55,12 @@ This release adds:
   preventing duplicate books when that device lacks local import history.
   Exact unique highlights and imported notes are reattached to the same records.
 - Live sync phases, sent/received counts, and queued edits in Settings.
+- Open EPUBs with Adobe page templates and IDPF/Adobe-obfuscated fonts;
+  reuse shared resources so repeated chapter links do not inflate the size limit.
 - Metadata saves ignore ISBNs held by deleted book tombstones. Live ISBN
   conflicts still need review; validation errors identify the affected field.
 
-The earlier 0.1.1-beta.1 and 0.1.1-beta.2 candidates were not published. This beta includes the
+The earlier 0.1.1-beta.1, 0.1.1-beta.2, and 0.1.1-beta.3 candidates were not published. This beta includes the
 cross-device Kobo import fix. Earlier duplicate copies remain for review;
 this release does not remove them automatically.
 

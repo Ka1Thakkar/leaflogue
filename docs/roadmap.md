@@ -19,7 +19,7 @@ Windows installers, as documented in [beta validation](beta-desktop-validation.m
 
 ## 0.1.1 — integrated reader
 
-The experimental **0.1.1-beta.3** ships the local paged EPUB reader, read-only
+The experimental **0.1.1-beta.4** ships the local paged EPUB reader, read-only
 Calibre linking, confirmed highlights and notes, return-to-context navigation,
 reader display settings, and Reader/Assistant sidebar. The broader milestone
 below includes follow-up work; book-file sync and cross-device positions are
