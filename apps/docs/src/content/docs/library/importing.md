@@ -116,7 +116,7 @@ Import-source profiles and their record mappings currently stay on the computer
 that performed the import. A second computer can have synced books, highlights,
 and notes without that local import history.
 
-The next 0.1.1 beta adds a review of matching books before a desktop import.
+Starting in **0.1.1-beta.4**, the desktop adds a review of matching books before a desktop import.
 Under **Import into**, choose **Keep existing** to reuse a book already in your
 library, or **Create a separate book** when you intend another copy. A unique
 source quotation/date match, ISBN, or title/author candidate is suggested; when several copies match, choose

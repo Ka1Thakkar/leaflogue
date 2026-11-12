@@ -70,7 +70,7 @@ in [`tests/marketing`](tests/marketing/README.md); dictionary credits are in
 
 ## Get Leaflogue
 
-**[0.1.0-beta.3 is available as an experimental beta](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.0-beta.3).**
+**[0.1.1-beta.4 is available as an experimental beta](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.4).**
 Automated checks and signed update-feed validation pass. Clean-desktop
 installation, manual updates/uninstall,
 and actual Orca, VoiceOver, and Narrator acceptance are still pending.
@@ -113,17 +113,25 @@ You host the sync backend and web app yourself. Start with the
 Deployment variables are documented in
 [`docs/configuration.md`](docs/configuration.md).
 
-## What's next
+## Reader beta and next steps
 
-- **0.1.0 beta:** the desktop now includes an opt-in local, read-only MCP server
-  for books, passages, notes, and threads with citations. See the
-  [agent setup guide](apps/docs/src/content/docs/ai/mcp.md). Cross-platform
-  candidate validation is still required before publication.
-- **0.1.1:** an integrated EPUB reader, shared highlights and notes, “Read in
-  context,” optional book-file sync, and cross-device reading position.
+**0.1.1-beta.4** adds a paged local EPUB reader, a right context sidebar,
+read-only Calibre linking with EPUB/KEPUB choice and no duplicate files, shared library
+highlights and notes, and navigation between a passage and its EPUB context.
+Add book searches Google Books as you type, with Open Library fallback.
+Desktop imports review existing books after sync, and Settings shows live sync
+phases, transfer counts, and queued edits.
+See the [reader guide](https://leaflogue-docs.vercel.app/library/epub/) and
+[Calibre guide](https://leaflogue-docs.vercel.app/library/calibre/).
 
-See the [versioned roadmap](docs/roadmap.md#current-release-assignments) and
-[reader plan](docs/releases/0.1.1.md) for scope and acceptance criteria.
+Book files, links, and reading positions remain local and are excluded from
+SQLite backups and library exports. File sync and cross-device progress,
+PDFs, bookmarks, book search, and richer match review remain follow-ups.
+The opt-in read-only MCP server remains available; see the
+[agent setup guide](apps/docs/src/content/docs/ai/mcp.md).
+
+See the [versioned roadmap](docs/roadmap.md) and
+[reader plan](docs/releases/0.1.1.md) for the longer-term scope.
 
 ## Build and run
 

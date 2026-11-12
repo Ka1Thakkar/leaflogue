@@ -3,12 +3,12 @@ title: Install Leaflogue
 description: Choose the Linux, macOS, or Windows beta build and understand installation and updates.
 ---
 
-The experimental **0.1.0-beta.3** targets Linux, macOS, and Windows. Automated
+The experimental **0.1.1-beta.4** targets Linux, macOS, and Windows. Automated
 checks pass; clean-desktop installation and actual Orca, VoiceOver, and Narrator
 acceptance remain pending. Back up your library before testing. Downloads and
 their validation records are on the
 [GitHub Releases page](https://github.com/Ka1Thakkar/leaflogue/releases).
-Check the [0.1.0 release notes](/start/release-notes/) for the beta's status
+Check the [0.1.1 release notes](/start/release-notes/) for the beta's status
 and known limitations before installing.
 
 You do not need a Leaflogue account, a sync database, or an AI key to use the
@@ -59,7 +59,7 @@ for the experimental beta.
 1. Save the matching AppImage in a folder you want to keep, such as
    `~/Applications`.
 2. In your file manager, open its properties and allow it to run as a program,
-   or run `chmod +x Leaflogue-0.1.0-beta.3-*.AppImage` in that folder.
+   or run `chmod +x Leaflogue-0.1.1-beta.4-*.AppImage` in that folder.
 3. Double-click the AppImage. First-run setup shows where your library and
    settings will live. Choose **Local only** to get started.
 

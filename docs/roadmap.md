@@ -19,6 +19,12 @@ Windows installers, as documented in [beta validation](beta-desktop-validation.m
 
 ## 0.1.1 — integrated reader
 
+The experimental **0.1.1-beta.4** ships the local paged EPUB reader, read-only
+Calibre linking, confirmed highlights and notes, return-to-context navigation,
+reader display settings, and Reader/Assistant sidebar. The broader milestone
+below includes follow-up work; book-file sync and cross-device positions are
+not part of this beta.
+
 The [reader plan](releases/0.1.1.md) covers DRM-free EPUB attachments, reading
 position, highlights and notes shared with the rest of the library, dictionary
 and optional AI actions, and return-to-context navigation. It also includes

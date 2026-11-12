@@ -1,8 +1,7 @@
 # Local EPUB reader development
 
-The first 0.1.1 development slice is available from a desktop book page:
-**Read**, then **Attach EPUB** in the right-hand Reader tab. This is source functionality, not part of
-the published 0.1.0 beta. Attach a DRM-free text EPUB to an existing book.
+The 0.1.1-beta.4 reader is available from a desktop book page:
+**Read**, then **Attach EPUB** in the right-hand Reader tab. This is included in the experimental 0.1.1-beta.4 release. Attach a DRM-free text EPUB to an existing book.
 
 The reader follows the EPUB spine and lays the book out as reflowable pages.
 Arrow keys, Page Up/Down, Space (Shift+Space goes back), mouse-wheel movement,
@@ -41,13 +40,13 @@ resume points are accepted only for that edition and valid chapter/paragraph
 indices. This data stays on this device and is never sent by library sync.
 
 **SQLite backups and library exports do not include attachments or resume points.**
-Keep your original EPUBs. To preserve this development reader's local state,
+Keep your original EPUBs. To preserve the reader's local state,
 copy the sidecar directory separately while the app is closed. Restoring a
 SQLite backup does not restore or roll back this directory. Merging books does
 not move their attachments yet; attach to the book you intend to keep.
 
 The reader preserves semantic EPUB markup, publisher stylesheets, local images
-and unobfuscated fonts inside a sandboxed iframe. Only sanitized elements and
+and supported fonts inside a sandboxed iframe. Only sanitized elements and
 attributes are retained. External resources, scripts, forms and embedded frames
 are blocked. Resources come from the linked EPUB itself; reading does not fetch
 publisher URLs. An image or font may not render if its format is unsupported.
@@ -75,7 +74,10 @@ accumulate horizontal drift over a long book. Reflow constrains publisher block
 widths and padding, wraps long tokens, and reserves a small inset for glyphs.
 
 
-Encrypted resources (including font obfuscation) are rejected for now. Limits
+IDPF and Adobe font obfuscation is restored in memory using the book identifier.
+If the identifier cannot restore a font, that font is omitted. Other encrypted
+resources are rejected as DRM. Adobe page templates are ignored, and shared
+resources are embedded once per book. Limits
 are 50 MB per archive, 8 MB per entry, 100 MB expanded, 4,000 entries and 1,000
 spine chapters, plus a 40 MB formatted-resource budget. Malformed XML, external
 entities and unsupported document types are rejected. Simple HTML5 doctypes
