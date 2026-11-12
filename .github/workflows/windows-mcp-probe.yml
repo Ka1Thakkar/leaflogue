@@ -1,27 +1,45 @@
-name: Windows MCP regression probe
+name: Beta artifact verification
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  # GitHub requires write permission to download unpublished draft assets.
+  contents: write
 jobs:
-  windows-mcp:
-    runs-on: windows-2025
-    timeout-minutes: 15
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version-file: .nvmrc
-      - name: Install and build the desktop source
-        shell: bash
+      - name: Install verifier tooling
         run: |
           corepack enable npm
           corepack install
           npm ci
-          node node_modules/electron/install.js
-          npm run build --workspace @leaflogue/desktop
-      - name: Exercise the real MCP client
-        shell: bash
-        run: npx playwright test --config tests/e2e/playwright.config.ts mcp.spec.ts
+      - name: Verify release digests, checksum manifests, audits and signed payloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/assets
+          gh run watch 43165888713 --repo Ka1Thakkar/leaflogue --interval 30 --exit-status
+          gh run watch 43165887343 --repo Ka1Thakkar/leaflogue --interval 30 --exit-status
+          gh release download beta-candidate-43165888713-1 --repo Ka1Thakkar/leaflogue --dir /tmp/assets
+          gh api 'repos/Ka1Thakkar/leaflogue/releases?per_page=100' --jq '.[] | select(.tag_name=="beta-candidate-43165888713-1")' > /tmp/assets/release-api.json
+          node scripts/release-verification/assets.mjs /tmp/assets 0.1.1-beta.4 2dc1f19fd06b7167928b89be25d2f6d20af68f89
+          npx esbuild apps/desktop/src/main/update-manifest.ts --bundle --platform=node --format=esm --outfile=/tmp/leaflogue-beta4-runtime-verifier.mjs
+          node scripts/release-verification/signatures.mjs /tmp/assets
+      - name: Scan extracted applications with checksum-verified Gitleaks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/gitleaks
+          gh release download v8.24.3 --repo gitleaks/gitleaks --pattern gitleaks_8.24.3_linux_x64.tar.gz --pattern gitleaks_8.24.3_checksums.txt --dir /tmp/gitleaks
+          (cd /tmp/gitleaks && sha256sum --check --ignore-missing gitleaks_8.24.3_checksums.txt && tar -xzf gitleaks_8.24.3_linux_x64.tar.gz)
+          python3 scripts/release-verification/scan.py /tmp/assets
