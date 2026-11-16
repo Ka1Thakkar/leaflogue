@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createProfile, removeProfile } from "./harness";
 import { completeLocalSetup, launchPackagedApp, stopPackagedProcess } from "./packaged-process";
@@ -16,7 +17,8 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     await app.page.evaluate(() => localStorage.setItem("leaflogue.reader-display", JSON.stringify({ dark: true, theme: true })));
     await app.page.reload();
     const setup = await app.page.evaluate(async () => ({ id: (await window.leaflogue.library.createBook({ title: "Packaged PDF", authors: [] })).id, file: (await window.leaflogue.system.getCapabilities()).storagePaths.libraryFile }));
-    const bytes = !scanned && process.env.LEAFLOGUE_TEST_PDF ? await readFile(process.env.LEAFLOGUE_TEST_PDF) : readerPdf(scanned);
+    const font = await readFile(join(dirname(createRequire(__filename).resolve("pdfjs-dist/package.json")), "standard_fonts", "LiberationSans-Regular.ttf"));
+    const bytes = !scanned && process.env.LEAFLOGUE_TEST_PDF ? await readFile(process.env.LEAFLOGUE_TEST_PDF) : readerPdf(scanned, font);
     const source = join(profile.files, "sample.pdf"); await writeFile(source, bytes);
     await mkdir(`${setup.file}.epubs`, { recursive: true });
     await writeFile(join(`${setup.file}.epubs`, `${setup.id}.attachment.json`), JSON.stringify({ path: source, sha256: createHash("sha256").update(bytes).digest("hex") }));
@@ -34,6 +36,8 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     await reader.locator("body").click(); await app.page.keyboard.press("ArrowRight");
     const second = reader.locator('article[data-chapter="1"] .pdf-page-image');
     await expect(second).toHaveAttribute("data-rendered", "true"); await expect(second).toBeInViewport(); await expect(first).not.toBeVisible();
+    if (!scanned) await expect.poll(async () => app.page.locator('iframe[title="PDF pages"]').evaluate((frame) => Array.from((frame as HTMLIFrameElement).contentDocument!.fonts).filter((font) => font.family.startsWith("g_") && font.status === "loaded").length)).toBeGreaterThan(0);
+    await app.page.screenshot({ path: test.info().outputPath("packaged-pdf-text.png") });
     await app.page.keyboard.press("ArrowLeft"); await expect(first).toHaveAttribute("data-rendered", "true"); await expect(first).toBeInViewport();
     await app.page.screenshot({ path: test.info().outputPath("packaged-pdf.png") });
   } catch (error) { throw new Error(`Packaged PDF display failed. Console: ${errors.join("\n")}; stderr: ${app.stderr()}`, { cause: error }); }

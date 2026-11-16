@@ -1,5 +1,6 @@
-import { writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createProfile, launch, removeProfile } from "./harness";
 import { readerPdf } from "./pdf-fixture";
@@ -7,7 +8,9 @@ import { readerPdf } from "./pdf-fixture";
 test("reads PDF pages and shares highlights and notes with the library", async () => {
   const profile = createProfile();
   try {
-    const file = join(profile.files, "text-book.pdf"); await writeFile(file, readerPdf());
+    const file = join(profile.files, "text-book.pdf");
+    const font = await readFile(join(dirname(createRequire(__filename).resolve("pdfjs-dist/package.json")), "standard_fonts", "LiberationSans-Regular.ttf"));
+    await writeFile(file, readerPdf(false, font));
     let session = await launch(profile); let page = session.page;
     await page.getByRole("button", { name: "Set up later" }).click();
     const saved = await page.evaluate(async () => {
@@ -36,6 +39,7 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await expect(options).not.toBeVisible();
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } }); await page.keyboard.press("PageDown");
     await expect(reader.getByText("Return to this paragraph.", { exact: true })).toBeVisible();
+    await expect.poll(async () => page.locator('iframe[title="PDF pages"]').evaluate((frame) => Array.from((frame as HTMLIFrameElement).contentDocument!.fonts).filter((font) => font.family.startsWith("g_") && font.status === "loaded").length)).toBeGreaterThan(0);
     await reader.getByText("Return to this paragraph.", { exact: true }).evaluate((element) => {
       const doc = element.ownerDocument; const range = doc.createRange(); range.selectNodeContents(element);
       doc.getSelection()!.removeAllRanges(); doc.getSelection()!.addRange(range); element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));

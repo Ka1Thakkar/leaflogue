@@ -6,19 +6,20 @@ import type { BookId, EpubDocument } from "@leaflogue/contracts";
 export function usePdfPages(book: EpubDocument | undefined, bookId: BookId, frame: RefObject<HTMLIFrameElement | null>, loaded: number, chapter: number, onError: (message: string) => void) {
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   useEffect(() => {
-    if (book?.format !== "pdf") return;
+    const ownerDocument = frame.current?.contentDocument;
+    if (book?.format !== "pdf" || !loaded || ownerDocument?.body.dataset.edition !== book.sha256) return;
     let active = true; let task: PDFDocumentLoadingTask | undefined;
     void window.leaflogue.epub!.readPdf(bookId, book.sha256).then(async (bytes) => {
       if (!active) return;
       const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
       if (!active) return;
       GlobalWorkerOptions.workerSrc = workerUrl;
-      task = getDocument({ data: bytes, enableXfa: false, useSystemFonts: true, useWorkerFetch: false, disableAutoFetch: true });
+      task = getDocument({ ownerDocument, disableWorkerRendering: true, data: bytes, enableXfa: false, useSystemFonts: true, useWorkerFetch: false, disableAutoFetch: true });
       const document = await task.promise;
       if (active) setPdf(document);
     }).catch(() => { if (active) onError("This PDF could not be rendered. Try reopening the linked file."); });
     return () => { active = false; setPdf(undefined); if (task) void task.destroy(); };
-  }, [book, bookId, onError]);
+  }, [book, bookId, onError, loaded, frame]);
   useEffect(() => {
     if (!pdf || !loaded) return;
     const sheet = frame.current?.contentDocument?.querySelector<HTMLElement>(`article[data-chapter="${chapter}"] .pdf-sheet`);
