@@ -1,3 +1,5 @@
+import { HighlightColourPicker } from "./HighlightColourPicker";
+import { currentHighlightPalette, useHighlightColours } from "./highlight-colours";
 import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
@@ -22,6 +24,8 @@ const PAGE_SIZE = 20;
 
 function Annotation({ highlight, showBook, focused = false }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean }) {
   const contextWorkspace = useContextWorkspace();
+  const colours = useHighlightColours();
+  const highlightInk = currentHighlightPalette()[colours[highlight.id] ?? "yellow"].ink;
   const { tags, reload, readOnly, aiEnabled, activeId, setActiveId } = useContext(PassageContext);
   const [confirm, confirmDialog] = useConfirm();
   const [editing, setEditing] = useState(false);
@@ -75,13 +79,13 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
       // The passage a link opened, e.g. from Today's highlight: marked so the eye lands on it.
       {...(focused ? { "data-focused": "", "aria-current": "true" as const, tabIndex: -1 } : {})}
     >
-      <p className={styles.passageMeta}>
+      <div className={styles.passageMeta}>
         {showBook && <a href={href.book(highlight.bookId)}>{highlight.bookTitle}</a>}
-        <time dateTime={new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toISOString()}>
+        <HighlightColourPicker highlightId={highlight.id} /><time style={{ color: highlightInk }} dateTime={new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toISOString()}>
           {new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
         </time>
         <span>{highlight.text.length.toLocaleString()} chars</span>
-      </p>
+      </div>
       {deleted && !error && <p role="status" className="ll-muted">Highlight deleted.</p>}
       {editing ? (
         <HighlightForm bookId={highlight.bookId} highlight={highlight} onClose={() => setEditing(false)} onSaved={reload} />

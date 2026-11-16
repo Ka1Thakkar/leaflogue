@@ -186,3 +186,12 @@ original source provenance. Password-protected PDFs are unsupported. Parsing is
 bounded to 50 MB, 1,000 pages and 10 MB extracted text; canvas output is capped
 to 16 million pixels per visible page. Fit-page, fit-width and percentage zoom
 retain page-based navigation rather than a continuous document scroll.
+
+## Next-beta highlight display colours
+
+Five named colour preferences are stored per highlight ID in the local renderer
+profile. Yellow is the default. Reader markings and passage dates share the
+choice; all five hues are adapted to theme tokens with contrast checks.
+Coordinates and imported annotation records are unchanged by recolouring.
+Preferences survive changing formats but are not synced/backed up with library
+data. This intentionally requires no Convex or PostgreSQL schema change.

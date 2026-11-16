@@ -1,3 +1,5 @@
+import { HighlightColourPicker } from "./HighlightColourPicker";
+import { HIGHLIGHT_COLOURS, highlightPalette, useHighlightColours } from "./highlight-colours";
 import { usePdfPages } from "./pdf-pages";
 import { searchReader, readerTextRange } from "./reader-search";
 import { CalibrePicker } from "./CalibrePicker";
@@ -18,6 +20,7 @@ const GAP = 48;
 /** Publisher markup stays inside a scriptless, network-denied reading document. */
 export function EpubReader({ bookId, embedded = false, target, active = true, onOpenInBook, onExplain }: { readonly bookId: BookId; readonly embedded?: boolean; readonly target?: { highlightId: HighlightId; requestId: number }; readonly active?: boolean; readonly onExplain?: (highlight: SavedHighlight, readOnly: boolean) => void; readonly onOpenInBook?: (id: HighlightId) => void }) {
   const [book, setBook] = useState<EpubDocument>();
+  const highlightColours = useHighlightColours();
   const [confirm, confirmDialog] = useConfirm();
   const [activeHighlight, setActiveHighlight] = useState<{ id: HighlightId; left: number; top: number; note?: boolean }>();
   const [noteMarkers, setNoteMarkers] = useState<{ id: HighlightId; left: number; top: number; label: string }[]>([]);
@@ -60,6 +63,18 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
     applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : undefined);
   }, [loaded, appearance, readerDisplay, book?.format]);
+  useEffect(() => {
+    const doc = frame.current?.contentDocument;
+    const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
+    if (!loaded || !doc || !definition) return;
+    const dark = book?.format === "pdf" ? false : readerDisplay.dark;
+    const tokens = definition[dark ? "dark" : "light"];
+    const paper = book?.format === "pdf" ? "#ffffff" : readerDisplay.theme ? tokens.paper : dark ? "#000000" : "#ffffff";
+    const palette = highlightPalette({ ...tokens, paper }, dark);
+    let style = doc.getElementById("leaflogue-colour-rules");
+    if (!style) { style = doc.createElement("style"); style.id = "leaflogue-colour-rules"; doc.head.append(style); }
+    style.textContent = HIGHLIGHT_COLOURS.map((colour) => `::highlight(leaflogue-colour-${colour}){background:${palette[colour].fill};color:${palette[colour].text}}`).join("\n");
+  }, [loaded, appearance, readerDisplay, book?.format]);
   const [saved, setSaved] = useState("");
   const [query, setQuery] = useState("");
   const [bookmarks, setBookmarks] = useState<readonly Position[]>([]);
@@ -99,10 +114,14 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     paintedRanges.current = matches;
     const ranges = matches.map((match) => match.range);
     inner.CSS.highlights.set("leaflogue-saved", new inner.Highlight(...ranges));
+    for (const colour of HIGHLIGHT_COLOURS) {
+      const coloured = new inner.Highlight(...matches.filter(({ highlight }) => (highlightColours[highlight.id] ?? "yellow") === colour).map(({ range }) => range));
+      coloured.priority = 1; inner.CSS.highlights.set(`leaflogue-colour-${colour}`, coloured);
+    }
     refreshNoteMarkers.current();
     setMatchStatus({ matched: ranges.length, unmatched: (contents?.highlights.length ?? 0) - ranges.length });
-    return () => { paintedRanges.current = []; inner.CSS.highlights.delete("leaflogue-saved"); };
-  }, [book, contents, loaded, annotationVersion, localAnchors]);
+    return () => { paintedRanges.current = []; inner.CSS.highlights.delete("leaflogue-saved"); for (const colour of HIGHLIGHT_COLOURS) inner.CSS.highlights.delete(`leaflogue-colour-${colour}`); };
+  }, [book, contents, loaded, annotationVersion, localAnchors, highlightColours]);
   const options = useRef<HTMLDivElement>(null);
   const jump = useRef<(chapter: number) => void>(() => undefined);
   useEffect(() => { if (optionsOpen) options.current?.focus(); }, [optionsOpen]);
@@ -457,7 +476,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       {!optionsOpen && !calibreOpen && active && noteMarkers.map((marker) => <button key={marker.id} className={styles.noteMarker} aria-label={marker.label} title={marker.label} style={{ left: marker.left, top: marker.top }} onClick={() => { setSelected(undefined); setActiveHighlight({ id: marker.id, left: Math.min(marker.left, window.innerWidth - 344), top: marker.top }); }}><Icon name="note-paper" size={15} aria-hidden="true" /></button>)}
       {activeHighlight && activePassage && !optionsOpen && <div data-reader-selection role="dialog" aria-label="Saved highlight actions" className={styles.selection} style={{ left: activeHighlight.left, top: Math.min(activeHighlight.top, window.innerHeight - (activeHighlight.note ? 280 : 160)) }} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActiveHighlight(undefined); } }}>
         {activeHighlight.note ? <><label className="ll-label">Note<textarea autoFocus className="ll-field" rows={3} maxLength={10000} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className="ll-button" disabled={savingHighlight || !note.trim()} onClick={() => void noteActiveHighlight()}>Save note</button></> : <>
-          <p className={styles.activeExcerpt}>{activePassage.text.length > 100 ? `${activePassage.text.slice(0, 100)}…` : activePassage.text}</p>
+          <HighlightColourPicker highlightId={activePassage.id} /><p className={styles.activeExcerpt}>{activePassage.text.length > 100 ? `${activePassage.text.slice(0, 100)}…` : activePassage.text}</p>
           {activePassage.notes.length > 0 && <div className={styles.activeNotes}>{activePassage.notes.map((note) => <MarkdownText key={note.id} text={note.markdown} />)}</div>}
           {onExplain && <button className="ll-button-secondary" onClick={() => { clearSelection(); onExplain(activePassage, contents?.book.archived ?? false); }}>Explain this passage</button>}
           <button className="ll-button-secondary" onClick={() => { onOpenInBook?.(activePassage.id); setActiveHighlight(undefined); }}>Open in book</button>

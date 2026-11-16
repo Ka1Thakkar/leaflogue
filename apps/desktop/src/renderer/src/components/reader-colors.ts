@@ -26,7 +26,7 @@ const mix = (a: string, b: string, amount: number) => {
 };
 
 /** Map chromatic colours by hue family; adapt missing families to the theme's saturation. */
-export function readerColor(value: string, property: "color" | "background-color" | "border-color", dark: boolean, tokens?: ThemeTokens): string {
+export function readerColor(value: string, property: "color" | "background-color" | "border-color", dark: boolean, tokens?: ThemeTokens, hueTolerance = 35): string {
   const original = rgb(value);
   const paper = tokens?.paper.slice(0, 7) ?? (dark ? "#000000" : "#ffffff");
   const ink = tokens?.ink.slice(0, 7) ?? (dark ? "#ffffff" : "#111111");
@@ -38,7 +38,7 @@ export function readerColor(value: string, property: "color" | "background-color
   const candidates = [tokens.pen, tokens.stamp, tokens.highlighter, tokens.chart, tokens.kraft].filter((color): color is string => Boolean(color)).map((color) => color.slice(0, 7)).filter((color) => hsl(color)[1] > 0.15);
   const nearest = [...candidates].sort((a, b) => distance(hsl(a)[0], hue) - distance(hsl(b)[0], hue))[0];
   const accent = hsl(tokens.pen.slice(0, 7));
-  const base = nearest && distance(hsl(nearest)[0], hue) < 35 ? nearest : fromHsl(hue, Math.max(0.3, Math.min(0.7, accent[1])), dark ? 0.72 : 0.32);
+  const base = nearest && distance(hsl(nearest)[0], hue) < hueTolerance ? nearest : fromHsl(hue, Math.max(0.3, Math.min(0.7, accent[1])), dark ? 0.72 : 0.32);
   if (property === "background-color") return mix(paper, base, 0.18);
   if (property === "border-color") return base;
   const [h, s, l] = hsl(base);

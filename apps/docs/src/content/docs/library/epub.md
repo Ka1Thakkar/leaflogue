@@ -128,3 +128,15 @@ edition needs a new review.
 Use Tab and Shift+Tab within reader options; Escape closes options and returns
 focus to the reader. These keyboard checks do not replace actual screen-reader
 acceptance, which remains pending.
+
+## Highlight colours (next beta)
+
+Each highlight has a colour: yellow by default, with green, blue, pink and
+purple alternatives. Click the small swatch beside its date on the book page,
+or click a saved reader highlight and open its colour palette. The date and
+reader marking use the same choice. All colours adapt to the active theme;
+changing themes retains the colour name rather than a fixed paint value.
+
+Colour choices are saved on this device and survive file unlinking or changing
+formats. They are display preferences, not part of library sync, SQLite backups
+or exports. The highlight text and notes still use normal library sync.

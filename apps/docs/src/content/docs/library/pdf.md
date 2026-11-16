@@ -28,8 +28,9 @@ on this device. Search and bookmarks work with extracted text and page positions
 Select text and choose **Highlight** or **Add note** to save it. Selecting
 alone does not create a highlight. Reader highlights and the book page use
 the same records: notes, removal and normal library sync continue to work.
-Click an existing reader highlight to open its actions or return to the book
-page. **Read in context** opens a matched passage in its PDF page.
+Click an existing reader highlight to open its actions, choose a
+[theme-adapted colour](/library/epub/#highlight-colours-next-beta), or return to
+the book page. **Read in context** opens a matched passage in its PDF page.
 
 When an existing highlight's text is unique in the linked edition, it can
 appear in the reader. Repeated text needs explicit location review; missing

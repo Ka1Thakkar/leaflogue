@@ -400,3 +400,36 @@ test("reviews ambiguous highlights locally without changing imported records", a
     await session.close();
   } finally { await removeProfile(profile); }
 });
+
+test("persists a per-highlight colour across passage and reader views", async () => {
+  const profile = createProfile();
+  try {
+    let session = await launch(profile); let page = session.page;
+    await page.getByRole("button", { name: "Set up later" }).click();
+    const saved = await page.evaluate(async () => {
+      const book = await window.leaflogue.library.createBook({ title: "Colour fixture", authors: [] });
+      return window.leaflogue.library.createHighlight({ bookId: book.id, text: "We read deliberately." });
+    });
+    await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId);
+    const card = page.locator(`#highlight-${saved.id}`);
+    const dateBefore = await card.locator("time").evaluate((node) => getComputedStyle(node).color);
+    await card.getByLabel("Highlight colour: yellow", { exact: true }).click();
+    await card.getByRole("radio", { name: "green", exact: true }).check();
+    await expect.poll(async () => card.locator("time").evaluate((node) => getComputedStyle(node).color)).not.toBe(dateBefore);
+    await page.getByRole("button", { name: "Read", exact: true }).click();
+    await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
+    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    const painted = () => page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
+      const inner = (frame as HTMLIFrameElement).contentWindow as Window & typeof globalThis;
+      return inner.CSS.highlights.get("leaflogue-colour-green")?.size ?? 0;
+    });
+    await expect.poll(painted).toBe(1);
+    await session.close(); session = await launch(profile); page = session.page;
+    await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId);
+    await expect(page.locator(`#highlight-${saved.id}`).getByLabel("Highlight colour: green", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Read", exact: true }).click();
+    await expect.poll(painted).toBe(1);
+    expect((await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), saved.bookId))!.highlights).toEqual([saved]);
+    await session.close();
+  } finally { await removeProfile(profile); }
+});
