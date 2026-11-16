@@ -22,7 +22,7 @@ export function usePdfPages(book: EpubDocument | undefined, bookId: BookId, fram
   useEffect(() => {
     if (!pdf || !loaded) return;
     const sheet = frame.current?.contentDocument?.querySelector<HTMLElement>(`article[data-chapter="${chapter}"] .pdf-sheet`);
-    const canvas = sheet?.querySelector("canvas"); if (!sheet || !canvas) return;
+    const canvas = sheet?.querySelector("canvas"); const image = sheet?.querySelector<HTMLImageElement>(".pdf-page-image"); if (!sheet || !canvas || !image) return;
     let active = true; let render: ReturnType<Awaited<ReturnType<PDFDocumentProxy["getPage"]>>["render"]> | undefined;
     void pdf.getPage(chapter + 1).then(async (page) => {
       if (!active) return;
@@ -30,11 +30,16 @@ export function usePdfPages(book: EpubDocument | undefined, bookId: BookId, fram
       const scale = Math.min(2, window.devicePixelRatio || 1, Math.sqrt(16_000_000 / (base.width * base.height)));
       const viewport = page.getViewport({ scale }); canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
       render = page.render({ canvas, viewport }); await render.promise;
+      if (!active || !canvas.isConnected) return;
+      // Chromium can retain correct canvas pixels without compositing them in
+      // a transformed, sandboxed iframe. Present a decoded local bitmap instead.
+      image.src = canvas.toDataURL("image/png"); await image.decode();
+      if (active) image.dataset.rendered = "true";
     }).catch((error: unknown) => { if (active && !(error instanceof Error && error.name === "RenderingCancelledException")) onError("This PDF page could not be rendered."); });
     for (const span of sheet.querySelectorAll<HTMLElement>("[data-pdf-text-width]")) {
       const width = span.offsetWidth; const target = Number(span.dataset.pdfTextWidth);
       if (width && Number.isFinite(target) && target > 0) span.style.transform = `rotate(${span.dataset.pdfAngle ?? 0}rad) scaleX(${target / width})`;
     }
-    return () => { active = false; render?.cancel(); };
+    return () => { active = false; render?.cancel(); image.removeAttribute("src"); delete image.dataset.rendered; };
   }, [pdf, frame, loaded, chapter, onError]);
 }

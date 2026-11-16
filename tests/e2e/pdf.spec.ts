@@ -20,6 +20,7 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await session.chooseFile(file); await page.getByRole("button", { name: "Attach PDF", exact: true }).click();
     let reader = page.frameLocator('iframe[title="PDF pages"]');
     await expect(reader.getByText("We read deliberately.", { exact: true })).toBeVisible();
+    await expect(reader.locator(".pdf-page-image").first()).toHaveAttribute("data-rendered", "true");
     await expect.poll(async () => page.locator('iframe[title="PDF pages"]').evaluate((frame) => {
       const canvas = (frame as HTMLIFrameElement).contentDocument!.querySelector("canvas")!;
       return Array.from(canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data).some((value, i) => i % 4 < 3 && value < 200);
@@ -75,7 +76,7 @@ test("reads image-only PDFs without OCR messages or fabricated highlights", asyn
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click(); await session.chooseFile(file);
     await page.getByRole("button", { name: "Attach PDF", exact: true }).click();
-    const reader = page.frameLocator('iframe[title="PDF pages"]'); await expect(reader.locator("canvas").first()).toBeVisible();
+    const reader = page.frameLocator('iframe[title="PDF pages"]'); await expect(reader.locator(".pdf-page-image").first()).toHaveAttribute("data-rendered", "true");
     await expect.poll(async () => page.locator('iframe[title="PDF pages"]').evaluate((frame) => {
       const canvas = (frame as HTMLIFrameElement).contentDocument!.querySelector("canvas")!;
       return canvas.width > 300 && Array.from(canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data).some((value, i) => i % 4 < 3 && value < 100);
