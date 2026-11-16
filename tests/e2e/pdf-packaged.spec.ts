@@ -12,6 +12,7 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
   const profile = createProfile(); const app = await launchPackagedApp(executable!, profile);
   const errors: string[] = [];
   try {
+    app.page.on("pageerror", (error) => errors.push(error.stack ?? error.message));
     app.page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
     await completeLocalSetup(app.page);
     await app.page.evaluate(() => localStorage.setItem("leaflogue.reader-display", JSON.stringify({ dark: true, theme: true })));
@@ -40,6 +41,6 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     await app.page.screenshot({ path: test.info().outputPath("packaged-pdf-text.png") });
     await app.page.keyboard.press("ArrowLeft"); await expect(first).toHaveAttribute("data-rendered", "true"); await expect(first).toBeInViewport();
     await app.page.screenshot({ path: test.info().outputPath("packaged-pdf.png") });
-  } catch (error) { throw new Error(`Packaged PDF display failed. Console: ${errors.join("\n")}; stderr: ${app.stderr()}`, { cause: error }); }
+  } catch (error) { await app.page.screenshot({ path: test.info().outputPath("failure.png") }); throw new Error(`Packaged PDF display failed. State: ${JSON.stringify(await app.page.evaluate(() => ({ active: document.activeElement?.outerHTML.slice(0, 300), tabs: Array.from(document.querySelectorAll("[role=tab]"), (tab) => [tab.textContent, tab.getAttribute("aria-selected")]), frames: document.querySelectorAll("iframe").length })))}. Console: ${errors.join("\n")}; stderr: ${app.stderr()}`, { cause: error }); }
   finally { await stopPackagedProcess(app.child); await app.browser.close(); await removeProfile(profile); }
 });

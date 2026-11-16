@@ -1,11 +1,6 @@
-.picker { position: relative; display: inline-block; vertical-align: middle; }
-.picker summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 4px; }
-.picker summary::-webkit-details-marker { display: none; }
-.picker summary:hover { background: var(--ui-raised); }
-.picker summary:focus-visible { outline: 2px solid var(--ui-accent); }
-.picker summary > span, .palette label > span { width: 12px; height: 12px; border-radius: 50%; border: 1px solid; flex: none; }
-.palette { display: flex; flex-wrap: wrap; gap: 10px; position: absolute; z-index: 65; top: 100%; left: 0; width: min(280px, calc(100vw - 40px)); margin: 0; padding: 12px; background: var(--ui-panel); color: var(--ui-text); border: 1px solid var(--ui-line-strong); border-radius: 8px; box-shadow: 0 8px 24px #0003; }
-.palette legend { font-size: 12px; font-weight: 500; background: var(--ui-panel); padding-inline: 5px; }
-.palette label { display: flex; align-items: center; gap: 5px; text-transform: capitalize; cursor: pointer; font-size: 12px; }
-.palette input { accent-color: var(--ui-accent); }
-.palette p { margin: 0; width: 100%; }
+.palette { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; vertical-align: middle; }
+.palette label { display: grid; place-items: center; width: 24px; height: 24px; cursor: pointer; }
+.palette input { appearance: none; width: 14px; height: 14px; margin: 0; border: 1px solid currentColor; border-radius: 50%; cursor: pointer; }
+.palette input:checked { outline: 2px solid currentColor; outline-offset: 2px; }
+.palette input:focus-visible { outline: 2px dashed var(--ui-text); outline-offset: 3px; }
+.palette p { margin: 0; width: 100%; font-size: 12px; }

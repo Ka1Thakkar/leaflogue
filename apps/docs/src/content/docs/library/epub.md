@@ -10,7 +10,7 @@ known limitations.
 ## Link your book file
 
 In the desktop app, open a book and choose **Read**. In the right-hand
-**Reader** tab, choose **Attach EPUB** and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
+**Reader** tab, choose **Attach EPUB** (**Attach book file** in the next beta) and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
 `.kepub.epub`).
 Leaflogue links the original file; it does not make another copy. Keep that
 file available where you attached it. If Calibre manages your books, use
@@ -132,9 +132,11 @@ acceptance, which remains pending.
 ## Highlight colours (next beta)
 
 Each highlight has a colour: yellow by default, with green, blue, pink and
-purple alternatives. Click the small swatch beside its date on the book page,
-or click a saved reader highlight and open its colour palette. The date and
-reader marking use the same choice. All colours adapt to the active theme;
+purple alternatives. Choose a swatch in the highlight’s actions on the book page
+or in a saved reader highlight’s actions. All five choices are visible directly;
+one click changes the colour. The date, hover bar and
+reader marking use the same choice; no additional colour tag is shown beside
+the date. All colours adapt to the active theme;
 changing themes retains the colour name rather than a fixed paint value.
 
 Colour choices are saved on this device and survive file unlinking or changing

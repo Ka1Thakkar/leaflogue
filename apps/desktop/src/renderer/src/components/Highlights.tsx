@@ -5,7 +5,7 @@ import { useContextWorkspace } from "./ContextPanel";
 import { Menu, MenuItem } from "@leaflogue/ui";
 
 import { Select, SelectItem } from "@leaflogue/ui";
-import { useCallback, useContext, useDeferredValue, useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useCallback, useContext, useDeferredValue, useEffect, useId, useRef, useState, type RefObject, type CSSProperties } from "react";
 import { ArrowDownWideNarrow, BookOpen, CalendarDays, Filter, History, MoreHorizontal, Network, Pencil, Plus, Rows3, Search, Sparkles, StickyNote, Tags, Trash2, X } from "../components/icons";
 import type { Book, BookId, HighlightId, HighlightListEntry, HighlightQuery, LibraryStatistics, Tag, TagId } from "@leaflogue/contracts";
 import { Bars, Facet, Panel, StatTile, TitleRow } from "@leaflogue/ui";
@@ -74,6 +74,7 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
     <article
       id={`highlight-${highlight.id}`}
       className={styles.annotation}
+      style={{ "--passage-colour": highlightInk } as CSSProperties}
       aria-label={`Highlight from ${highlight.bookTitle}`}
       onFocus={() => setActiveId?.(highlight.id)}
       // The passage a link opened, e.g. from Today's highlight: marked so the eye lands on it.
@@ -81,7 +82,7 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
     >
       <div className={styles.passageMeta}>
         {showBook && <a href={href.book(highlight.bookId)}>{highlight.bookTitle}</a>}
-        <HighlightColourPicker highlightId={highlight.id} /><time style={{ color: highlightInk }} dateTime={new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toISOString()}>
+        <time style={{ color: highlightInk }} dateTime={new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toISOString()}>
           {new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
         </time>
         <span>{highlight.text.length.toLocaleString()} chars</span>
@@ -101,6 +102,7 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
           </div>
           {!readOnly && !deleted && (
             <div className={styles.actions}>
+              <HighlightColourPicker highlightId={highlight.id} />
               {aiEnabled && (
                 <button className="ll-icon-button" aria-label="Explain this passage" title="Explain this passage" ref={explainTrigger} onClick={() => contextWorkspace?.showAssistant({ highlight, reload, readOnly })}><Sparkles size={18} aria-hidden="true" /></button>
               )}

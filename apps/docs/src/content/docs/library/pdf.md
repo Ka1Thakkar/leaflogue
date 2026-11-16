@@ -10,7 +10,7 @@ beta.4 downloads.
 
 ## Link one file
 
-Open a book and choose **Read → Attach PDF**, or **Link from Calibre** and
+Open a book and choose **Read → Attach book file**, or **Link from Calibre** and
 choose **PDF** under **Book format**. Leaflogue reads the original file in
 place without copying or changing it. A book can have one linked EPUB, KEPUB,
 or PDF at a time. Unlink the current file in reader options before attaching
@@ -18,7 +18,12 @@ another format. Unlinking keeps the book, highlights, notes and original file.
 
 ## Read and annotate
 
-PDF pages keep their original layout and colours. Use keyboard page turns,
+PDF pages keep their original layout. Reader options offers **Dark mode**
+(black paper and white text) and **Use theme colours** (theme paper and ink).
+Turn both off for the original colours. These are display-only adjustments;
+they do not change the original PDF. Images keep their original colours on mixed pages. Covers, scans and pages
+with complex artwork or text over images keep their original colours throughout. Raster text
+inside an image is not recoloured. Use keyboard page turns,
 mouse-wheel page turns, or the page list in the in-app right-click options.
 Use **Zoom** in reader options for fit-page, fit-width, or 100–200% views.
 When zoomed, scroll within the current page; keyboard page turns still work.

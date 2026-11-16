@@ -4,8 +4,8 @@ import styles from "./highlight-colours.module.css";
 export function HighlightColourPicker({ highlightId }: { readonly highlightId: string }) {
   const colours = useHighlightColours(); const selected = colours[highlightId] ?? "yellow";
   const palette = currentHighlightPalette(); const name = useId(); const [error, setError] = useState("");
-  return <details className={styles.picker}>
-    <summary aria-label={`Highlight colour: ${selected}`} title="Change highlight colour"><span aria-hidden="true" style={{ background: palette[selected].fill, borderColor: palette[selected].ink }} /></summary>
-    <fieldset className={styles.palette}><legend>Highlight colour</legend>{HIGHLIGHT_COLOURS.map((colour) => <label key={colour} title={colour}><input type="radio" name={name} value={colour} checked={colour === selected} onChange={() => { try { saveHighlightColour(highlightId, colour); setError(""); } catch { setError("The colour could not be saved. Try again."); } }} /><span aria-hidden="true" style={{ background: palette[colour].fill, borderColor: palette[colour].ink }} />{colour}</label>)}{error && <p role="alert">{error}</p>}</fieldset>
-  </details>;
+  return <div role="radiogroup" aria-label="Highlight colour" className={styles.palette}>
+    {HIGHLIGHT_COLOURS.map((colour) => <label key={colour}><input type="radio" aria-label={colour} name={name} value={colour} checked={colour === selected} style={{ background: palette[colour].fill, color: palette[colour].ink }} onChange={() => { try { saveHighlightColour(highlightId, colour); setError(""); } catch { setError("The colour could not be saved. Try again."); } }} /></label>)}
+    {error && <p role="alert">{error}</p>}
+  </div>;
 }

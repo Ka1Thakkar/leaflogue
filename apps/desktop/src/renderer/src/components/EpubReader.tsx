@@ -44,12 +44,13 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   const [page, setPage] = useState(0);
   const [count, setCount] = useState(1);
   const [loaded, setLoaded] = useState(0);
-  usePdfPages(book, bookId, frame, loaded, chapter, setError);
   const [readerDisplay, setReaderDisplay] = useState<{ dark: boolean; theme: boolean }>(() => {
     try { const value = JSON.parse(localStorage.getItem("leaflogue.reader-display") ?? "null") as { dark?: unknown; theme?: unknown } | null; return { dark: typeof value?.dark === "boolean" ? value.dark : true, theme: value?.theme === true }; }
     catch { return { dark: true, theme: false }; }
   });
   const [appearance, setAppearance] = useState<AppearanceConfiguration>();
+  const pdfTokens = appearance?.themes.find((theme) => theme.id === appearance.themeId)?.[readerDisplay.dark ? "dark" : "light"];
+  usePdfPages(book, bookId, frame, loaded, chapter, setError, readerDisplay, pdfTokens);
   useEffect(() => {
     let active = true;
     void window.leaflogue.appearance.describe().then((value) => { if (active) setAppearance(value); }).catch(() => undefined);
@@ -67,9 +68,9 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const doc = frame.current?.contentDocument;
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
     if (!loaded || !doc || !definition) return;
-    const dark = book?.format === "pdf" ? false : readerDisplay.dark;
+    const dark = readerDisplay.dark;
     const tokens = definition[dark ? "dark" : "light"];
-    const paper = book?.format === "pdf" ? "#ffffff" : readerDisplay.theme ? tokens.paper : dark ? "#000000" : "#ffffff";
+    const paper = readerDisplay.theme ? tokens.paper : dark ? "#000000" : "#ffffff";
     const palette = highlightPalette({ ...tokens, paper }, dark);
     let style = doc.getElementById("leaflogue-colour-rules");
     if (!style) { style = doc.createElement("style"); style.id = "leaflogue-colour-rules"; doc.head.append(style); }
@@ -465,7 +466,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   if (!window.leaflogue.epub) return null;
   return <section className={styles.reader} aria-label={book?.format === "pdf" ? "Local PDF reader" : "Local EPUB reader"}>
     {confirmDialog}
-    {!book && <><p className="ll-muted">{target ? "Link a book file to find this highlight in its original context." : "Link an EPUB or PDF to read it here."} The file stays in its original location.</p><button className="ll-button-secondary" disabled={busy} onClick={attach}>{busy ? "Checking for book file…" : "Attach EPUB"}</button><button className="ll-button-secondary" disabled={busy} onClick={attach}>Attach PDF</button>{window.leaflogue.calibre && <button className="ll-button-secondary" onClick={() => setCalibreOpen(true)}>Link from Calibre</button>}<p className="ll-muted">Book files are not included in library backups.</p></>}
+    {!book && <><p className="ll-muted">{target ? "Link a book file to find this highlight in its original context." : "Link an EPUB or PDF to read it here."} The file stays in its original location.</p><button className="ll-button-secondary" disabled={busy} onClick={attach}>{busy ? "Checking for book file…" : "Attach book file"}</button>{window.leaflogue.calibre && <button className="ll-button-secondary" onClick={() => setCalibreOpen(true)}>Link from Calibre</button>}<p className="ll-muted">Book files are not included in library backups.</p></>}
     {error && <InlineError>{error}</InlineError>}
     {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : "Read EPUB"}</button>}
     {calibreOpen && <div className={styles.overlay}><div role="dialog" aria-label="Calibre library" className={styles.options} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setCalibreOpen(false); } }}><CalibrePicker bookId={bookId} title={contents?.book.title ?? ""} onClose={() => setCalibreOpen(false)} onLinked={(next) => { anchor.current = next.position; setBook(next); setChapter(next.position.chapter); setCalibreOpen(false); setOptionsOpen(false); setOpened(true); setError(""); }} /></div></div>}
@@ -521,12 +522,11 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
             {!bookmarks.length && <p className="ll-muted">No bookmarks yet.</p>}
             <ol className={styles.locationList}>{bookmarks.map((item, index) => <li key={`${item.chapter}:${item.paragraph}:${item.offset ?? 0}`}><button className="ll-button-secondary" onClick={() => visit(item)}><strong>{book.chapters[item.chapter]?.title}</strong><span>{(book.chapters[item.chapter]?.paragraphs ?? book.chapters[item.chapter]?.text.split("\n\n"))?.[item.paragraph]?.slice(item.offset ?? 0, (item.offset ?? 0) + 100)}</span></button><button className="ll-button-secondary" disabled={savingBookmark} aria-label={`Remove bookmark ${index + 1}`} onClick={() => void updateBookmarks(bookmarks.filter((_, i) => i !== index))}>Remove</button></li>)}</ol>
           </details>
-          {book.format !== "pdf" && <><label className="ll-label">Typography<Select aria-label="Text size" value={String(fontSize)} onValueChange={(value) => setFontSize(Number(value))}>{[16, 18, 20, 24, 28].map((size) => <SelectItem key={size} value={String(size)}>{size} px</SelectItem>)}</Select></label>
+          {book.format !== "pdf" && <label className="ll-label">Typography<Select aria-label="Text size" value={String(fontSize)} onValueChange={(value) => setFontSize(Number(value))}>{[16, 18, 20, 24, 28].map((size) => <SelectItem key={size} value={String(size)}>{size} px</SelectItem>)}</Select></label>}
           <div className={styles.displayPreferences}>
             <label><span><strong>Dark mode</strong><small>Black background, white text</small></span><input type="checkbox" role="switch" aria-label="Dark mode" checked={readerDisplay.dark} onChange={(event) => setReaderDisplay((value) => ({ ...value, dark: event.target.checked }))} /></label>
-            <label><span><strong>Use theme colours</strong><small>Adapt book colours to {appearance?.themes.find((theme) => theme.id === appearance.themeId)?.name ?? "your theme"}</small></span><input type="checkbox" role="switch" aria-label="Use theme colours" checked={readerDisplay.theme} onChange={(event) => setReaderDisplay((value) => ({ ...value, theme: event.target.checked }))} /></label>
+            <label><span><strong>Use theme colours</strong><small>{book.format === "pdf" ? "Use theme paper and text colours: " : "Adapt book colours to "}{appearance?.themes.find((theme) => theme.id === appearance.themeId)?.name ?? "your theme"}</small></span><input type="checkbox" role="switch" aria-label="Use theme colours" checked={readerDisplay.theme} onChange={(event) => setReaderDisplay((value) => ({ ...value, theme: event.target.checked }))} /></label>
           </div>
-          </>}
           {book.format === "pdf" && <><label className="ll-label">Zoom<Select aria-label="PDF zoom" value={pdfZoom} onValueChange={setPdfZoom}><SelectItem value="page">Fit page</SelectItem><SelectItem value="width">Fit width</SelectItem>{[100, 150, 200].map((value) => <SelectItem key={value} value={String(value)}>{value}%</SelectItem>)}</Select></label><p className="ll-muted">PDF pages keep their original layout.</p></>}
           <details className={styles.readerTools}>
             <summary>Review highlight locations</summary>

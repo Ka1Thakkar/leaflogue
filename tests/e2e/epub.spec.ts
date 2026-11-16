@@ -11,12 +11,13 @@ test("attaches an inert local EPUB and resumes the same edition after restart", 
     const id = await page.evaluate(async () => (await window.leaflogue.library.createBook({ title: "Reader fixture", authors: [] })).id);
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Open context panel", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Attach EPUB", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Attach book file", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Attach book file", exact: true })).toHaveCount(1);
     await session.cancelNextFileDialog();
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Attach EPUB", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Attach book file", exact: true })).toBeEnabled();
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("article", { name: "A quiet beginning" })).toContainText("We read deliberately.");
     await expect(page.getByRole("article").locator("script, img, iframe")).toHaveCount(0);
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } });
@@ -72,7 +73,7 @@ test("turns pages inside a long chapter and restores the exact text after restar
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/paged-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     let reading = page.getByRole("region", { name: "Book pages", exact: true });
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("PageDown");
@@ -123,7 +124,7 @@ test("preserves publisher formatting and offers in-app reader options on right c
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/styled-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     const reader = page.frameLocator('iframe[title="EPUB pages"]');
     const heading = reader.getByRole("heading", { name: "A quiet beginning", exact: true });
     await expect(heading).toHaveCSS("text-align", "center");
@@ -212,7 +213,7 @@ test("keeps line ends inside each page with publisher padding and fractional wid
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/layout-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("heading", { name: "A quiet beginning" })).toBeVisible();
     await page.getByRole("button", { name: "Expand context panel", exact: true }).click();
     await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => (frame as HTMLIFrameElement).contentDocument!.getElementById("reader-scroll")!.style.setProperty("max-width", "311.375px", "important"));
@@ -246,7 +247,7 @@ test("navigates both ways between a highlight and its reader entity, including n
     await page.evaluate(({ bookId }) => { location.hash = `#/library/${bookId}`; }, saved);
     await page.getByRole("button", { name: "Read in context", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     const reader = page.frameLocator('iframe[title="EPUB pages"]');
     await expect(reader.getByRole("article", { name: "A second chapter" })).toBeInViewport();
     const marker = page.getByRole("button", { name: "1 note: Return to this paragraph.", exact: true });
@@ -283,7 +284,7 @@ test("searches across the book and keeps bookmarks after restart", async () => {
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Open context panel", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     const reader = page.frameLocator('iframe[title="EPUB pages"]');
     await expect(reader.getByRole("article", { name: "A quiet beginning" })).toContainText("We read deliberately.");
     await reader.locator("body").click({ button: "right" });
@@ -335,7 +336,7 @@ test("confirms saving a reader selection before opening the existing AI disclosu
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     const reader = page.frameLocator('iframe[title="EPUB pages"]');
     await reader.locator("p").first().evaluate((element) => {
       const doc = element.ownerDocument; const range = doc.createRange(); range.selectNodeContents(element);
@@ -368,7 +369,7 @@ test("reviews ambiguous highlights locally without changing imported records", a
     await page.evaluate((id) => { location.hash = `#/library/${id}`; }, original.bookId);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/review-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     const reader = page.frameLocator('iframe[title="EPUB pages"]');
     await expect(reader.getByRole("article", { name: "A quiet beginning" })).toBeVisible();
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } }); await page.keyboard.press("Shift+F10");
@@ -413,12 +414,16 @@ test("persists a per-highlight colour across passage and reader views", async ()
     await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId);
     const card = page.locator(`#highlight-${saved.id}`);
     const dateBefore = await card.locator("time").evaluate((node) => getComputedStyle(node).color);
-    await card.getByLabel("Highlight colour: yellow", { exact: true }).click();
+    await card.hover();
+    await expect(card.getByRole("radiogroup", { name: "Highlight colour", exact: true }).getByRole("radio")).toHaveCount(5);
+    await expect(card.getByRole("radio", { name: "green", exact: true })).toBeVisible();
     await card.getByRole("radio", { name: "green", exact: true }).check();
     await expect.poll(async () => card.locator("time").evaluate((node) => getComputedStyle(node).color)).not.toBe(dateBefore);
+    const ink = await card.locator("time").evaluate((node) => getComputedStyle(node).color);
+    await expect(card).toHaveCSS("box-shadow", `${ink} 2px 0px 0px 0px inset`);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     const painted = () => page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
       const inner = (frame as HTMLIFrameElement).contentWindow as Window & typeof globalThis;
       return inner.CSS.highlights.get("leaflogue-colour-green")?.size ?? 0;
@@ -426,7 +431,7 @@ test("persists a per-highlight colour across passage and reader views", async ()
     await expect.poll(painted).toBe(1);
     await session.close(); session = await launch(profile); page = session.page;
     await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId);
-    await expect(page.locator(`#highlight-${saved.id}`).getByLabel("Highlight colour: green", { exact: true })).toBeVisible();
+    await expect(page.locator(`#highlight-${saved.id}`).getByRole("radio", { name: "green", exact: true })).toBeChecked();
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await expect.poll(painted).toBe(1);
     expect((await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), saved.bookId))!.highlights).toEqual([saved]);

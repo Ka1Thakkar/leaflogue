@@ -10,7 +10,7 @@ describe("local PDF reading", () => {
     const book = await parsePdf(readerPdf());
     expect(book.format).toBe("pdf"); expect(book.chapters).toHaveLength(2);
     expect(book.chapters[0]?.text).toContain("We read deliberately.");
-    expect(book.chapters[0]?.html).toContain("<canvas");
+    expect(book.chapters[0]?.html).toContain('class="pdf-page-image"');
     const scan = await parsePdf(readerPdf(true));
     expect(scan.chapters).toHaveLength(2); expect(scan.chapters[0]?.paragraphs).toEqual([""]);
     expect(scan.chapters[0]?.html).not.toContain("data-paragraph");

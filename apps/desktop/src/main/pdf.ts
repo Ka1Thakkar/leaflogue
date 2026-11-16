@@ -35,7 +35,7 @@ async function extractPdf(bytes: Buffer): Promise<EpubDocument> {
       });
       // Empty placeholder keeps page-position persistence valid for image-only pages.
       if (!paragraphs.length) paragraphs.push("");
-      chapters.push({ id: `pdf-page-${index + 1}`, title: `Page ${index + 1}`, text: paragraphs.join("\n\n"), paragraphs, html: `<div class="pdf-sheet" data-pdf-width="${viewport.width}" data-pdf-height="${viewport.height}" style="width:${viewport.width}px;height:${viewport.height}px"><canvas aria-hidden="true"></canvas><img class="pdf-page-image" alt="" aria-hidden="true"/>${spans.join("")}</div>` });
+      chapters.push({ id: `pdf-page-${index + 1}`, title: `Page ${index + 1}`, text: paragraphs.join("\n\n"), paragraphs, html: `<div class="pdf-sheet" data-pdf-width="${viewport.width}" data-pdf-height="${viewport.height}" style="width:${viewport.width}px;height:${viewport.height}px"><img class="pdf-page-image" alt="" aria-hidden="true"/>${spans.join("")}</div>` });
       page.cleanup();
     }
     return { format: "pdf", sha256: createHash("sha256").update(bytes).digest("hex"), chapters, position: { chapter: 0, paragraph: 0 } };
