@@ -273,3 +273,50 @@ test("navigates both ways between a highlight and its reader entity, including n
     await session.close();
   } finally { await removeProfile(profile); }
 });
+
+test("searches across the book and keeps bookmarks after restart", async () => {
+  const profile = createProfile();
+  try {
+    let session = await launch(profile); let page = session.page;
+    await page.getByRole("button", { name: "Set up later" }).click();
+    const id = await page.evaluate(async () => (await window.leaflogue.library.createBook({ title: "Search fixture", authors: [] })).id);
+    await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
+    await page.getByRole("button", { name: "Open context panel", exact: true }).click();
+    await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
+    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    const reader = page.frameLocator('iframe[title="EPUB pages"]');
+    await expect(reader.getByRole("article", { name: "A quiet beginning" })).toContainText("We read deliberately.");
+    await reader.locator("body").click({ button: "right" });
+    await page.getByText("Search this book", { exact: true }).click();
+    await page.getByRole("searchbox", { name: "Search this book" }).fill("Second");
+    await expect(page.getByRole("status").filter({ hasText: /matches/ })).toContainText("matches");
+    await page.locator('details').filter({ has: page.getByRole('searchbox') }).getByRole("button").first().click();
+    await expect(reader.getByRole("article", { name: "A second chapter" })).toBeInViewport();
+    await reader.locator("body").click({ button: "right" });
+    await page.getByText("Bookmarks (0)", { exact: true }).click();
+    await page.getByRole("button", { name: "Bookmark this location", exact: true }).click();
+    await expect(page.getByText("Bookmarks (1)", { exact: true })).toBeVisible();
+    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.position.chapter, id)).toBe(1);
+    await session.close(); session = await launch(profile); page = session.page;
+    await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
+    await page.getByRole("button", { name: "Read", exact: true }).click();
+    const reopened = page.frameLocator('iframe[title="EPUB pages"]');
+    await expect(reopened.getByRole("article", { name: "A second chapter" })).toBeInViewport();
+    await reopened.locator("body").click({ button: "right" });
+    await page.getByText("Bookmarks (1)", { exact: true }).click();
+    await page.getByRole("dialog", { name: "Reader options", exact: true }).getByRole("button", { name: /A second chapter/ }).click();
+    await expect(reopened.getByRole("article", { name: "A second chapter" })).toBeInViewport();
+    await page.locator("#context-reader").click({ position: { x: 5, y: 5 } }); await page.keyboard.press("Home");
+    await expect(reopened.getByRole("article", { name: "A quiet beginning" })).toBeInViewport();
+    await reopened.locator("body").click({ button: "right" });
+    await page.getByText("Bookmarks (1)", { exact: true }).click();
+    await page.getByRole("dialog", { name: "Reader options", exact: true }).getByRole("button", { name: /A second chapter/ }).click();
+    await expect(reopened.getByRole("article", { name: "A second chapter" })).toBeInViewport();
+    await reopened.locator("body").click({ button: "right" });
+    await page.getByText("Bookmarks (1)", { exact: true }).click();
+    await page.getByRole("button", { name: "Remove bookmark 1", exact: true }).click();
+    await expect(page.getByText("Bookmarks (0)", { exact: true })).toBeVisible();
+    expect(await page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.bookmarks, id)).toEqual([]);
+    await session.close();
+  } finally { await removeProfile(profile); }
+});

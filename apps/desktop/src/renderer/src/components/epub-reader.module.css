@@ -44,3 +44,11 @@
 .calibreResults span { display: grid; gap: 3px; }
 .calibreResults small { color: var(--ui-dim); }
 .calibreResults input { margin-top: 4px; accent-color: var(--ui-text); }
+
+.readerTools { display: grid; border-top: 1px solid var(--ui-line); padding-top: 14px; }
+.readerTools summary { cursor: pointer; font-weight: 500; margin-bottom: 12px; }
+.readerTools label { margin-block: 12px; }
+.locationList { display: grid; gap: 10px; list-style: none; padding: 0; margin: 12px 0 0; max-height: 18rem; overflow-y: auto; }
+.locationList li { display: flex; align-items: start; gap: 8px; min-width: 0; }
+.locationList li > button:first-child { display: grid; gap: 5px; flex: 1; min-width: 0; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.locationList span { font: 14px/1.5 var(--ui-font-reading); }

@@ -238,6 +238,10 @@ export class EpubStore {
     }
     if (document.sha256 !== attachment.sha256) throw new Error("The linked EPUB has changed. Edition review is needed before reusing its reading position.");
     try {
+      const saved = JSON.parse(await readFile(this.path(bookId, "bookmarks.json"), "utf8")) as { sha256?: unknown; bookmarks?: unknown };
+      if (saved.sha256 === document.sha256) document = { ...document, bookmarks: validateBookmarks(document, saved.bookmarks) };
+    } catch (error) { if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    try {
       const saved: unknown = JSON.parse(await readFile(this.path(bookId, "json"), "utf8"));
       if (saved && typeof saved === "object" && "sha256" in saved && saved.sha256 === document.sha256 && "chapter" in saved && "paragraph" in saved) {
         const { chapter, paragraph } = saved;
@@ -254,6 +258,17 @@ export class EpubStore {
   async unlink(bookId: string): Promise<void> {
     await rm(this.path(bookId, "attachment.json"), { force: true });
     await rm(this.path(bookId, "json"), { force: true });
+    await rm(this.path(bookId, "bookmarks.json"), { force: true });
+  }
+  async saveBookmarks(bookId: string, sha256: unknown, value: unknown) {
+    const document = await this.open(bookId);
+    if (!document || document.sha256 !== sha256) throw new Error("Bookmark edition is invalid.");
+    const bookmarks = validateBookmarks(document, value);
+    const target = this.path(bookId, "bookmarks.json");
+    const staged = `${target}.${randomUUID()}.tmp`;
+    await writeFile(staged, JSON.stringify({ sha256, bookmarks }), { mode: 0o600 });
+    await rename(staged, target);
+    return bookmarks;
   }
   async savePosition(bookId: string, sha256: unknown, chapter: unknown, paragraph: unknown, offset?: unknown): Promise<void> {
     const document = await this.open(bookId);
@@ -264,4 +279,20 @@ export class EpubStore {
     await writeFile(temporary, JSON.stringify({ sha256, chapter, paragraph, ...(offset ? { offset } : {}) }), { mode: 0o600 });
     await rename(temporary, target);
   }
+}
+
+function validateBookmarks(document: EpubDocument, value: unknown): import("@leaflogue/contracts").EpubBookmark[] {
+  if (!Array.isArray(value) || value.length > 500) throw new Error("A book can have up to 500 bookmarks.");
+  const keys = new Set<string>();
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== "object") throw new Error("Bookmark is invalid.");
+    const { chapter, paragraph, offset = 0 } = item as Record<string, unknown>;
+    if (typeof chapter !== "number" || !Number.isInteger(chapter) || chapter < 0 || chapter >= document.chapters.length || typeof paragraph !== "number" || !Number.isInteger(paragraph) || paragraph < 0 || typeof offset !== "number" || !Number.isInteger(offset) || offset < 0) throw new Error("Bookmark is invalid.");
+    const text = (document.chapters[chapter]!.paragraphs ?? document.chapters[chapter]!.text.split("\n\n"))[paragraph];
+    if (text === undefined || offset > text.length) throw new Error("Bookmark is invalid.");
+    const key = `${chapter}:${paragraph}:${offset}`;
+    if (keys.has(key)) throw new Error("Duplicate bookmark.");
+    keys.add(key);
+    return { chapter, paragraph, offset };
+  });
 }

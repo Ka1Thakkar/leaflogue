@@ -86,3 +86,15 @@ uses fallback fonts. Adobe page templates are ignored. DRM, fixed-layout
 fidelity, audio/video, PDFs, and book-file sync are not supported
 in this version. EPUBs must be no larger than 50 MB; malformed or oversized
 resources may also be rejected.
+
+## Search and bookmarks (next beta)
+
+In the next beta, open reader options with right-click or **Shift+F10**.
+Expand **Search this book**, type literal text, and choose a result to open
+its location. Search ignores case and shows up to 100 matches; narrow the
+query to find more. Results do not create saved highlights.
+
+Expand **Bookmarks**, then choose **Bookmark this location**. Choose a saved
+entry to return or **Remove** to delete it. Bookmarks belong to the exact
+linked edition, stay on this device, and are removed when the file is
+unlinked. They are not included in library sync, SQLite backups, or exports.

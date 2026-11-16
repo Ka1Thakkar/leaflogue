@@ -1,3 +1,4 @@
+import { searchReader, readerTextRange } from "./reader-search";
 import { CalibrePicker } from "./CalibrePicker";
 import { MarkdownText } from "./MarkdownText";
 import { useConfirm } from "./Confirm";
@@ -57,6 +58,11 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : undefined);
   }, [loaded, appearance, readerDisplay]);
   const [saved, setSaved] = useState("");
+  const [query, setQuery] = useState("");
+  const [bookmarks, setBookmarks] = useState<readonly Position[]>([]);
+  const [savingBookmark, setSavingBookmark] = useState(false);
+  const results = useMemo(() => book ? searchReader(book, query) : [], [book, query]);
+  useEffect(() => { setBookmarks(book?.bookmarks ?? []); setQuery(""); }, [book]);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [calibreOpen, setCalibreOpen] = useState(false);
   const [contents, setContents] = useState<BookContents>();
@@ -124,6 +130,19 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     }).catch((failure: unknown) => { if (active) setError(String(failure)); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [bookId]);
+  const visit = (position: Position, length = 0) => {
+    const doc = frame.current?.contentDocument;
+    const range = doc && readerTextRange(doc, position, length);
+    if (!range) { setError("This location could not be opened in this edition."); return; }
+    setOptionsOpen(false); navigateRange.current(range); save.current(position); setChapter(position.chapter); frame.current?.focus();
+  };
+  const updateBookmarks = async (next: readonly Position[]) => {
+    if (!book || savingBookmark) return;
+    setSavingBookmark(true);
+    try { setBookmarks(await window.leaflogue.epub!.saveBookmarks(bookId, book.sha256, next)); setSaved("Bookmarks saved"); }
+    catch { setError("Your bookmarks could not be saved. Try again."); }
+    finally { setSavingBookmark(false); }
+  };
   const source = useMemo(() => {
     if (!book) return "";
     const publisherStyles = [...new Set(book.chapters.map((item) => item.styles ?? ""))].join("\n").replace(/<\/style/giu, "<\\/style");
@@ -401,6 +420,23 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
           <div className={styles.optionHeading}><div><p className="ui-label">Reader</p><h2>{contents?.book.title ?? "Reading"}</h2></div><button className="ll-icon-button" aria-label="Close reader options" onClick={() => { setOptionsOpen(false); frame.current?.focus(); }}><Icon name="close" size={17} aria-hidden="true" /></button></div>
           <div className={styles.progress}><span>Page {page + 1} of {count}</span><span>{Math.round((page + 1) / count * 100)}%</span></div><progress className={styles.progressBar} value={page + 1} max={count} aria-label="Reading progress" />
           <label className="ll-label">Contents<Select aria-label="Chapter" value={String(chapter)} onValueChange={(value) => { jump.current(Number(value)); setOptionsOpen(false); }}>{book.chapters.map((item, index) => <SelectItem value={String(index)} key={item.id}>{index + 1}. {item.title}</SelectItem>)}</Select></label>
+          <details className={styles.readerTools}>
+            <summary>Search this book</summary>
+            <label className="ll-label">Find text<input className="ll-input" type="search" aria-label="Search this book" value={query} maxLength={200} onChange={(event) => setQuery(event.target.value)} /></label>
+            {query.trim() && <p role="status" className="ll-muted">{results.length === 100 ? "First 100 matches — narrow your search for more" : `${results.length} matches`}</p>}
+            <ol className={styles.locationList}>{results.map((result) => <li key={`${result.chapter}:${result.paragraph}:${result.offset}`}><button className="ll-button-secondary" onClick={() => visit(result, result.length)}><strong>{book.chapters[result.chapter]?.title}</strong><span>{result.excerpt}</span></button></li>)}</ol>
+          </details>
+          <details className={styles.readerTools}>
+            <summary>Bookmarks ({bookmarks.length})</summary>
+            <p className="ll-muted">Saved on this device for this edition.</p>
+            <button className="ll-button-secondary" disabled={savingBookmark || bookmarks.length >= 500} onClick={() => {
+              const current = { ...anchor.current };
+              if (bookmarks.some((item) => item.chapter === current.chapter && item.paragraph === current.paragraph && (item.offset ?? 0) === (current.offset ?? 0))) { setSaved("This location is already bookmarked"); return; }
+              void updateBookmarks([...bookmarks, current]);
+            }}>Bookmark this location</button>
+            {!bookmarks.length && <p className="ll-muted">No bookmarks yet.</p>}
+            <ol className={styles.locationList}>{bookmarks.map((item, index) => <li key={`${item.chapter}:${item.paragraph}:${item.offset ?? 0}`}><button className="ll-button-secondary" onClick={() => visit(item)}><strong>{book.chapters[item.chapter]?.title}</strong><span>{(book.chapters[item.chapter]?.paragraphs ?? book.chapters[item.chapter]?.text.split("\n\n"))?.[item.paragraph]?.slice(item.offset ?? 0, (item.offset ?? 0) + 100)}</span></button><button className="ll-button-secondary" disabled={savingBookmark} aria-label={`Remove bookmark ${index + 1}`} onClick={() => void updateBookmarks(bookmarks.filter((_, i) => i !== index))}>Remove</button></li>)}</ol>
+          </details>
           <label className="ll-label">Typography<Select aria-label="Text size" value={String(fontSize)} onValueChange={(value) => setFontSize(Number(value))}>{[16, 18, 20, 24, 28].map((size) => <SelectItem key={size} value={String(size)}>{size} px</SelectItem>)}</Select></label>
           <div className={styles.displayPreferences}>
             <label><span><strong>Dark mode</strong><small>Black background, white text</small></span><input type="checkbox" role="switch" aria-label="Dark mode" checked={readerDisplay.dark} onChange={(event) => setReaderDisplay((value) => ({ ...value, dark: event.target.checked }))} /></label>

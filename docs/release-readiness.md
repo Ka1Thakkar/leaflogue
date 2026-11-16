@@ -1,4 +1,29 @@
-# 0.1.0-beta.3 release readiness
+# Release readiness
+
+## Published 0.1.1-beta.4
+
+- [x] Publish the experimental reader beta with matching guides and downloads.
+- [x] Pass exact tagged source, browser/desktop, native packaging and MCP checks.
+- [x] Retain 44 assets with checksums, SBOMs, audits and build-input records.
+- [x] Independently verify package versions, checksums, signed beta manifests
+  and extracted application secret scans.
+- [x] Verify the deployed documentation points to the published beta.4 release.
+- [ ] Record clean-machine install, import, backup/restore, restart, update and
+  uninstall acceptance across Linux x64/ARM64, Mac ARM64/Intel and Windows x64.
+- [ ] Record keyboard-only and actual Orca, VoiceOver and Narrator acceptance.
+- [ ] Record observed Gatekeeper and SmartScreen installation prompts.
+
+Evidence: [tagged checks](https://github.com/Ka1Thakkar/leaflogue/actions/runs/43165887343),
+[release builds](https://github.com/Ka1Thakkar/leaflogue/actions/runs/43165888713),
+[independent artifact verification](https://github.com/Ka1Thakkar/leaflogue/actions/runs/43165949049),
+and [published release](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.4).
+Manual acceptance remains required for stable publication. Mac packages are
+ad-hoc signed without notarization, and Windows packages are unsigned.
+Community testers can use the [beta feedback form](https://github.com/Ka1Thakkar/leaflogue/issues/new?template=beta_feedback.yml)
+to report their OS, architecture, version and results; untested items stay open.
+
+## Historical 0.1.0-beta.3 preparation
+
 
 Status: experimental public beta authorized, 10 November 2026.
 This is a prerelease, with the manual checks below explicitly deferred.
