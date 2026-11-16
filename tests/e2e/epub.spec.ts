@@ -320,3 +320,38 @@ test("searches across the book and keeps bookmarks after restart", async () => {
     await session.close();
   } finally { await removeProfile(profile); }
 });
+
+test("confirms saving a reader selection before opening the existing AI disclosure", async () => {
+  const profile = createProfile();
+  try {
+    const session = await launch(profile); const { page, app } = session;
+    await app.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler("ai:describe"); ipcMain.handle("ai:describe", () => ({ enabled: true, providers: [{ id: "test", credential: "saved", consented: false }] }));
+      ipcMain.removeHandler("ai:describe-explain-task"); ipcMain.handle("ai:describe-explain-task", () => ({ disclosureId: "test", providerId: "test", providerName: "Test provider", model: "test", consented: false, trainsOnFreeTier: false, bookTitle: "AI reader fixture", authors: [], passage: "We read deliberately.", notes: [] }));
+      ipcMain.removeHandler("ai:explain-passage"); ipcMain.handle("ai:explain-passage", () => { throw new Error("Explanation must not run before consent"); });
+    });
+    await page.getByRole("button", { name: "Set up later" }).click();
+    const id = await page.evaluate(async () => (await window.leaflogue.library.createBook({ title: "AI reader fixture", authors: [] })).id);
+    await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
+    await page.getByRole("button", { name: "Read", exact: true }).click();
+    await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
+    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    const reader = page.frameLocator('iframe[title="EPUB pages"]');
+    await reader.locator("p").first().evaluate((element) => {
+      const doc = element.ownerDocument; const range = doc.createRange(); range.selectNodeContents(element);
+      doc.getSelection()!.removeAllRanges(); doc.getSelection()!.addRange(range);
+      element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    });
+    const actions = page.getByRole("toolbar", { name: "Selected text actions", exact: true });
+    await actions.getByRole("button", { name: "Save & explain", exact: true }).click();
+    const confirm = page.getByRole("dialog", { name: "Save and explain this selection?", exact: true });
+    await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(await page.evaluate(async (bookId) => (await window.leaflogue.library.getBookContents(bookId))!.highlights.length, id)).toBe(0);
+    await actions.getByRole("button", { name: "Save & explain", exact: true }).click();
+    await confirm.getByRole("button", { name: "Save & explain", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "Assistant", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("Leaflogue has not sent anything to Test provider yet.", { exact: false })).toBeVisible();
+    expect(await page.evaluate(async (bookId) => (await window.leaflogue.library.getBookContents(bookId))!.highlights.length, id)).toBe(1);
+    await session.close();
+  } finally { await removeProfile(profile); }
+});

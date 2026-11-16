@@ -98,3 +98,15 @@ Expand **Bookmarks**, then choose **Bookmark this location**. Choose a saved
 entry to return or **Remove** to delete it. Bookmarks belong to the exact
 linked edition, stay on this device, and are removed when the file is
 unlinked. They are not included in library sync, SQLite backups, or exports.
+
+## Explain a passage (next beta)
+
+With optional AI enabled and a provider configured in Settings, click a saved
+highlight and choose **Explain this passage**. For a new selection, choose
+**Save & explain** and confirm: this saves a normal library highlight before
+opening the Assistant tab. Cancel keeps the selection without saving it.
+
+The Assistant uses the existing provider disclosure and first-use consent.
+Selecting text alone does not save or send it. Previously accepted providers
+can answer immediately after you explicitly choose Explain. Saved highlights
+and notes use normal library sync; the book file stays local.

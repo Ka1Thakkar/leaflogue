@@ -15,7 +15,7 @@ const escape = (value: string) => value.replace(/&/gu, "&amp;").replace(/</gu, "
 const GAP = 48;
 
 /** Publisher markup stays inside a scriptless, network-denied reading document. */
-export function EpubReader({ bookId, embedded = false, target, active = true, onOpenInBook }: { readonly bookId: BookId; readonly embedded?: boolean; readonly target?: { highlightId: HighlightId; requestId: number }; readonly active?: boolean; readonly onOpenInBook?: (id: HighlightId) => void }) {
+export function EpubReader({ bookId, embedded = false, target, active = true, onOpenInBook, onExplain }: { readonly bookId: BookId; readonly embedded?: boolean; readonly target?: { highlightId: HighlightId; requestId: number }; readonly active?: boolean; readonly onExplain?: (highlight: SavedHighlight, readOnly: boolean) => void; readonly onOpenInBook?: (id: HighlightId) => void }) {
   const [book, setBook] = useState<EpubDocument>();
   const [confirm, confirmDialog] = useConfirm();
   const [activeHighlight, setActiveHighlight] = useState<{ id: HighlightId; left: number; top: number; note?: boolean }>();
@@ -314,6 +314,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       window.dispatchEvent(new CustomEvent("leaflogue:reader-selection", { detail: null }));
     };
     const selectionChanged = () => {
+      if (selectionLocked.current) return;
       const current = doc.getSelection(); const previous = selectedRange.current;
       if (!current?.rangeCount || current.isCollapsed || !previous || previous.compareBoundaryPoints(0, current.getRangeAt(0)) !== 0 || previous.compareBoundaryPoints(2, current.getRangeAt(0)) !== 0) clearSelection();
     };
@@ -338,21 +339,25 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     frame.current?.contentDocument?.getSelection()?.removeAllRanges();
     window.dispatchEvent(new CustomEvent("leaflogue:reader-selection", { detail: null }));
   }
-  async function createHighlight() {
+  async function createHighlight(explain = false) {
     if (!selected || savingHighlight || contents?.book.archived) return;
+    if (explain) selectionLocked.current = true;
+    if (explain && !await confirm({ title: "Save and explain this selection?", message: "This saves the selected text as a library highlight, which can sync to your connected devices, then opens the Assistant. The Assistant uses your configured AI provider and its existing consent settings.", confirmLabel: "Save & explain" })) { selectionLocked.current = false; return; }
     setSavingHighlight(true); setError("");
     try {
       const doc = frame.current?.contentDocument;
       const existing = contents?.highlights.find((highlight) => normalizedQuote(highlight.text) === normalizedQuote(selected.text) && (
         highlight.sourceLocation === selected.sourceLocation || (!highlight.sourceLocation?.startsWith("epub:") && doc && book && matchReaderHighlight(doc, book, highlight))
       ));
+      let explained = existing;
       if (existing) {
         if (note.trim()) await window.leaflogue.library.createNote({ bookId, highlightId: existing.id, markdown: note.trim() });
       } else {
-        await window.leaflogue.library.createHighlight({ bookId, text: selected.text, sourceLocation: selected.sourceLocation, ...(note.trim() ? { noteMarkdown: note.trim() } : {}) });
+        explained = await window.leaflogue.library.createHighlight({ bookId, text: selected.text, sourceLocation: selected.sourceLocation, ...(note.trim() ? { noteMarkdown: note.trim() } : {}) });
       }
       window.dispatchEvent(new Event("leaflogue:annotations-changed"));
       clearSelection();
+      if (explain && explained) onExplain?.(explained, false);
     } catch { setError("The highlight could not be saved. Your selection has been kept so you can retry."); }
     finally { setSavingHighlight(false); }
   }
@@ -401,6 +406,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
         {activeHighlight.note ? <><label className="ll-label">Note<textarea autoFocus className="ll-field" rows={3} maxLength={10000} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className="ll-button" disabled={savingHighlight || !note.trim()} onClick={() => void noteActiveHighlight()}>Save note</button></> : <>
           <p className={styles.activeExcerpt}>{activePassage.text.length > 100 ? `${activePassage.text.slice(0, 100)}…` : activePassage.text}</p>
           {activePassage.notes.length > 0 && <div className={styles.activeNotes}>{activePassage.notes.map((note) => <MarkdownText key={note.id} text={note.markdown} />)}</div>}
+          {onExplain && <button className="ll-button-secondary" onClick={() => { clearSelection(); onExplain(activePassage, contents?.book.archived ?? false); }}>Explain this passage</button>}
           <button className="ll-button-secondary" onClick={() => { onOpenInBook?.(activePassage.id); setActiveHighlight(undefined); }}>Open in book</button>
           {!contents?.book.archived && <><button className="ll-button-secondary" onClick={() => { setNote(""); setActiveHighlight((value) => value ? { ...value, note: true } : value); }}>Add note</button><button className="ll-button-secondary" onClick={() => void removeActiveHighlight()}>Remove highlight</button></>}
         </>}
@@ -409,6 +415,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       {selected && !optionsOpen && <div data-reader-selection className={styles.selection} role={addingNote ? "dialog" : "toolbar"} aria-label={addingNote ? "Note for selected text" : "Selected text actions"} style={{ left: selected.left, top: Math.max(8, Math.min(selected.top, window.innerHeight - (addingNote ? 280 : 80))) }} onMouseDown={(event) => { if (!addingNote) event.preventDefault(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); clearSelection(); } }}>
         {addingNote ? <><label className="ll-label">Note<textarea autoFocus className="ll-field" rows={3} maxLength={10000} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className="ll-button" disabled={savingHighlight} onClick={() => void createHighlight()}>Save highlight and note</button></> : <>
           {!contents?.book.archived && <><button className="ll-button-secondary" disabled={savingHighlight} onClick={() => void createHighlight()}>{savingHighlight ? "Saving…" : "Highlight"}</button><button className="ll-button-secondary" onClick={() => { selectionLocked.current = true; setAddingNote(true); }}>Add note</button></>}
+          {onExplain && !contents?.book.archived && <button className="ll-button-secondary" disabled={savingHighlight} onClick={() => void createHighlight(true)}>Save &amp; explain</button>}
           {/^[\p{L}][\p{L}\p{M}'’-]{0,59}$/u.test(selected.text) && <button className="ll-button-secondary" onClick={() => { window.dispatchEvent(new CustomEvent("leaflogue:reader-define", { detail: selected.text })); clearSelection(); }}>Define</button>}
         </>}
         <button className="ll-button-secondary" disabled={savingHighlight} onClick={clearSelection}>Cancel</button>
