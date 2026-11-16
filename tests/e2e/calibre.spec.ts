@@ -1,22 +1,24 @@
+import { readerPdf } from "./pdf-fixture";
 import { DatabaseSync } from "node:sqlite";
-import { copyFileSync, mkdirSync, readFileSync, renameSync, readdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, renameSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createProfile, launch, removeProfile } from "./harness";
 
-for (const format of ["EPUB", "KEPUB"] as const) test(`links the chosen Calibre ${format} without copying and follows its format-specific rename`, async () => {
+for (const format of ["EPUB", "KEPUB", "PDF"] as const) test(`links the chosen Calibre ${format} without copying and follows its format-specific rename`, async () => {
   const profile = createProfile();
   try {
     const root = join(profile.files, "Calibre Library"); const folder = join(root, "A Reader", "A quiet beginning (1)"); mkdirSync(folder, { recursive: true });
     const dbPath = join(root, "metadata.db"); const db = new DatabaseSync(dbPath);
     db.exec(`CREATE TABLE library_id(uuid TEXT); CREATE TABLE books(id INTEGER, uuid TEXT, title TEXT, path TEXT, author_sort TEXT); CREATE TABLE data(book INTEGER,format TEXT,name TEXT); CREATE TABLE authors(id INTEGER,name TEXT); CREATE TABLE books_authors_link(book INTEGER,author INTEGER); CREATE TABLE identifiers(book INTEGER,type TEXT,val TEXT);
-    INSERT INTO library_id VALUES('11111111-1111-4111-8111-111111111111'); INSERT INTO books VALUES(1,'22222222-2222-4222-8222-222222222222','A quiet beginning','A Reader/A quiet beginning (1)','A Reader'); INSERT INTO data VALUES(1,'EPUB','a-quiet-beginning'); INSERT INTO data VALUES(1,'KEPUB','a-kobo-beginning'); INSERT INTO authors VALUES(1,'A Reader'); INSERT INTO books_authors_link VALUES(1,1); INSERT INTO identifiers VALUES(1,'isbn','9780306406157');`); db.close();
+    INSERT INTO library_id VALUES('11111111-1111-4111-8111-111111111111'); INSERT INTO books VALUES(1,'22222222-2222-4222-8222-222222222222','A quiet beginning','A Reader/A quiet beginning (1)','A Reader'); INSERT INTO data VALUES(1,'EPUB','a-quiet-beginning'); INSERT INTO data VALUES(1,'KEPUB','a-kobo-beginning'); INSERT INTO data VALUES(1,'PDF','a-pdf-beginning'); INSERT INTO authors VALUES(1,'A Reader'); INSERT INTO books_authors_link VALUES(1,1); INSERT INTO identifiers VALUES(1,'isbn','9780306406157');`); db.close();
     const epub = join(folder, "a-quiet-beginning.epub"), kepub = join(folder, "a-kobo-beginning.kepub");
     copyFileSync(resolve(__dirname, "../fixtures/local-reader.epub"), epub);
     copyFileSync(resolve(__dirname, "../fixtures/local-reader.kepub"), kepub);
-    const original = format === "EPUB" ? epub : kepub;
+    const pdf = join(folder, "a-pdf-beginning.pdf"); writeFileSync(pdf, readerPdf());
+    const original = format === "EPUB" ? epub : format === "KEPUB" ? kepub : pdf;
     const epubBytes = readFileSync(epub), kepubBytes = readFileSync(kepub);
-    const heading = format === "EPUB" ? "A quiet beginning" : "A Kobo beginning";
+    const heading = format === "EPUB" ? "A quiet beginning" : format === "KEPUB" ? "A Kobo beginning" : "A quiet PDF beginning.";
     const before = readFileSync(dbPath);
     let session = await launch(profile); let page = session.page;
     await page.getByRole("button", { name: "Set up later" }).click();
@@ -30,12 +32,12 @@ for (const format of ["EPUB", "KEPUB"] as const) test(`links the chosen Calibre 
     await picker.getByRole("radio", { name: /A quiet beginning A Reader/ }).check();
     await expect(picker).toContainText("ISBN match");
     await expect(picker.getByRole("radio", { name: /A quiet beginning A Reader/ })).toHaveCount(1);
-    await picker.getByRole("group", { name: "Book format", exact: true }).getByRole("radio", { name: format === "KEPUB" ? "KEPUB (Kobo EPUB)" : "EPUB", exact: true }).check();
+    await picker.getByRole("group", { name: "Book format", exact: true }).getByRole("radio", { name: format === "KEPUB" ? "KEPUB (Kobo EPUB)" : format, exact: true }).check();
     await picker.getByRole("button", { name: `Link selected ${format}`, exact: true }).click();
     await expect(picker).not.toBeVisible();
-    await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    await expect(page.frameLocator(format === "PDF" ? 'iframe[title="PDF pages"]' : 'iframe[title="EPUB pages"]').getByText(heading, { exact: true })).toBeVisible();
     expect(readFileSync(dbPath)).toEqual(before);
-    expect(readdirSync(`${session.libraryFile}.epubs`).filter((file) => /\.(?:epub|kepub)$/u.test(file))).toEqual([]);
+    expect(readdirSync(`${session.libraryFile}.epubs`).filter((file) => /\.(?:epub|kepub|pdf)$/u.test(file))).toEqual([]);
     const reference = JSON.parse(readFileSync(join(`${session.libraryFile}.epubs`, `${id}.attachment.json`), "utf8")) as { calibre: { bookUuid: string; format: string } };
     expect(reference.calibre.bookUuid).toBe("22222222-2222-4222-8222-222222222222");
     expect(reference.calibre.format).toBe(format);
@@ -46,7 +48,7 @@ for (const format of ["EPUB", "KEPUB"] as const) test(`links the chosen Calibre 
     session = await launch(profile); page = session.page;
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
-    await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    await expect(page.frameLocator(format === "PDF" ? 'iframe[title="PDF pages"]' : 'iframe[title="EPUB pages"]').getByText(heading, { exact: true })).toBeVisible();
     await session.close();
   } finally { await removeProfile(profile); }
 });

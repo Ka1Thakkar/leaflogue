@@ -1,3 +1,4 @@
+import { parsePdf } from "./pdf";
 import { formatEpubChapter, type EpubFormatBudget } from "./epub-format";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, writeFile, rm } from "node:fs/promises";
@@ -204,7 +205,7 @@ export class EpubStore {
     return join(this.root, `${bookId}.${suffix}`);
   }
   async attach(bookId: string, sourcePath: string, calibre?: CalibreReference): Promise<EpubDocument> {
-    const document = await parseEpub(await readEpubFile(sourcePath));
+    const document = await parseBook(await readEpubFile(sourcePath));
     await mkdir(this.root, { recursive: true, mode: 0o700 });
     // One reference per book for now; never silently replace an edition.
     try {
@@ -212,12 +213,12 @@ export class EpubStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "EEXIST" && calibre) {
         const previous = JSON.parse(await readFile(this.path(bookId, "attachment.json"), "utf8")) as { sha256?: unknown };
-        if (previous.sha256 !== document.sha256) throw new Error("This is a different EPUB edition. Unlink the current file before linking another edition.", { cause: error });
+        if (previous.sha256 !== document.sha256) throw new Error("This is a different book-file edition. Unlink the current file before linking another edition.", { cause: error });
         const staged = this.path(bookId, `${randomUUID()}.tmp`);
         await writeFile(staged, JSON.stringify({ path: sourcePath, sha256: document.sha256, calibre }), { mode: 0o600 });
         await rename(staged, this.path(bookId, "attachment.json")); return await this.open(bookId) ?? document;
       }
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("This book already has an EPUB linked.", { cause: error });
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("This book already has a book file linked.", { cause: error });
       throw error;
     }
     return document;
@@ -226,17 +227,31 @@ export class EpubStore {
     let attachment: unknown;
     try { attachment = JSON.parse(await readFile(this.path(bookId, "attachment.json"), "utf8")); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
-    if (!attachment || typeof attachment !== "object" || !("path" in attachment) || typeof attachment.path !== "string" || !("sha256" in attachment) || typeof attachment.sha256 !== "string") throw new Error("EPUB link is invalid.");
+    if (!attachment || typeof attachment !== "object" || !("path" in attachment) || typeof attachment.path !== "string" || !("sha256" in attachment) || typeof attachment.sha256 !== "string") throw new Error("Book file link is invalid.");
     let document: EpubDocument;
     try {
       const source = "calibre" in attachment && this.resolveCalibre ? await this.resolveCalibre(attachment.calibre) : attachment.path;
-      document = await parseEpub(await readEpubFile(source));
+      document = await parseBook(await readEpubFile(source));
     }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("The linked EPUB moved or is unavailable. Return it to its original location to read it.", { cause: error });
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("The linked book file moved or is unavailable. Return it to its original location to read it.", { cause: error });
       throw error;
     }
-    if (document.sha256 !== attachment.sha256) throw new Error("The linked EPUB has changed. Edition review is needed before reusing its reading position.");
+    if (document.sha256 !== attachment.sha256) throw new Error("The linked book file has changed. Edition review is needed before reusing its reading position.");
+    try {
+      const saved = JSON.parse(await readFile(this.path(bookId, "anchors.json"), "utf8")) as { sha256?: unknown; anchors?: unknown };
+      if (saved.sha256 === document.sha256 && saved.anchors && typeof saved.anchors === "object" && !Array.isArray(saved.anchors)) {
+        const anchors: Record<string, string> = {};
+        for (const [id, location] of Object.entries(saved.anchors).slice(0, 10000)) {
+          if (/^[\da-f-]{36}$/iu.test(id) && validAnchor(document, location)) anchors[id] = location as string;
+        }
+        document = { ...document, localAnchors: anchors };
+      }
+    } catch (error) { if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    try {
+      const saved = JSON.parse(await readFile(this.path(bookId, "bookmarks.json"), "utf8")) as { sha256?: unknown; bookmarks?: unknown };
+      if (saved.sha256 === document.sha256) document = { ...document, bookmarks: validateBookmarks(document, saved.bookmarks) };
+    } catch (error) { if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     try {
       const saved: unknown = JSON.parse(await readFile(this.path(bookId, "json"), "utf8"));
       if (saved && typeof saved === "object" && "sha256" in saved && saved.sha256 === document.sha256 && "chapter" in saved && "paragraph" in saved) {
@@ -251,9 +266,38 @@ export class EpubStore {
     } catch (error) { if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     return document;
   }
+  async readPdf(bookId: string, sha256: unknown) {
+    const attachment = JSON.parse(await readFile(this.path(bookId, "attachment.json"), "utf8")) as { path: string; sha256: string; calibre?: CalibreReference };
+    const source = attachment.calibre && this.resolveCalibre ? await this.resolveCalibre(attachment.calibre) : attachment.path;
+    const bytes = await readEpubFile(source);
+    if (attachment.sha256 !== sha256 || createHash("sha256").update(bytes).digest("hex") !== sha256 || bytes.subarray(0, 5).toString() !== "%PDF-") throw new Error("The linked PDF changed. Relink this edition before reading it.");
+    return new Uint8Array(bytes);
+  }
   async unlink(bookId: string): Promise<void> {
     await rm(this.path(bookId, "attachment.json"), { force: true });
     await rm(this.path(bookId, "json"), { force: true });
+    await rm(this.path(bookId, "bookmarks.json"), { force: true });
+    await rm(this.path(bookId, "anchors.json"), { force: true });
+  }
+  async saveAnchor(bookId: string, sha256: unknown, highlightId: unknown, location: unknown) {
+    const document = await this.open(bookId);
+    if (!document || document.sha256 !== sha256 || typeof highlightId !== "string" || !/^[\da-f-]{36}$/iu.test(highlightId) || (location !== null && !validAnchor(document, location))) throw new Error("Highlight location is invalid for this edition.");
+    const anchors = { ...document.localAnchors };
+    if (location === null) delete anchors[highlightId]; else anchors[highlightId] = location as string;
+    if (Object.keys(anchors).length > 10000) throw new Error("Too many reviewed highlight locations.");
+    const target = this.path(bookId, "anchors.json"); const staged = `${target}.${randomUUID()}.tmp`;
+    await writeFile(staged, JSON.stringify({ sha256, anchors }), { mode: 0o600 }); await rename(staged, target);
+    return anchors;
+  }
+  async saveBookmarks(bookId: string, sha256: unknown, value: unknown) {
+    const document = await this.open(bookId);
+    if (!document || document.sha256 !== sha256) throw new Error("Bookmark edition is invalid.");
+    const bookmarks = validateBookmarks(document, value);
+    const target = this.path(bookId, "bookmarks.json");
+    const staged = `${target}.${randomUUID()}.tmp`;
+    await writeFile(staged, JSON.stringify({ sha256, bookmarks }), { mode: 0o600 });
+    await rename(staged, target);
+    return bookmarks;
   }
   async savePosition(bookId: string, sha256: unknown, chapter: unknown, paragraph: unknown, offset?: unknown): Promise<void> {
     const document = await this.open(bookId);
@@ -265,3 +309,30 @@ export class EpubStore {
     await rename(temporary, target);
   }
 }
+
+function validateBookmarks(document: EpubDocument, value: unknown): import("@leaflogue/contracts").EpubBookmark[] {
+  if (!Array.isArray(value) || value.length > 500) throw new Error("A book can have up to 500 bookmarks.");
+  const keys = new Set<string>();
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== "object") throw new Error("Bookmark is invalid.");
+    const { chapter, paragraph, offset = 0 } = item as Record<string, unknown>;
+    if (typeof chapter !== "number" || !Number.isInteger(chapter) || chapter < 0 || chapter >= document.chapters.length || typeof paragraph !== "number" || !Number.isInteger(paragraph) || paragraph < 0 || typeof offset !== "number" || !Number.isInteger(offset) || offset < 0) throw new Error("Bookmark is invalid.");
+    const text = (document.chapters[chapter]!.paragraphs ?? document.chapters[chapter]!.text.split("\n\n"))[paragraph];
+    if (text === undefined || offset > text.length) throw new Error("Bookmark is invalid.");
+    const key = `${chapter}:${paragraph}:${offset}`;
+    if (keys.has(key)) throw new Error("Duplicate bookmark.");
+    keys.add(key);
+    return { chapter, paragraph, offset };
+  });
+}
+
+function validAnchor(document: EpubDocument, location: unknown): boolean {
+  if (typeof location !== "string" || location.length > 200) return false;
+  const [prefix, hash, ...parts] = location.split(":"); const values = parts.map(Number);
+  if (prefix !== "epub" || hash !== document.sha256 || parts.length !== 5 || parts.some((part) => !/^\d+$/u.test(part)) || values.some((value) => !Number.isSafeInteger(value))) return false;
+  const [chapter, first, start, last, end] = values as [number, number, number, number, number];
+  const paragraphs = document.chapters[chapter]?.paragraphs ?? document.chapters[chapter]?.text.split("\n\n");
+  return paragraphs?.[first] !== undefined && paragraphs?.[last] !== undefined && start <= paragraphs[first]!.length && end <= paragraphs[last]!.length && (first < last || (first === last && start < end));
+}
+
+function parseBook(bytes: Buffer) { return bytes.subarray(0, 5).toString() === "%PDF-" ? parsePdf(bytes) : parseEpub(bytes); }

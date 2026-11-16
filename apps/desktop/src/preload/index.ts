@@ -1,6 +1,6 @@
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL, type CalibreConnection, type CalibreFormat, type CalibreSearch } from "@leaflogue/contracts";
 import { CATALOG_SEARCH_CHANNEL, type CatalogSearch } from "@leaflogue/contracts";
-import { EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL, type EpubDocument } from "@leaflogue/contracts";
+import { PDF_BYTES_CHANNEL, EPUB_ANCHOR_CHANNEL, EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL, type EpubDocument } from "@leaflogue/contracts";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import {
   LIBRARY_CREATE_CHANNEL,
@@ -205,6 +205,9 @@ const bridge: LeaflogueBridge = Object.freeze({
     unlink: (id: BookId) => ipcRenderer.invoke(EPUB_UNLINK_CHANNEL, id) as Promise<void>,
     attach: (bookId: BookId) => ipcRenderer.invoke(EPUB_ATTACH_CHANNEL, bookId) as Promise<EpubDocument | undefined>,
     open: (bookId: BookId) => ipcRenderer.invoke(EPUB_OPEN_CHANNEL, bookId) as Promise<EpubDocument | undefined>,
+    readPdf: (bookId: BookId, sha256: string) => ipcRenderer.invoke(PDF_BYTES_CHANNEL, bookId, sha256) as Promise<Uint8Array>,
+    saveAnchor: (bookId: BookId, sha256: string, highlightId: HighlightId, location: string | null) => ipcRenderer.invoke(EPUB_ANCHOR_CHANNEL, bookId, sha256, highlightId, location) as Promise<Readonly<Record<string, string>>>,
+    saveBookmarks: (bookId: BookId, sha256: string, bookmarks: readonly import("@leaflogue/contracts").EpubBookmark[]) => ipcRenderer.invoke(EPUB_BOOKMARKS_CHANNEL, bookId, sha256, bookmarks) as Promise<readonly import("@leaflogue/contracts").EpubBookmark[]>,
     savePosition: (bookId: BookId, sha256: string, chapter: number, paragraph: number, offset?: number) => ipcRenderer.invoke(EPUB_POSITION_CHANNEL, bookId, sha256, chapter, paragraph, offset) as Promise<void>,
   }),
   system: Object.freeze({

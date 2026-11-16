@@ -45,7 +45,7 @@ export function CalibrePicker({ bookId, title, onLinked, onClose }: { readonly b
     <p className="ll-muted">Calibre keeps the file. Leaflogue reads it in place and never modifies your Calibre library.</p>
     <button className="ll-button-secondary" disabled={choosing || linking} onClick={() => void choose()}>{choosing ? "Choosing library…" : connection ? "Change library folder" : "Choose Calibre library"}</button>
     {connection && <>
-      <p className="ll-muted">{connection.name} · {connection.bookCount} books with EPUB or KEPUB</p>
+      <p className="ll-muted">{connection.name} · {connection.bookCount} books with EPUB, KEPUB or PDF</p>
       <label className="ll-label">Search Calibre<input className="ll-field" placeholder="Title, author, or ISBN" value={query} maxLength={200} disabled={linking} onChange={(event) => { setQuery(event.target.value); setSearching(true); setSelected(undefined); }} /></label>
       {searching && <p role="status" className="ll-muted">Searching your library…</p>}
       {results && <fieldset className={styles.calibreResults} disabled={linking || searching || choosing}>
@@ -54,7 +54,7 @@ export function CalibrePicker({ bookId, title, onLinked, onClose }: { readonly b
           <input type="radio" name="calibre-edition" value={book.uuid} checked={selected?.uuid === book.uuid} onChange={() => { setSelected(book); setFormat(book.formats[0] ?? "EPUB"); }} />
           <span><strong>{book.title}</strong><small>{book.authors.join(", ")}{book.isbn13 ? ` · ${book.isbn13}` : ""}</small><small>{book.formats.join(" · ")}</small>{book.match !== "none" && <small>{book.match === "isbn" ? "ISBN match" : "Title and author match"}</small>}</span>
         </label>)}
-        {!results.books.length && <p>No EPUB or KEPUB books found. Clear the search to browse this library.</p>}
+        {!results.books.length && <p>No EPUB, KEPUB or PDF books found. Clear the search to browse this library.</p>}
         {results.hasMore && <p className="ll-muted">Showing the first 50 matches. Refine your search to find another edition.</p>}
       </fieldset>}
       {selected && <fieldset className={styles.calibreResults} disabled={linking || searching || choosing}>

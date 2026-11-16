@@ -106,7 +106,7 @@ it("ignores a slow response for a superseded query", async () => {
 
 const metadataBook: Book = { ...book, id: book.id as Book["id"], status: "unread" as const, archived: false, createdAt: 1, updatedAt: 1, highlightCount: 0, isbn13: "9780306406157" };
 async function metadataEditor(latest = metadataBook) {
-  Object.defineProperty(window, "leaflogue", { configurable: true, value: { library: { updateBookMetadata, getBookContents: vi.fn().mockResolvedValue({ book: latest, highlights: [], standaloneNotes: [] }) } } as unknown as LeaflogueBridge });
+  Object.defineProperty(window, "leaflogue", { configurable: true, value: { library: { listBooks: vi.fn().mockResolvedValue([]), updateBookMetadata, getBookContents: vi.fn().mockResolvedValue({ book: latest, highlights: [], standaloneNotes: [] }) } } as unknown as LeaflogueBridge });
   await act(async () => { root.render(<MetadataForm book={metadataBook} onClose={onClose} onSaved={onSaved} />); await tick(); });
 }
 

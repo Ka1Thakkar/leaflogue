@@ -131,7 +131,8 @@ Linking the same file edition from Calibre can replace a direct file reference
 without discarding its reading position. **Unlink book file** removes only local
 link and position metadata; it never removes the EPUB, logical book, highlights
 or notes. Linking another edition requires unlinking first, with explicit
-confirmation. Edition-bound anchors from a different file are not guessed.
+confirmation. Coordinates from another edition are never reused. Unique unchanged text can
+be matched in a deliberately linked replacement; repeated text requires review.
 
 Calibre connections and paths stay local and are not included in SQLite backups
 or uploaded with library sync. Calibre annotation/metadata write-back, Content
@@ -149,3 +150,48 @@ and an in-app confirmation that accounts for attached notes. A note icon appears
 in the page margin for highlights with notes; clicking it displays those notes
 and the same actions. **Open in book** restores the centre workspace and focuses
 the original library annotation rather than creating another copy.
+
+## Next-beta reader tools
+
+Search, bookmarks, selection AI actions and manual match review are development
+features after beta.4. Book search is literal, case-insensitive and bounded to
+100 results. Bookmarks persist paragraph/character positions for an exact edition.
+Reader AI reuses the existing saved-highlight disclosure/consent flow: a new
+selection explicitly confirms saving a highlight before opening the Assistant.
+
+Manual match review exposes up to 100 candidate ranges with chapter/context
+previews. A confirmed override lives in the local reader sidecar, keyed by book,
+edition hash and highlight ID. It never rewrites imported source locations,
+quotation text, notes or revisions. Rendering still verifies the quote against
+the selected range, so edited text cannot silently reuse a stale override.
+Reset removes the override, and unlink removes the edition's local sidecars.
+Bookmarks and reviewed anchors are not synced or included in library backups.
+
+The options overlay contains keyboard focus while open; Escape returns focus
+to the reader. Actual screen-reader and cross-platform human acceptance remain
+separate outstanding checks.
+
+## Next-beta PDF reading
+
+The same single-file attachment store now accepts PDFs and Calibre PDF links.
+PDF.js parses geometry/text and renders the visible page; no PDF scripts, forms,
+links or embedded files become interactive application content. Renderer workers
+and code are bundled locally and loaded only for a PDF. Image-only pages remain
+readable without OCR or text annotation matching. No per-page OCR notice is shown.
+
+PDF text spans use the same annotation, search, note, bookmark and review flows
+as EPUB text. Page/paragraph anchors stay bound to the original bytes; a
+replacement file uses unique quote matching or explicit review, preserving
+original source provenance. Password-protected PDFs are unsupported. Parsing is
+bounded to 50 MB, 1,000 pages and 10 MB extracted text; canvas output is capped
+to 16 million pixels per visible page. Fit-page, fit-width and percentage zoom
+retain page-based navigation rather than a continuous document scroll.
+
+## Next-beta highlight display colours
+
+Five named colour preferences are stored per highlight ID in the local renderer
+profile. Yellow is the default. Reader markings and passage dates share the
+choice; all five hues are adapted to theme tokens with contrast checks.
+Coordinates and imported annotation records are unchanged by recolouring.
+Preferences survive changing formats but are not synced/backed up with library
+data. This intentionally requires no Convex or PostgreSQL schema change.

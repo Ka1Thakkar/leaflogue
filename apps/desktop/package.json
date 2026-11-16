@@ -1,6 +1,6 @@
 {
   "name": "@leaflogue/desktop",
-  "version": "0.1.1-beta.4",
+  "version": "0.1.1-beta.5",
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
@@ -39,6 +39,7 @@
     "@leaflogue/storage": "0.0.0",
     "@leaflogue/ui": "0.0.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "pdfjs-dist": "6.5.438",
     "pg": "^8.23.0",
     "postcss": "^8.5.32",
     "postcss-value-parser": "^4.2.0",

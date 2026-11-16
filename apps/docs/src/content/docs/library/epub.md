@@ -10,7 +10,7 @@ known limitations.
 ## Link your book file
 
 In the desktop app, open a book and choose **Read**. In the right-hand
-**Reader** tab, choose **Attach EPUB** and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
+**Reader** tab, choose **Attach EPUB** (**Attach book file** in the next beta) and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
 `.kepub.epub`).
 Leaflogue links the original file; it does not make another copy. Keep that
 file available where you attached it. If Calibre manages your books, use
@@ -86,3 +86,59 @@ uses fallback fonts. Adobe page templates are ignored. DRM, fixed-layout
 fidelity, audio/video, PDFs, and book-file sync are not supported
 in this version. EPUBs must be no larger than 50 MB; malformed or oversized
 resources may also be rejected.
+
+## Search and bookmarks (next beta)
+
+In the next beta, open reader options with right-click or **Shift+F10**.
+Expand **Search this book**, type literal text, and choose a result to open
+its location. Search ignores case and shows up to 100 matches; narrow the
+query to find more. Results do not create saved highlights.
+
+Expand **Bookmarks**, then choose **Bookmark this location**. Choose a saved
+entry to return or **Remove** to delete it. Bookmarks belong to the exact
+linked edition, stay on this device, and are removed when the file is
+unlinked. They are not included in library sync, SQLite backups, or exports.
+
+## Explain a passage (next beta)
+
+With optional AI enabled and a provider configured in Settings, click a saved
+highlight and choose **Explain this passage**. For a new selection, choose
+**Save & explain** and confirm: this saves a normal library highlight before
+opening the Assistant tab. Cancel keeps the selection without saving it.
+
+The Assistant uses the existing provider disclosure and first-use consent.
+Selecting text alone does not save or send it. Previously accepted providers
+can answer immediately after you explicitly choose Explain. Saved highlights
+and notes use normal library sync; the book file stays local.
+
+## Review highlight locations (next beta)
+
+Reader options includes **Review highlight locations**. Choose a saved passage
+to see exact-text candidates, allowing whitespace and quotation-mark differences.
+Use **Preview location** to read its context, then reopen options and choose
+**Use this location** to confirm it. Repeated quotations are never chosen
+automatically. If no text matches, the passage remains in your library.
+
+Reviews are local and bound to the exact EPUB edition. They do not change the
+imported passage, original source location, notes, or library revision, and do
+not sync or appear in SQLite backups/exports. **Reset reviewed location** removes
+the local choice. Unlinking the file removes its local reviews. A replacement
+edition needs a new review.
+
+Use Tab and Shift+Tab within reader options; Escape closes options and returns
+focus to the reader. These keyboard checks do not replace actual screen-reader
+acceptance, which remains pending.
+
+## Highlight colours (next beta)
+
+Each highlight has a colour: yellow by default, with green, blue, pink and
+purple alternatives. Choose a swatch in the highlight’s actions on the book page
+or in a saved reader highlight’s actions. All five choices are visible directly;
+one click changes the colour. The date, hover bar and
+reader marking use the same choice; no additional colour tag is shown beside
+the date. All colours adapt to the active theme;
+changing themes retains the colour name rather than a fixed paint value.
+
+Colour choices are saved on this device and survive file unlinking or changing
+formats. They are display preferences, not part of library sync, SQLite backups
+or exports. The highlight text and notes still use normal library sync.

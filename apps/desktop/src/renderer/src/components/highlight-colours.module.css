@@ -1,0 +1,6 @@
+.palette { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; vertical-align: middle; }
+.palette label { display: grid; place-items: center; width: 24px; height: 24px; cursor: pointer; }
+.palette input { appearance: none; width: 14px; height: 14px; margin: 0; border: 1px solid currentColor; border-radius: 50%; cursor: pointer; }
+.palette input:checked { outline: 2px solid currentColor; outline-offset: 2px; }
+.palette input:focus-visible { outline: 2px dashed var(--ui-text); outline-offset: 3px; }
+.palette p { margin: 0; width: 100%; font-size: 12px; }

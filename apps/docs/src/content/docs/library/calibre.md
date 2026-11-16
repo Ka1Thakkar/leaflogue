@@ -65,3 +65,6 @@ They are not uploaded with library sync or included in SQLite backups or
 exports. Keep a separate backup of your Calibre library, and link books again
 on another computer. The [backup guide](/library/backups/#epub-files-and-reading-positions)
 explains how to preserve Leaflogue's local reader state too.
+
+PDF format selection is included in the next-beta development batch; see
+[Read local PDFs](/library/pdf/). The published beta.4 supports EPUB and KEPUB.

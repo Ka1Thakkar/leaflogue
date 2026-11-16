@@ -1,9 +1,11 @@
+import { HighlightColourPicker } from "./HighlightColourPicker";
+import { currentHighlightPalette, useHighlightColours } from "./highlight-colours";
 import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
 
 import { Select, SelectItem } from "@leaflogue/ui";
-import { useCallback, useContext, useDeferredValue, useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useCallback, useContext, useDeferredValue, useEffect, useId, useRef, useState, type RefObject, type CSSProperties } from "react";
 import { ArrowDownWideNarrow, BookOpen, CalendarDays, Filter, History, MoreHorizontal, Network, Pencil, Plus, Rows3, Search, Sparkles, StickyNote, Tags, Trash2, X } from "../components/icons";
 import type { Book, BookId, HighlightId, HighlightListEntry, HighlightQuery, LibraryStatistics, Tag, TagId } from "@leaflogue/contracts";
 import { Bars, Facet, Panel, StatTile, TitleRow } from "@leaflogue/ui";
@@ -22,6 +24,8 @@ const PAGE_SIZE = 20;
 
 function Annotation({ highlight, showBook, focused = false }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean }) {
   const contextWorkspace = useContextWorkspace();
+  const colours = useHighlightColours();
+  const highlightInk = currentHighlightPalette()[colours[highlight.id] ?? "yellow"].ink;
   const { tags, reload, readOnly, aiEnabled, activeId, setActiveId } = useContext(PassageContext);
   const [confirm, confirmDialog] = useConfirm();
   const [editing, setEditing] = useState(false);
@@ -70,18 +74,19 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
     <article
       id={`highlight-${highlight.id}`}
       className={styles.annotation}
+      style={{ "--passage-colour": highlightInk } as CSSProperties}
       aria-label={`Highlight from ${highlight.bookTitle}`}
       onFocus={() => setActiveId?.(highlight.id)}
       // The passage a link opened, e.g. from Today's highlight: marked so the eye lands on it.
       {...(focused ? { "data-focused": "", "aria-current": "true" as const, tabIndex: -1 } : {})}
     >
-      <p className={styles.passageMeta}>
+      <div className={styles.passageMeta}>
         {showBook && <a href={href.book(highlight.bookId)}>{highlight.bookTitle}</a>}
-        <time dateTime={new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toISOString()}>
+        <time style={{ color: highlightInk }} dateTime={new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toISOString()}>
           {new Date(highlight.sourceCreatedAt ?? highlight.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
         </time>
         <span>{highlight.text.length.toLocaleString()} chars</span>
-      </p>
+      </div>
       {deleted && !error && <p role="status" className="ll-muted">Highlight deleted.</p>}
       {editing ? (
         <HighlightForm bookId={highlight.bookId} highlight={highlight} onClose={() => setEditing(false)} onSaved={reload} />
@@ -97,6 +102,7 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
           </div>
           {!readOnly && !deleted && (
             <div className={styles.actions}>
+              <HighlightColourPicker highlightId={highlight.id} />
               {aiEnabled && (
                 <button className="ll-icon-button" aria-label="Explain this passage" title="Explain this passage" ref={explainTrigger} onClick={() => contextWorkspace?.showAssistant({ highlight, reload, readOnly })}><Sparkles size={18} aria-hidden="true" /></button>
               )}

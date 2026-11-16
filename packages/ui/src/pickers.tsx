@@ -25,7 +25,7 @@ export function ComboBox({ value, onValueChange, options, label, className = "",
     id: generatedId,
     inputId: id,
     inputValue: value,
-    selectedItem: options.find(option => option === value) ?? null,
+    selectedItem: value || null,
     stateReducer: (state, { type, changes }) => type === useCombobox.stateChangeTypes.InputKeyDownEscape
       ? { ...changes, inputValue: state.inputValue, selectedItem: state.selectedItem }
       : changes,

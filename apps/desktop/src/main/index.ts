@@ -2,7 +2,7 @@ import { CalibreLibrary } from "./calibre";
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL } from "@leaflogue/contracts";
 import { searchCatalog } from "@leaflogue/catalog";
 import { CATALOG_SEARCH_CHANNEL } from "@leaflogue/contracts";
-import { EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL } from "@leaflogue/contracts";
+import { PDF_BYTES_CHANNEL, EPUB_ANCHOR_CHANNEL, EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL } from "@leaflogue/contracts";
 import { EpubStore } from "./epub";
 import { mcpAccessEnabled, mcpAccessFile, saveMcpAccess } from "./mcp-access";
 import { serveLocalMcp } from "./mcp-server";
@@ -516,7 +516,7 @@ void app.whenReady().then(async () => {
   registerTrustedHandler(ipcMain, CALIBRE_LINK_CHANNEL, () => app.isPackaged, async (id: unknown, uuid: unknown, format: unknown = "EPUB") => {
     const bookId = epubBook(id); const store = epubStore(); const service = calibre();
     if (typeof uuid !== "string") throw new Error("Choose a Calibre book.");
-    if (format !== "EPUB" && format !== "KEPUB") throw new Error("Choose EPUB or KEPUB from Calibre.");
+    if (format !== "EPUB" && format !== "KEPUB" && format !== "PDF") throw new Error("Choose EPUB, KEPUB or PDF from Calibre.");
     const linked = await service.reference(uuid, format);
     return store.attach(bookId, linked.path, linked.reference);
   });
@@ -525,12 +525,15 @@ void app.whenReady().then(async () => {
   registerTrustedHandler(ipcMain, EPUB_ATTACH_CHANNEL, () => app.isPackaged, async (id: unknown) => {
     const bookId = epubBook(id);
     const store = epubStore();
-    const chosen = await dialog.showOpenDialog({ title: "Attach a local DRM-free EPUB or KEPUB", properties: ["openFile"], filters: [{ name: "EPUB and Kobo EPUB books", extensions: ["epub", "kepub"] }] });
+    const chosen = await dialog.showOpenDialog({ title: "Attach a local EPUB, KEPUB or PDF", properties: ["openFile"], filters: [{ name: "EPUB, Kobo EPUB and PDF books", extensions: ["epub", "kepub", "pdf"] }] });
     if (chosen.canceled || !chosen.filePaths[0]) return undefined;
     const path = chosen.filePaths[0];
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
     return store.attach(bookId, path);
   });
+  registerTrustedHandler(ipcMain, PDF_BYTES_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown) => epubStore().readPdf(epubBook(id), hash));
+  registerTrustedHandler(ipcMain, EPUB_ANCHOR_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, highlightId: unknown, location: unknown) => epubStore().saveAnchor(epubBook(id), hash, highlightId, location));
+  registerTrustedHandler(ipcMain, EPUB_BOOKMARKS_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, bookmarks: unknown) => epubStore().saveBookmarks(epubBook(id), hash, bookmarks));
   registerTrustedHandler(ipcMain, EPUB_POSITION_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, chapter: unknown, paragraph: unknown, offset: unknown) => epubStore().savePosition(epubBook(id), hash, chapter, paragraph, offset));
   registerTrustedHandler(ipcMain, MCP_DESCRIBE_CHANNEL, () => app.isPackaged, describeMcp);
   registerTrustedHandler(ipcMain, MCP_CONFIGURE_CHANNEL, () => app.isPackaged, (enabled: unknown) => {
