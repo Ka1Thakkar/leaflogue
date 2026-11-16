@@ -43,7 +43,18 @@ export function usePdfPages(book: EpubDocument | undefined, bookId: BookId, fram
       const hasText = !!sheet.querySelector("[data-pdf-text-width]");
       // Keep scans/covers and complex transparency artwork intact. Separating
       // their text/graphics would need flattening or OCR, not a colour filter.
-      const complexArtwork = operators?.fnArray.some((op) => op === OPS.beginGroup || op === OPS.clip || op === OPS.eoClip || op === OPS.setTextRenderingMode || op === OPS.paintFormXObjectBegin || op === OPS.paintImageXObjectRepeat || op === OPS.paintInlineImageXObjectGroup || maskOps.has(op));
+      let pendingClip = false;
+      const complexArtwork = operators?.fnArray.some((op, index) => {
+        if (op === OPS.clip || op === OPS.eoClip) pendingClip = true;
+        if (op === OPS.constructPath && pendingClip) {
+          pendingClip = false;
+          const args: unknown = operators.argsArray[index];
+          // A clip followed by endPath is ordinary page/image cropping, not
+          // transparency artwork. Replay it in the original-image layer.
+          if (!Array.isArray(args) || args[0] !== OPS.endPath) return true;
+        }
+        return op === OPS.beginGroup || op === OPS.setTextRenderingMode || op === OPS.paintFormXObjectBegin || op === OPS.paintImageXObjectRepeat || op === OPS.paintInlineImageXObjectGroup || maskOps.has(op);
+      });
       // An image layer must not cover text printed over a photograph. Preserve
       // the original page when these bounds overlap, rather than reorder it.
       let overlappingText = false;

@@ -10,7 +10,7 @@ export function readerPdf(imageOnly = false, font?: Buffer, mixed: boolean | "ov
   ];
   const stream = (value: string) => `<< /Length ${Buffer.byteLength(value)} >>\nstream\n${value}\nendstream`;
   objects[5] = stream(imageOnly ? 'q 200 0 0 250 40 140 cm /Im1 Do Q' : 'BT /F1 18 Tf 40 440 Td (A quiet PDF beginning.) Tj 0 -36 Td (We read deliberately.) Tj ET');
-  if (mixed) objects[5] = stream('BT /F1 18 Tf 40 440 Td (A quiet PDF beginning.) Tj 0 -36 Td (We read deliberately.) Tj ET q 120 0 0 140 40 140 cm /Im1 Do Q');
+  if (mixed) objects[5] = stream('q 0 0 400 500 re W* n BT /F1 18 Tf 40 440 Td (A quiet PDF beginning.) Tj 0 -36 Td (We read deliberately.) Tj ET q 120 0 0 140 40 140 cm /Im1 Do Q Q');
   if (mixed === "overlap") objects[5] = stream('q 120 0 0 100 40 390 cm /Im1 Do Q BT /F1 18 Tf 40 440 Td (Words over an image.) Tj ET');
   objects[6] = stream(imageOnly ? 'q 0.8 g 40 40 200 300 re f Q' : 'BT /F1 18 Tf 40 440 Td (A second PDF page.) Tj 0 -36 Td (Return to this paragraph.) Tj ET');
   if (font && !imageOnly) {

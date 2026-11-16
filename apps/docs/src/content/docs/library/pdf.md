@@ -20,6 +20,7 @@ another format. Unlinking keeps the book, highlights, notes and original file.
 
 PDF pages keep their original layout. Reader options offers **Dark mode**
 (black paper and white text) and **Use theme colours** (theme paper and ink).
+The area around the page uses the same selected paper colour.
 Turn both off for the original colours. These are display-only adjustments;
 they do not change the original PDF. Images keep their original colours on mixed pages. Covers, scans and pages
 with complex artwork or text over images keep their original colours throughout. Raster text

@@ -19,7 +19,7 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     await app.page.reload();
     const setup = await app.page.evaluate(async () => ({ id: (await window.leaflogue.library.createBook({ title: "Packaged PDF", authors: [] })).id, file: (await window.leaflogue.system.getCapabilities()).storagePaths.libraryFile }));
     const font = await readFile(join(dirname(createRequire(__filename).resolve("pdfjs-dist/package.json")), "standard_fonts", "LiberationSans-Regular.ttf"));
-    const bytes = !scanned && process.env.LEAFLOGUE_TEST_PDF ? await readFile(process.env.LEAFLOGUE_TEST_PDF) : readerPdf(scanned, font);
+    const bytes = !scanned && process.env.LEAFLOGUE_TEST_PDF ? await readFile(process.env.LEAFLOGUE_TEST_PDF) : readerPdf(scanned, font, !scanned);
     const source = join(profile.files, "sample.pdf"); await writeFile(source, bytes);
     await mkdir(`${setup.file}.epubs`, { recursive: true });
     await writeFile(join(`${setup.file}.epubs`, `${setup.id}.attachment.json`), JSON.stringify({ path: source, sha256: createHash("sha256").update(bytes).digest("hex") }));
@@ -41,6 +41,22 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     await app.page.screenshot({ path: test.info().outputPath("packaged-pdf-text.png") });
     await app.page.keyboard.press("ArrowLeft"); await expect(first).toHaveAttribute("data-rendered", "true"); await expect(first).toBeInViewport();
     await app.page.screenshot({ path: test.info().outputPath("packaged-pdf.png") });
+    const chapter = Number(process.env.LEAFLOGUE_TEST_PDF_CHAPTER ?? 0);
+    if (!scanned && process.env.LEAFLOGUE_TEST_PDF && Number.isInteger(chapter) && chapter > 0 && chapter < 1000) {
+      for (let index = 1; index <= chapter; index++) {
+        await app.page.keyboard.press("ArrowRight");
+        await expect(reader.locator(`article[data-chapter="${index}"] .pdf-page-image`)).toHaveAttribute("data-rendered", "true");
+      }
+      const paper = await app.page.evaluate(async () => { const a = await window.leaflogue.appearance.describe(); return a.themes.find((t) => t.id === a.themeId)!.dark.paper; });
+      const expected = [1, 3, 5].map((offset) => parseInt(paper.slice(offset, offset + 2), 16));
+      const actual = await reader.locator(`article[data-chapter="${chapter}"] .pdf-page-image`).evaluate((image) => {
+        const canvas = image.ownerDocument.createElement("canvas"); canvas.width = canvas.height = 1;
+        canvas.getContext("2d")!.drawImage(image as HTMLImageElement, 0, 0);
+        return Array.from(canvas.getContext("2d")!.getImageData(0, 0, 1, 1).data).slice(0, 3);
+      });
+      expect(Math.max(...actual.map((value, index) => Math.abs(value - expected[index]!)))).toBeLessThanOrEqual(1);
+      await app.page.screenshot({ path: test.info().outputPath("packaged-pdf-chapter.png") });
+    }
   } catch (error) { await app.page.screenshot({ path: test.info().outputPath("failure.png") }); throw new Error(`Packaged PDF display failed. State: ${JSON.stringify(await app.page.evaluate(() => ({ active: document.activeElement?.outerHTML.slice(0, 300), tabs: Array.from(document.querySelectorAll("[role=tab]"), (tab) => [tab.textContent, tab.getAttribute("aria-selected")]), frames: document.querySelectorAll("iframe").length })))}. Console: ${errors.join("\n")}; stderr: ${app.stderr()}`, { cause: error }); }
   finally { await stopPackagedProcess(app.child); await app.browser.close(); await removeProfile(profile); }
 });

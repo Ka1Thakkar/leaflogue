@@ -50,6 +50,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   });
   const [appearance, setAppearance] = useState<AppearanceConfiguration>();
   const pdfTokens = appearance?.themes.find((theme) => theme.id === appearance.themeId)?.[readerDisplay.dark ? "dark" : "light"];
+  const readerPaper = readerDisplay.theme && pdfTokens ? pdfTokens.paper : readerDisplay.dark ? "#000000" : "#ffffff";
   usePdfPages(book, bookId, frame, loaded, chapter, setError, readerDisplay, pdfTokens);
   useEffect(() => {
     let active = true;
@@ -205,7 +206,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       ::highlight(leaflogue-saved){background:#ffe098;color:#292017}
       img{max-width:100%!important;max-height:100%!important;object-fit:contain}table{max-width:100%}pre{white-space:pre-wrap}
       [data-reader-link]{cursor:pointer}p{orphans:2;widows:2}
-      ${book.format === "pdf" ? `body{padding:12px!important;background:#292929!important}#reader-scroll{max-width:none!important;padding:0!important}#reader-pages{column-width:auto!important;column-count:auto!important;column-gap:0!important;overflow:hidden}#reader-pages>article{display:none;position:absolute;inset:0;padding:0!important;overflow:hidden}#reader-pages .pdf-sheet{position:absolute!important;max-width:none!important;transform-origin:0 0;background:#fff} .pdf-sheet canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;visibility:hidden}.pdf-sheet .pdf-page-image{position:absolute;inset:0;width:100%!important;height:100%!important;max-height:none!important;pointer-events:none;object-fit:fill;z-index:0}.pdf-sheet [data-paragraph]{z-index:1;color:transparent!important;cursor:text;user-select:text}.pdf-sheet [data-paragraph]::selection{background:#6699ff88}` : ""}
+      ${book.format === "pdf" ? `body{padding:12px!important;background:transparent!important}#reader-scroll{max-width:none!important;padding:0!important}#reader-pages{column-width:auto!important;column-count:auto!important;column-gap:0!important;overflow:hidden}#reader-pages>article{display:none;position:absolute;inset:0;padding:0!important;overflow:hidden}#reader-pages .pdf-sheet{position:absolute!important;max-width:none!important;transform-origin:0 0;background:#fff}.pdf-sheet .pdf-page-image{position:absolute;inset:0;width:100%!important;height:100%!important;max-height:none!important;pointer-events:none;object-fit:fill;z-index:0}.pdf-sheet [data-paragraph]{z-index:1;color:transparent!important;cursor:text;user-select:text}.pdf-sheet [data-paragraph]::selection{background:#6699ff88}` : ""}
       </style></head><body data-edition="${escape(book.sha256)}"><main id="reader-scroll"><div id="reader-pages">${chapters}</div></main></body></html>`;
   }, [book]);
 
@@ -471,7 +472,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : "Read EPUB"}</button>}
     {calibreOpen && <div className={styles.overlay}><div role="dialog" aria-label="Calibre library" className={styles.options} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setCalibreOpen(false); } }}><CalibrePicker bookId={bookId} title={contents?.book.title ?? ""} onClose={() => setCalibreOpen(false)} onLinked={(next) => { anchor.current = next.position; setBook(next); setChapter(next.position.chapter); setCalibreOpen(false); setOptionsOpen(false); setOpened(true); setError(""); }} /></div></div>}
     {opened && book && <>
-      <div className={styles.viewport} ref={viewport} role="region" aria-label="Book pages" onContextMenu={(event) => { event.preventDefault(); menu.current(event.clientX, event.clientY); }}>
+      <div className={styles.viewport} ref={viewport} style={book.format === "pdf" ? { background: readerPaper } : undefined} role="region" aria-label="Book pages" onContextMenu={(event) => { event.preventDefault(); menu.current(event.clientX, event.clientY); }}>
         <iframe ref={frame} className={styles.frame} title={book.format === "pdf" ? "PDF pages" : "EPUB pages"} sandbox="allow-same-origin" srcDoc={source} onLoad={() => setLoaded((value) => value + 1)} />
       </div>
       {!optionsOpen && !calibreOpen && active && noteMarkers.map((marker) => <button key={marker.id} className={styles.noteMarker} aria-label={marker.label} title={marker.label} style={{ left: marker.left, top: marker.top }} onClick={() => { setSelected(undefined); setActiveHighlight({ id: marker.id, left: Math.min(marker.left, window.innerWidth - 344), top: marker.top }); }}><Icon name="note-paper" size={15} aria-hidden="true" /></button>)}
