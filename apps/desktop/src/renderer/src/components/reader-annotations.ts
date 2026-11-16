@@ -58,9 +58,13 @@ export function matchReaderHighlight(doc: Document, book: EpubDocument, highligh
   if (highlight.sourceLocation?.startsWith("epub:")) {
     const [prefix, hash, ...values] = highlight.sourceLocation.split(":");
     const numbers = values.map(Number);
-    if (prefix !== "epub" || hash !== book.sha256 || numbers.length !== 5 || !numbers.every((value) => Number.isSafeInteger(value) && value >= 0)) return undefined;
-    const range = rangeAt(doc, numbers[0]!, numbers[1]!, numbers[2]!, numbers[3]!, numbers[4]!);
-    return range && normalizedQuote(range.toString()) === quote ? range : undefined;
+    if (prefix !== "epub" || numbers.length !== 5 || !numbers.every((value) => Number.isSafeInteger(value) && value >= 0)) return undefined;
+    if (hash === book.sha256) {
+      const range = rangeAt(doc, numbers[0]!, numbers[1]!, numbers[2]!, numbers[3]!, numbers[4]!);
+      return range && normalizedQuote(range.toString()) === quote ? range : undefined;
+    }
+    // A deliberately attached replacement file may locate the unchanged quote,
+    // but never inherits coordinates from a different edition or format.
   }
   const candidates = readerHighlightCandidates(doc, book, highlight.text, 2);
   return candidates.length === 1 ? candidates[0]!.range : undefined;

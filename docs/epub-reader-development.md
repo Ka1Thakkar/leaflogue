@@ -131,7 +131,8 @@ Linking the same file edition from Calibre can replace a direct file reference
 without discarding its reading position. **Unlink book file** removes only local
 link and position metadata; it never removes the EPUB, logical book, highlights
 or notes. Linking another edition requires unlinking first, with explicit
-confirmation. Edition-bound anchors from a different file are not guessed.
+confirmation. Coordinates from another edition are never reused. Unique unchanged text can
+be matched in a deliberately linked replacement; repeated text requires review.
 
 Calibre connections and paths stay local and are not included in SQLite backups
 or uploaded with library sync. Calibre annotation/metadata write-back, Content
@@ -169,3 +170,19 @@ Bookmarks and reviewed anchors are not synced or included in library backups.
 The options overlay contains keyboard focus while open; Escape returns focus
 to the reader. Actual screen-reader and cross-platform human acceptance remain
 separate outstanding checks.
+
+## Next-beta PDF reading
+
+The same single-file attachment store now accepts PDFs and Calibre PDF links.
+PDF.js parses geometry/text and renders the visible page; no PDF scripts, forms,
+links or embedded files become interactive application content. Renderer workers
+and code are bundled locally and loaded only for a PDF. Image-only pages remain
+readable without OCR or text annotation matching. No per-page OCR notice is shown.
+
+PDF text spans use the same annotation, search, note, bookmark and review flows
+as EPUB text. Page/paragraph anchors stay bound to the original bytes; a
+replacement file uses unique quote matching or explicit review, preserving
+original source provenance. Password-protected PDFs are unsupported. Parsing is
+bounded to 50 MB, 1,000 pages and 10 MB extracted text; canvas output is capped
+to 16 million pixels per visible page. Fit-page, fit-width and percentage zoom
+retain page-based navigation rather than a continuous document scroll.

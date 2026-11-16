@@ -61,10 +61,14 @@ describe("Calibre book formats", () => {
       const db = new DatabaseSync(join(library, "metadata.db"));
       db.exec("INSERT INTO data VALUES(1,'KEPUB','kobo-book'); INSERT INTO data VALUES(1,'PDF','print-book')"); db.close();
       await writeFile(join(library, "Author/Book/kobo-book.kepub"), "kobo edition bytes");
+      await writeFile(join(library, "Author/Book/print-book.pdf"), "%PDF-1.4 fixture");
       const before = await readFile(join(library, "metadata.db"));
       expect(await service.connect(library)).toMatchObject({ bookCount: 1 });
       const books = (await service.search("A Book")).books;
-      expect(books).toHaveLength(1); expect(books[0]?.formats).toEqual(["EPUB", "KEPUB"]);
+      expect(books).toHaveLength(1); expect(books[0]?.formats).toEqual(["EPUB", "KEPUB", "PDF"]);
+      const pdf = await service.reference(bookUuid, "PDF");
+      expect(pdf.reference.format).toBe("PDF");
+      expect(await service.resolve(pdf.reference)).toBe(join(library, "Author/Book/print-book.pdf"));
       const { reference, path } = await service.reference(bookUuid, "KEPUB");
       expect(reference.format).toBe("KEPUB"); expect(path).toBe(join(library, "Author/Book/kobo-book.kepub"));
       expect(await readFile(join(library, "metadata.db"))).toEqual(before);
@@ -77,7 +81,7 @@ describe("Calibre book formats", () => {
       expect(await service.resolve(reference)).toBe(join(moved, "Author/Book/kobo-renamed.kepub"));
       const missing = new DatabaseSync(join(moved, "metadata.db")); missing.exec("DELETE FROM data WHERE format='KEPUB'"); missing.close();
       await expect(service.resolve(reference)).rejects.toThrow(/selected KEPUB/u);
-      await expect(service.resolve({ ...reference, format: "../PDF" })).rejects.toThrow(/Choose EPUB or KEPUB/u);
+      await expect(service.resolve({ ...reference, format: "../PDF" })).rejects.toThrow(/Choose EPUB, KEPUB or PDF/u);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
   it("offers KEPUB-only books and applies the same file-boundary checks", async () => {

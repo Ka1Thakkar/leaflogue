@@ -31,9 +31,13 @@ and optional AI actions, and return-to-context navigation. It also includes
 separate opt-in book-file sync, offline downloads, progress across devices,
 and conservative matching of imported highlights against an attached edition.
 
+Text and image-only PDF reading is implemented in the next-beta development
+batch, using one linked file per book and shared text annotations where a
+selectable text layer exists. Scans are readable without OCR or text matching.
+
 ## Later evaluation
 
-- PDF and other formats, with OCR considered separately.
+- Other formats and conversion. OCR is outside the current reader scope.
 - Deliberate, visible and undoable MCP writing tools.
 - Semantic search if ordinary passage search proves insufficient.
 - Metadata-provider expansion and book conversion.

@@ -32,6 +32,12 @@ describe("reader annotation matching", () => {
     expect(matchReaderHighlight(doc, book, highlight("quiet", "epub:edition-b:0:1:0:1:5"))).toBeUndefined();
     expect(matchReaderHighlight(doc, book, highlight("quiet", "epub:edition-a:0:9:0:9:5"))).toBeUndefined();
   });
+  it("matches unique text in a deliberately attached replacement without reusing its old coordinates", () => {
+    const doc = documentWith('<p data-chapter="0" data-paragraph="0">A quiet beginning.</p>');
+    const saved = highlight("quiet", "epub:previous-pdf:7:99:50:99:55");
+    expect(matchReaderHighlight(doc, book, saved)?.toString()).toBe("quiet");
+    expect(saved.sourceLocation).toBe("epub:previous-pdf:7:99:50:99:55");
+  });
   it("matches whitespace and typographic quote variations without guessing", () => {
     const doc = documentWith('<p data-chapter="0" data-paragraph="0">He said “read   quietly”.</p>');
     expect(matchReaderHighlight(doc, book, highlight('"read quietly"'))?.toString()).toBe("“read   quietly”");
