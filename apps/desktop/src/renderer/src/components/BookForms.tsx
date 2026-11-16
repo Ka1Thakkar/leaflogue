@@ -245,7 +245,7 @@ export function MetadataForm({ book: initialBook, onClose, onSaved }: { readonly
         </label>
         <div className={styles.formColumns}>
           {([["publisher", "Publisher", book.publisher], ["isbn13", "ISBN", book.isbn13], ["series", "Series", book.series], ["seriesNumber", "Series number", book.seriesNumber]] as const).map(([name, label, value]) => name === "series" ? (
-            <div className="ll-label" key={name}><span>{label}</span><ComboBox label="Series" name="series" value={series} onValueChange={setSeries} options={seriesOptions} maxLength={500} /></div>
+            <div className={`ll-label ${styles.seriesField}`} key={name}><span>{label}</span><ComboBox className="ll-field" label="Series" name="series" value={series} onValueChange={setSeries} options={seriesOptions} maxLength={500} /></div>
           ) : (
             <label className="ll-label" key={name}>{label}<input className="ll-field" name={name} defaultValue={value} /></label>
           ))}

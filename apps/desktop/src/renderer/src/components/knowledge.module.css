@@ -206,6 +206,10 @@
   display: grid;
   gap: 0.4rem;
 }
+.fields .seriesField {
+  display: grid;
+  gap: 0.4rem;
+}
 .fields textarea {
   resize: vertical;
 }

@@ -47,6 +47,14 @@ test("suggests existing series while allowing new names and clearing a series", 
     };
     let dialog = await open();
     const field = () => dialog.getByRole("combobox", { name: "Series", exact: true });
+    const publisher = dialog.getByRole("textbox", { name: "Publisher", exact: true });
+    const appearance = await publisher.evaluate((input) => { const css = getComputedStyle(input); return { border: css.borderTopStyle, font: css.fontSize, height: input.getBoundingClientRect().height }; });
+    await expect(field()).toHaveCSS("border-top-style", appearance.border);
+    await expect(field()).toHaveCSS("font-size", appearance.font);
+    expect(await field().evaluate((input) => input.getBoundingClientRect().height)).toBe(appearance.height);
+    const siblingTop = await dialog.getByRole("textbox", { name: "Series number", exact: true }).evaluate((input) => input.getBoundingClientRect().top);
+    expect(await field().evaluate((input) => input.getBoundingClientRect().top)).toBe(siblingTop);
+    await dialog.screenshot({ path: test.info().outputPath("series-metadata.png") });
     await field().fill("dun");
     await page.getByRole("option", { name: "Dungeon Crawler Carl", exact: true }).click();
     await expect(field()).toHaveValue("Dungeon Crawler Carl");
