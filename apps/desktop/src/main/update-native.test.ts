@@ -8,6 +8,13 @@ import { once } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
 import { launchUpdateHelper, WINDOWS_UPDATE_HELPER, MAC_UPDATE_HELPER, nativeUpdateUnavailable } from "./update-native";
 
+// Hosted Windows runners can spend several seconds starting PowerShell. Wait
+// for the actual readiness marker and include helper output on failure.
+const HELPER_START_ATTEMPTS = 400;
+function helperDiagnostics(path: string) {
+  try { return readFileSync(join(path, "helper.log"), "utf8").slice(-8000); }
+  catch { return "No helper log was written."; }
+}
 const folders: string[] = [];
 function folder() { const path = mkdtempSync(join(tmpdir(), "leaflogue-update-native-")); folders.push(path); return path; }
 afterEach(() => folders.splice(0).forEach(path => rmSync(path, { recursive: true, force: true })));
@@ -20,11 +27,11 @@ describe("native update installation boundary", () => {
     const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
     const child = await launchUpdateHelper(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, ready], join(path, "helper.log"));
     try {
-      for (let attempt = 0; attempt < 100 && !existsSync(ready); attempt += 1) {
+      for (let attempt = 0; attempt < HELPER_START_ATTEMPTS && !existsSync(ready); attempt += 1) {
         if (child.exitCode !== null || child.signalCode !== null) break;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      expect(existsSync(ready), "PowerShell must execute the script, not merely create a process").toBe(true);
+      expect(existsSync(ready), `PowerShell must execute the script, not merely create a process. Exit: ${child.exitCode}; ${helperDiagnostics(path)}`).toBe(true);
       expect(readFileSync(ready, "utf8")).toBe("initialized");
     } finally {
       if (child.exitCode === null && child.signalCode === null) {
@@ -33,7 +40,7 @@ describe("native update installation boundary", () => {
         await exited;
       }
     }
-  }, 10_000);
+  }, 30_000);
   it.skipIf(process.platform !== "win32")("continues when the captured parent process exits", async () => {
     const path = folder(), script = join(path, "wait.ps1"), config = join(path, "config.json"), state = join(path, "state.txt");
     const parent = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
@@ -44,16 +51,17 @@ describe("native update installation boundary", () => {
     const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
     const helper = await launchUpdateHelper(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, config], join(path, "helper.log"));
     const waitState = async (expected: string) => {
-      for (let i = 0; i < 100; i += 1) {
+      for (let i = 0; i < HELPER_START_ATTEMPTS; i += 1) {
         let value: string | undefined;
         try { value = await readFile(state, "utf8"); }
         catch (error) {
           if (!(error instanceof Error) || !("code" in error) || !["ENOENT", "EBUSY"].includes(String(error.code))) throw error;
         }
         if (value?.trim() === expected) return;
+        if (helper.exitCode !== null || helper.signalCode !== null) break;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      throw new Error(`Windows helper did not reach ${expected}`);
+      throw new Error(`Windows helper did not reach ${expected}. Exit: ${helper.exitCode}; ${helperDiagnostics(path)}`);
     };
     try {
       await waitState("waiting-for-app-exit");
@@ -66,7 +74,7 @@ describe("native update installation boundary", () => {
         const exited = once(helper, "exit"); helper.kill(); await exited;
       }
     }
-  }, 15_000);
+  }, 50_000);
   it("requires a real Windows installer installation", () => {
     const path = folder();
     const options = { platform: "win32" as const, executable: join(path, "Leaflogue.exe"), quit: () => undefined };

@@ -110,3 +110,21 @@ The Assistant uses the existing provider disclosure and first-use consent.
 Selecting text alone does not save or send it. Previously accepted providers
 can answer immediately after you explicitly choose Explain. Saved highlights
 and notes use normal library sync; the book file stays local.
+
+## Review highlight locations (next beta)
+
+Reader options includes **Review highlight locations**. Choose a saved passage
+to see exact-text candidates, allowing whitespace and quotation-mark differences.
+Use **Preview location** to read its context, then reopen options and choose
+**Use this location** to confirm it. Repeated quotations are never chosen
+automatically. If no text matches, the passage remains in your library.
+
+Reviews are local and bound to the exact EPUB edition. They do not change the
+imported passage, original source location, notes, or library revision, and do
+not sync or appear in SQLite backups/exports. **Reset reviewed location** removes
+the local choice. Unlinking the file removes its local reviews. A replacement
+edition needs a new review.
+
+Use Tab and Shift+Tab within reader options; Escape closes options and returns
+focus to the reader. These keyboard checks do not replace actual screen-reader
+acceptance, which remains pending.

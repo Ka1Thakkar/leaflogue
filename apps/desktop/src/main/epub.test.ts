@@ -63,6 +63,23 @@ describe("local EPUB reader", () => {
     await expect(parseEpub(zip({ ...files, "OPS/large": "x".repeat(8 * 1024 * 1024 + 1) }))).rejects.toThrow(/expanded/u);
     await expect(parseEpub(Buffer.from("not a zip"))).rejects.toThrow();
   });
+  it("retains local reviewed locations without altering the original file or another edition", async () => {
+    const root = await mkdtemp(join(tmpdir(), "leaflogue-reviewed-anchor-"));
+    const id = "12345678-1234-4234-8234-123456789abc"; const highlightId = "22345678-1234-4234-8234-123456789abc";
+    try {
+      const source = join(root, "book.epub"); const bytes = zip(files); await writeFile(source, bytes);
+      const store = new EpubStore(root); const book = await store.attach(id, source);
+      const location = `epub:${book.sha256}:0:1:0:1:3`;
+      await store.saveAnchor(id, book.sha256, highlightId, location);
+      expect((await new EpubStore(root).open(id))?.localAnchors).toEqual({ [highlightId]: location });
+      for (const invalid of [`epub:other:0:1:0:1:3`, `epub:${book.sha256}:99:1:0:1:3`, `epub:${book.sha256}:0:1:9:1:3`, `epub:${book.sha256}:0:1:0:1:999`, `epub:${book.sha256}:0:1:-1:1:3`]) await expect(store.saveAnchor(id, book.sha256, highlightId, invalid)).rejects.toThrow();
+      expect(await readFile(source)).toEqual(bytes);
+      await store.saveAnchor(id, book.sha256, highlightId, null);
+      expect((await store.open(id))?.localAnchors).toEqual({});
+      await store.saveAnchor(id, book.sha256, highlightId, location); await store.unlink(id); await store.attach(id, source);
+      expect((await store.open(id))?.localAnchors).toBeUndefined();
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it("persists edition-bound bookmarks and clears them on unlink", async () => {
     const root = await mkdtemp(join(tmpdir(), "leaflogue-bookmarks-"));
     const id = "12345678-1234-4234-8234-123456789abc";

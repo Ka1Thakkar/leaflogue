@@ -1870,10 +1870,12 @@ export const EPUB_ATTACH_CHANNEL = "epub:attach";
 export const EPUB_OPEN_CHANNEL = "epub:open";
 export const EPUB_POSITION_CHANNEL = "epub:position";
 
+export const EPUB_ANCHOR_CHANNEL = "epub:anchor";
 export const EPUB_BOOKMARKS_CHANNEL = "epub:bookmarks";
 export interface EpubBookmark { readonly chapter: number; readonly paragraph: number; readonly offset?: number }
 
 export interface EpubDocument {
+  readonly localAnchors?: Readonly<Record<string, string>>;
   readonly bookmarks?: readonly EpubBookmark[];
   readonly sha256: string;
   readonly chapters: readonly { readonly id: string; readonly title: string; readonly text: string; readonly html?: string; readonly styles?: string; readonly paragraphs?: readonly string[] }[];
@@ -1893,6 +1895,7 @@ export interface LeaflogueBridge {
     unlink?(bookId: BookId): Promise<void>;
     attach(bookId: BookId): Promise<EpubDocument | undefined>;
     open(bookId: BookId): Promise<EpubDocument | undefined>;
+    saveAnchor(bookId: BookId, sha256: string, highlightId: HighlightId, location: string | null): Promise<Readonly<Record<string, string>>>;
     saveBookmarks(bookId: BookId, sha256: string, bookmarks: readonly EpubBookmark[]): Promise<readonly EpubBookmark[]>;
     savePosition(bookId: BookId, sha256: string, chapter: number, paragraph: number, offset?: number): Promise<void>;
   };

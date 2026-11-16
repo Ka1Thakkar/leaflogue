@@ -2,7 +2,7 @@ import { CalibreLibrary } from "./calibre";
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL } from "@leaflogue/contracts";
 import { searchCatalog } from "@leaflogue/catalog";
 import { CATALOG_SEARCH_CHANNEL } from "@leaflogue/contracts";
-import { EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL } from "@leaflogue/contracts";
+import { EPUB_ANCHOR_CHANNEL, EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL } from "@leaflogue/contracts";
 import { EpubStore } from "./epub";
 import { mcpAccessEnabled, mcpAccessFile, saveMcpAccess } from "./mcp-access";
 import { serveLocalMcp } from "./mcp-server";
@@ -531,6 +531,7 @@ void app.whenReady().then(async () => {
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
     return store.attach(bookId, path);
   });
+  registerTrustedHandler(ipcMain, EPUB_ANCHOR_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, highlightId: unknown, location: unknown) => epubStore().saveAnchor(epubBook(id), hash, highlightId, location));
   registerTrustedHandler(ipcMain, EPUB_BOOKMARKS_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, bookmarks: unknown) => epubStore().saveBookmarks(epubBook(id), hash, bookmarks));
   registerTrustedHandler(ipcMain, EPUB_POSITION_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, chapter: unknown, paragraph: unknown, offset: unknown) => epubStore().savePosition(epubBook(id), hash, chapter, paragraph, offset));
   registerTrustedHandler(ipcMain, MCP_DESCRIBE_CHANNEL, () => app.isPackaged, describeMcp);

@@ -62,18 +62,31 @@ export function matchReaderHighlight(doc: Document, book: EpubDocument, highligh
     const range = rangeAt(doc, numbers[0]!, numbers[1]!, numbers[2]!, numbers[3]!, numbers[4]!);
     return range && normalizedQuote(range.toString()) === quote ? range : undefined;
   }
-  let found: Range | undefined;
+  const candidates = readerHighlightCandidates(doc, book, highlight.text, 2);
+  return candidates.length === 1 ? candidates[0]!.range : undefined;
+}
+export interface ReaderHighlightCandidate { range: Range; chapter: number; location: string; excerpt: string }
+/** Explicit review may find an imported quote in several places or a new edition. */
+export function readerHighlightCandidates(doc: Document, book: EpubDocument, text: string, limit = 100): ReaderHighlightCandidate[] {
+  const quote = normalizedQuote(text);
+  if (!quote) return [];
+  const found: ReaderHighlightCandidate[] = [];
   const chapters = editionIndex(doc, book);
   for (let chapter = 0; chapter < chapters.length; chapter++) {
     const { blocks, normalized, offsets } = chapters[chapter]!;
     let cursor = 0;
     while (cursor < normalized.length) {
       const start = normalized.indexOf(quote, cursor); if (start < 0) break;
-      if (found) return undefined;
       const rawStart = offsets[start]!; const rawEnd = offsets[start + quote.length - 1]! + 1;
       const first = blocks.find((block) => rawStart >= block.start && rawStart < block.start + block.length);
       const last = blocks.find((block) => rawEnd > block.start && rawEnd <= block.start + block.length);
-      if (first && last) found = rangeAt(doc, chapter, Number(first.element.dataset.paragraph), rawStart - first.start, Number(last.element.dataset.paragraph), rawEnd - last.start);
+      if (first && last) {
+        const paragraph = Number(first.element.dataset.paragraph); const endParagraph = Number(last.element.dataset.paragraph);
+        const startOffset = rawStart - first.start; const endOffset = rawEnd - last.start;
+        const range = rangeAt(doc, chapter, paragraph, startOffset, endParagraph, endOffset);
+        if (range) found.push({ range, chapter, location: `epub:${book.sha256}:${chapter}:${paragraph}:${startOffset}:${endParagraph}:${endOffset}`, excerpt: first.element.textContent?.slice(Math.max(0, startOffset - 60), startOffset + 180) ?? "" });
+        if (found.length >= limit) return found;
+      }
       cursor = start + 1;
     }
   }

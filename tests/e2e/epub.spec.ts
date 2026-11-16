@@ -355,3 +355,48 @@ test("confirms saving a reader selection before opening the existing AI disclosu
     await session.close();
   } finally { await removeProfile(profile); }
 });
+
+test("reviews ambiguous highlights locally without changing imported records", async () => {
+  const profile = createProfile();
+  try {
+    let session = await launch(profile); let page = session.page;
+    await page.getByRole("button", { name: "Set up later" }).click();
+    const original = await page.evaluate(async () => {
+      const book = await window.leaflogue.library.createBook({ title: "Match review", authors: [] });
+      return window.leaflogue.library.createHighlight({ bookId: book.id, text: "we read deliberately.", sourceLocation: "Kobo chapter 7", noteMarkdown: "Keep this original note" });
+    });
+    await page.evaluate((id) => { location.hash = `#/library/${id}`; }, original.bookId);
+    await page.getByRole("button", { name: "Read", exact: true }).click();
+    await session.chooseFile(resolve(__dirname, "../fixtures/review-reader.epub"));
+    await page.getByRole("button", { name: "Attach EPUB", exact: true }).click();
+    const reader = page.frameLocator('iframe[title="EPUB pages"]');
+    await expect(reader.getByRole("article", { name: "A quiet beginning" })).toBeVisible();
+    await page.locator("#context-reader").click({ position: { x: 5, y: 5 } }); await page.keyboard.press("Shift+F10");
+    let options = page.getByRole("dialog", { name: "Reader options", exact: true });
+    await options.getByText("Keyboard shortcuts", { exact: true }).focus(); await page.keyboard.press("Tab");
+    await expect(options.getByRole("button", { name: "Close reader options", exact: true })).toBeFocused();
+    await page.keyboard.press("Shift+Tab"); await expect(options.getByText("Keyboard shortcuts", { exact: true })).toBeFocused();
+    await options.getByText("Review highlight locations", { exact: true }).click();
+    await options.getByRole("button", { name: "we read deliberately.", exact: true }).click();
+    const matches = options.getByRole("group", { name: "Matching locations", exact: true });
+    await expect(matches).toContainText("2 matching locations");
+    await matches.getByRole("button", { name: "Use this location", exact: true }).nth(1).click();
+    await expect(options).toContainText("1 highlights shown");
+    await page.keyboard.press("Escape");
+    await expect(options).not.toBeVisible();
+    await expect(page.locator('iframe[title="EPUB pages"]')).toBeFocused();
+    await session.close(); session = await launch(profile); page = session.page;
+    await page.evaluate((id) => { location.hash = `#/library/${id}`; }, original.bookId);
+    await page.getByRole("button", { name: "Read", exact: true }).click();
+    await page.frameLocator('iframe[title="EPUB pages"]').locator("body").click({ button: "right" });
+    options = page.getByRole("dialog", { name: "Reader options", exact: true });
+    await expect(options).toContainText("1 highlights shown");
+    const contents = await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), original.bookId);
+    expect(contents!.highlights).toEqual([original]);
+    await options.getByText("Review highlight locations", { exact: true }).click();
+    await options.getByRole("button", { name: /we read deliberately/ }).click();
+    await options.getByRole("button", { name: "Reset reviewed location", exact: true }).click();
+    await expect(options).toContainText("0 highlights shown");
+    await session.close();
+  } finally { await removeProfile(profile); }
+});

@@ -238,6 +238,16 @@ export class EpubStore {
     }
     if (document.sha256 !== attachment.sha256) throw new Error("The linked EPUB has changed. Edition review is needed before reusing its reading position.");
     try {
+      const saved = JSON.parse(await readFile(this.path(bookId, "anchors.json"), "utf8")) as { sha256?: unknown; anchors?: unknown };
+      if (saved.sha256 === document.sha256 && saved.anchors && typeof saved.anchors === "object" && !Array.isArray(saved.anchors)) {
+        const anchors: Record<string, string> = {};
+        for (const [id, location] of Object.entries(saved.anchors).slice(0, 10000)) {
+          if (/^[\da-f-]{36}$/iu.test(id) && validAnchor(document, location)) anchors[id] = location as string;
+        }
+        document = { ...document, localAnchors: anchors };
+      }
+    } catch (error) { if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    try {
       const saved = JSON.parse(await readFile(this.path(bookId, "bookmarks.json"), "utf8")) as { sha256?: unknown; bookmarks?: unknown };
       if (saved.sha256 === document.sha256) document = { ...document, bookmarks: validateBookmarks(document, saved.bookmarks) };
     } catch (error) { if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -259,6 +269,17 @@ export class EpubStore {
     await rm(this.path(bookId, "attachment.json"), { force: true });
     await rm(this.path(bookId, "json"), { force: true });
     await rm(this.path(bookId, "bookmarks.json"), { force: true });
+    await rm(this.path(bookId, "anchors.json"), { force: true });
+  }
+  async saveAnchor(bookId: string, sha256: unknown, highlightId: unknown, location: unknown) {
+    const document = await this.open(bookId);
+    if (!document || document.sha256 !== sha256 || typeof highlightId !== "string" || !/^[\da-f-]{36}$/iu.test(highlightId) || (location !== null && !validAnchor(document, location))) throw new Error("Highlight location is invalid for this edition.");
+    const anchors = { ...document.localAnchors };
+    if (location === null) delete anchors[highlightId]; else anchors[highlightId] = location as string;
+    if (Object.keys(anchors).length > 10000) throw new Error("Too many reviewed highlight locations.");
+    const target = this.path(bookId, "anchors.json"); const staged = `${target}.${randomUUID()}.tmp`;
+    await writeFile(staged, JSON.stringify({ sha256, anchors }), { mode: 0o600 }); await rename(staged, target);
+    return anchors;
   }
   async saveBookmarks(bookId: string, sha256: unknown, value: unknown) {
     const document = await this.open(bookId);
@@ -295,4 +316,13 @@ function validateBookmarks(document: EpubDocument, value: unknown): import("@lea
     keys.add(key);
     return { chapter, paragraph, offset };
   });
+}
+
+function validAnchor(document: EpubDocument, location: unknown): boolean {
+  if (typeof location !== "string" || location.length > 200) return false;
+  const [prefix, hash, ...parts] = location.split(":"); const values = parts.map(Number);
+  if (prefix !== "epub" || hash !== document.sha256 || parts.length !== 5 || parts.some((part) => !/^\d+$/u.test(part)) || values.some((value) => !Number.isSafeInteger(value))) return false;
+  const [chapter, first, start, last, end] = values as [number, number, number, number, number];
+  const paragraphs = document.chapters[chapter]?.paragraphs ?? document.chapters[chapter]?.text.split("\n\n");
+  return paragraphs?.[first] !== undefined && paragraphs?.[last] !== undefined && start <= paragraphs[first]!.length && end <= paragraphs[last]!.length && (first < last || (first === last && start < end));
 }
