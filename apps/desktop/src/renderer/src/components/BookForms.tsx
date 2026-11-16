@@ -4,6 +4,7 @@ import { normalizeBookMetadata } from "@leaflogue/domain";
 import { InlineError } from "./shared";
 import styles from "./knowledge.module.css";
 import { useAction } from "./useAction";
+import { ComboBox } from "@leaflogue/ui";
 
 export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
   const { pending, error, run } = useAction();
@@ -168,6 +169,21 @@ function metadataSaveError(error: unknown): string {
 
 export function MetadataForm({ book: initialBook, onClose, onSaved }: { readonly book: Book; readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
   const [book] = useState(initialBook);
+  const [series, setSeries] = useState(initialBook.series ?? "");
+  const [seriesOptions, setSeriesOptions] = useState<readonly string[]>(initialBook.series ? [initialBook.series] : []);
+  useEffect(() => {
+    let active = true;
+    void window.leaflogue.library.listBooks({ includeArchived: true }).then((books) => {
+      if (!active) return;
+      const names = new Map<string, string>();
+      for (const value of [book.series, ...books.map((item) => item.series)]) {
+        const name = value?.trim();
+        if (name && !names.has(name.toLocaleLowerCase())) names.set(name.toLocaleLowerCase(), name);
+      }
+      setSeriesOptions([...names.values()].sort((a, b) => a.localeCompare(b)));
+    }).catch(() => { /* A new series can still be entered when suggestions are unavailable. */ });
+    return () => { active = false; };
+  }, [book.series]);
   const { pending, setPending, error, setError } = useAction();
   return (
     <form
@@ -228,11 +244,10 @@ export function MetadataForm({ book: initialBook, onClose, onSaved }: { readonly
           <textarea name="description" className="ll-field" rows={4} defaultValue={book.description} maxLength={20_000} />
         </label>
         <div className={styles.formColumns}>
-          {([["publisher", "Publisher", book.publisher], ["isbn13", "ISBN", book.isbn13], ["series", "Series", book.series], ["seriesNumber", "Series number", book.seriesNumber]] as const).map(([name, label, value]) => (
-            <label className="ll-label" key={name}>
-              {label}
-              <input className="ll-field" name={name} defaultValue={value} />
-            </label>
+          {([["publisher", "Publisher", book.publisher], ["isbn13", "ISBN", book.isbn13], ["series", "Series", book.series], ["seriesNumber", "Series number", book.seriesNumber]] as const).map(([name, label, value]) => name === "series" ? (
+            <div className="ll-label" key={name}><span>{label}</span><ComboBox label="Series" name="series" value={series} onValueChange={setSeries} options={seriesOptions} maxLength={500} /></div>
+          ) : (
+            <label className="ll-label" key={name}>{label}<input className="ll-field" name={name} defaultValue={value} /></label>
           ))}
         </div>
         <label className="ll-label">

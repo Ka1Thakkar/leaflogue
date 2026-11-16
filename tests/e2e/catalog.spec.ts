@@ -29,3 +29,39 @@ test("searches Google Books through IPC and adds the selected edition with metad
     await session.close();
   } finally { await removeProfile(profile); }
 });
+
+test("suggests existing series while allowing new names and clearing a series", async () => {
+  const profile = createProfile();
+  try {
+    const session = await launch(profile); const { page } = session;
+    await page.getByRole("button", { name: "Set up later" }).click();
+    const id = await page.evaluate(async () => {
+      const existing = await window.leaflogue.library.createBook({ title: "An existing volume", authors: [] });
+      await window.leaflogue.library.updateBookMetadata({ id: existing.id, expectedRevision: existing.revision, title: existing.title, authors: [], series: "Dungeon Crawler Carl" });
+      return (await window.leaflogue.library.createBook({ title: "Another volume", authors: [] })).id;
+    });
+    await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
+    const open = async () => {
+      await page.getByRole("button", { name: "Edit metadata", exact: true }).click();
+      return page.getByRole("dialog", { name: "Edit book metadata", exact: true });
+    };
+    let dialog = await open();
+    const field = () => dialog.getByRole("combobox", { name: "Series", exact: true });
+    await field().fill("dun");
+    await page.getByRole("option", { name: "Dungeon Crawler Carl", exact: true }).click();
+    await expect(field()).toHaveValue("Dungeon Crawler Carl");
+    await dialog.getByRole("button", { name: "Save metadata", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.library.getBookContents(bookId))!.book.series, id)).toBe("Dungeon Crawler Carl");
+    dialog = await open(); await field().fill("My own new series");
+    await expect(field()).toHaveValue("My own new series");
+    await dialog.getByRole("button", { name: "Save metadata", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.library.getBookContents(bookId))!.book.series, id)).toBe("My own new series");
+    dialog = await open(); await field().fill("");
+    await dialog.getByRole("button", { name: "Save metadata", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.library.getBookContents(bookId))!.book.series, id)).toBeUndefined();
+    await session.close();
+  } finally { await removeProfile(profile); }
+});

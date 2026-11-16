@@ -45,9 +45,12 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await expect.poll(paperPixel).toEqual([0, 0, 0]);
     const surround = page.getByRole("region", { name: "Book pages", exact: true });
     await expect(surround).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await expect(reader.locator("body")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await expect(reader.locator("html")).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await options.getByRole("switch", { name: "Dark mode", exact: true }).uncheck();
     await expect.poll(paperPixel).toEqual([255, 255, 255]);
     await expect(surround).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(reader.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await options.getByRole("switch", { name: "Use theme colours", exact: true }).check();
     const theme = await page.evaluate(async () => { const a = await window.leaflogue.appearance.describe(); return a.themes.find((t) => t.id === a.themeId)!; });
     const rgb = (hex: string) => [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
@@ -56,6 +59,8 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await options.getByRole("switch", { name: "Dark mode", exact: true }).check();
     await expect.poll(async () => Math.max(...(await paperPixel()).map((channel, i) => Math.abs(channel - rgb(theme.dark.paper)[i]!)))).toBeLessThanOrEqual(1);
     await expect(surround).toHaveCSS("background-color", `rgb(${rgb(theme.dark.paper).join(", ")})`);
+    await expect(reader.locator("body")).toHaveCSS("background-color", `rgb(${rgb(theme.dark.paper).join(", ")})`);
+    await expect(reader.locator("html")).toHaveCSS("background-color", `rgb(${rgb(theme.dark.paper).join(", ")})`);
     await expect.poll(imagePixel).toEqual([82, 71, 66]);
     await expect(reader.locator("canvas")).toHaveCount(0);
     await options.getByRole("switch", { name: "Use theme colours", exact: true }).uncheck();

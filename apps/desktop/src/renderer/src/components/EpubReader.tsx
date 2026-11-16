@@ -61,10 +61,17 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   useEffect(() => { try { localStorage.setItem("leaflogue.reader-display", JSON.stringify(readerDisplay)); } catch { /* session preference */ } }, [readerDisplay]);
   useEffect(() => {
     const doc = frame.current?.contentDocument;
-    if (!loaded || book?.format === "pdf" || !doc?.getElementById("reader-pages")) return;
+    if (!loaded || !doc?.getElementById("reader-pages")) return;
+    if (book?.format === "pdf") {
+      // Paint the iframe canvas itself: transparent body pixels can otherwise
+      // expose Chromium's white document backdrop around the fitted PDF.
+      doc.documentElement.style.setProperty("background", readerPaper, "important");
+      doc.body.style.setProperty("background", readerPaper, "important");
+      return;
+    }
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
     applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : undefined);
-  }, [loaded, appearance, readerDisplay, book?.format]);
+  }, [loaded, appearance, readerDisplay, book?.format, readerPaper]);
   useEffect(() => {
     const doc = frame.current?.contentDocument;
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);

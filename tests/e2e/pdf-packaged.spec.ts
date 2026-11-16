@@ -29,6 +29,10 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     const first = reader.locator('article[data-chapter="0"] .pdf-page-image');
     await expect(first).toHaveAttribute("data-rendered", "true"); await expect(first).toBeInViewport();
     expect(await first.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(300);
+    const framePaper = await app.page.evaluate(async () => { const a = await window.leaflogue.appearance.describe(); return a.themes.find((t) => t.id === a.themeId)!.dark.paper; });
+    const frameRgb = `rgb(${[1, 3, 5].map((offset) => parseInt(framePaper.slice(offset, offset + 2), 16)).join(", ")})`;
+    await expect(reader.locator("body")).toHaveCSS("background-color", frameRgb);
+    await expect(reader.locator("html")).toHaveCSS("background-color", frameRgb);
     await app.page.getByRole("button", { name: "Expand context panel", exact: true }).click();
     await app.page.getByRole("button", { name: "Restore split view", exact: true }).click();
     await app.page.getByRole("button", { name: "Collapse context panel", exact: true }).click();
