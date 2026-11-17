@@ -1,9 +1,9 @@
 ---
 title: Link your Calibre library
-description: Read Calibre-managed EPUBs without copying them or changing your Calibre library.
+description: Read Calibre-managed EPUB, KEPUB and PDF files without copying them or changing your Calibre library.
 ---
 
-Calibre linking is included in the experimental **0.1.1-beta.4** desktop
+Calibre linking is included in the experimental **0.1.1-beta.6** desktop
 release. See the [release notes](/start/release-notes/).
 
 
@@ -66,5 +66,4 @@ exports. Keep a separate backup of your Calibre library, and link books again
 on another computer. The [backup guide](/library/backups/#epub-files-and-reading-positions)
 explains how to preserve Leaflogue's local reader state too.
 
-PDF format selection is included in the next-beta development batch; see
-[Read local PDFs](/library/pdf/). The published beta.4 supports EPUB and KEPUB.
+PDF format selection is included in beta.6; see [Read local PDFs](/library/pdf/).

@@ -1,14 +1,14 @@
 ---
-title: 0.1.1-beta.4 release notes
+title: 0.1.1-beta.6 release notes
 description: What the reader beta adds, its known limits, and where to get it.
 ---
 
-**Release status: experimental public beta, `0.1.1-beta.4`.** Automated
+**Release status: experimental public beta, `0.1.1-beta.6`.** Automated
 source, native package, and MCP checks pass. Clean-desktop installation,
 manual updates/uninstall, and actual Orca, VoiceOver, and Narrator checks
 remain pending. The maintainer approved experimental publication with these
 limitations disclosed. Back up your library before testing.
-Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.4).
+Download from the [Releases page](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.6).
 This prerelease is not a signed stable update feed.
 
 ## Included
@@ -37,22 +37,37 @@ first version is read-only. Source and packaged-client automation passed on Mac,
 the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
-## Next beta: shared highlight colours
+## New in 0.1.1-beta.6
 
-The next candidate includes [per-highlight colours](/library/epub/#highlight-colours-next-beta)
-shared by desktop, Libredex, and the self-hosted web app. Five colour names
-adapt to each device’s theme. Existing local choices migrate automatically;
-shared values take precedence. SQLite backups and JSON exports retain them.
-Colour-only changes keep imported passages attached to their source.
+- [Local PDF reading](/library/pdf/) and Calibre PDF selection alongside EPUB
+  and KEPUB. Text highlights and notes share library records; scanned PDFs
+  remain readable without OCR or text matching.
+- PDF zoom, keyboard page turns, dark mode and theme paper/ink colours.
+  Ordinary mixed pages preserve image colours, including cropped chapter
+  illustrations. The surrounding reader frame follows the selected paper.
+- Book text search, local bookmarks, explicit review of ambiguous highlight
+  locations, and optional reader AI actions after a confirmed selection.
+- Five [per-highlight colours](/library/epub/#highlight-colours) that sync
+  between desktop, Libredex and the self-hosted web UI. Dates, hover bars and
+  reader markings adapt to each device’s theme. SQLite backups and JSON
+  exports retain colours; old device-only choices migrate safely.
+- Contract-23 Convex backends continue ordinary data sync while colours wait
+  in a durable local queue. Colours replay with fresh revisions after the
+  backend upgrade. Settings shows installed/required versions and distinguishes
+  automatic local migrations from administrator-managed backend deployments.
+- Existing-series suggestions in metadata, with support for custom names and
+  clearing. Fixes for blank PDF pages, square font glyphs and page-turn cleanup.
+- A static self-hostable Convex web UI ZIP; PostgreSQL hosting uses the
+  repository’s server container. Book-file reading remains desktop-only.
 
-This candidate uses SQLite schema **19**, PostgreSQL schema **14**, and Convex
-schema **17**, mutation contract **24**. Update desktop clients before the
-backend. Colour choices wait in a durable local queue against a contract-23 backend while ordinary data continues syncing. The
-public download below remains beta.4 until the new candidate is published.
+Beta.5 was an unpublished candidate. All 46 release assets passed independent
+checksums/digest verification, five signed beta feed/payload checks, production
+dependency audits, build-source checks and scans of the extracted applications
+and web archive. See the [verification run](https://github.com/Ka1Thakkar/leaflogue/actions/runs/44096864031).
 
-## New in 0.1.1-beta.4
+## Previously added in 0.1.1-beta.4
 
-This release adds:
+Beta.4 added:
 
 - A paged [desktop EPUB reader](/library/epub/) with remembered position,
   keyboard page turns, and an in-app right-click options overlay.
@@ -82,10 +97,8 @@ this device. SQLite backups and library exports do not include them; back up
 your original files and reader sidecars separately. Library highlights and
 notes continue to use normal sync. See [the reader guide](/library/epub/).
 
-Book-file sync, cross-device reading positions, PDFs, DRM, fixed-layout
-fidelity, audio/video, and Calibre write-back are not included. Book search,
-bookmarks, direct AI actions on reader selections, and richer ambiguous-match
-review remain follow-ups. Further scope is tracked in the
+Book-file sync, cross-device reading positions, DRM, full fixed-layout EPUB
+fidelity, audio/video, and Calibre write-back remain outside this release. Further scope is tracked in the
 [development roadmap](https://github.com/Ka1Thakkar/leaflogue/blob/main/docs/roadmap.md).
 
 ## Downloads and compatibility
@@ -99,10 +112,13 @@ signed beta updates through **Settings → Updates → Install and restart**.
 Windows ZIP/Linux tarball copies remain manual. This is a beta feed, not a
 stable update channel.
 
-This release retains local SQLite schema **17**, PostgreSQL schema **13**,
-and Convex schema **17**, mutation contract **23**. The desktop accepts Convex
-contracts **22–23**. Update desktops before updating a deployment to contract
-23. Back up a development library before opening it with a release build.
+This release uses local SQLite schema **19**, PostgreSQL schema **14**, and
+Convex schema **17**, mutation contract **24**. The desktop accepts Convex
+contracts **22–24**. Update desktops before updating the deployment. Contract
+23 continues ordinary data sync while unsupported colours wait locally;
+contract 22 may pause changes it cannot represent. Follow the
+[backend upgrade guide](/sync/convex/#upgrading-an-existing-deployment).
+Back up your library before changing versions.
 
 ## Validation still to complete
 

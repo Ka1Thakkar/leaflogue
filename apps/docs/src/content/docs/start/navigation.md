@@ -64,6 +64,10 @@ Reader position is saved across restarts; assistant conversations are not.
 Use Left/Right or Home/End while a tab is focused to switch tabs. Reader page
 controls are listed in [Read an EPUB](/library/epub/#turn-pages-and-change-the-display).
 
+## Edit book details
+
+Open a book and choose **Edit metadata**. The **Series** field suggests names already in your library as you type. Choose a suggestion, enter a new name, or clear the field to remove the series.
+
 ## Keyboard shortcuts
 
 | Press | To |

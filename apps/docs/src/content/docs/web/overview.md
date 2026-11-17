@@ -39,6 +39,7 @@ Statistics.
   day, and place widgets below your books. Your layout is kept with your
   account, so it is the same in every browser you sign in from. It is separate
   from the layout on your computers.
+- **Highlight colours.** Choose yellow, green, blue, pink or purple in a passage’s actions. Its date and hover bar use the choice, adapted to the theme. Choices sync with other clients connected to the same library, while each device adapts the shades to its theme.
 - **Themes.** All the built-in themes, light and dark. The choice is kept in
   this browser.
 
@@ -57,7 +58,7 @@ the desktop app:
 | In the desktop app only | In the browser instead |
 | --- | --- |
 | Choosing a folder, or a plugged-in e-reader, to import from | Choose the file itself, such as `KoboReader.sqlite` or `My Clippings.txt`. For KOReader or Boox, choose all their files at once. |
-| [Local EPUB reader](/library/epub/), [PDF reader](/library/pdf/) (next beta), and [Calibre library links](/library/calibre/) | Read linked files in the desktop app; saved library highlights and notes remain available in the browser. |
+| [Local EPUB reader](/library/epub/), [PDF reader](/library/pdf/), and [Calibre library links](/library/calibre/) | Read linked files in the desktop app; saved library highlights and notes remain available in the browser. |
 | Backups and restores | Your library lives on your server or deployment; back that up. |
 | Exporting to Markdown or JSON | Export from the desktop app. |
 | Checking for and installing updates | Whoever hosts it updates the web app. |
@@ -77,3 +78,5 @@ books to. Each person's page layouts are their own.
 The AI uses a provider key you set where the web app runs, never in a browser.
 Without one, AI features are not offered. In **Settings**, choose which of the
 available providers and models to use.
+
+The [beta.6 release](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.6) includes `Leaflogue-0.1.1-beta.6-web.zip` and `SHA256SUMS-web.txt` for static Convex hosting. PostgreSQL deployments use the repository’s server container.
