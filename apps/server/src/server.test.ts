@@ -158,6 +158,29 @@ async function bookWithPassage(cookie: string, libraryId: string) {
   return { bookId, highlightId, noteId, highlight };
 }
 
+describe("shared highlight colours", () => {
+  it("persists colour through HTTP, browse and older edits, and rejects invalid colours", async () => {
+    const { cookie, libraryId } = await owner();
+    const { bookId, highlightId, highlight } = await bookWithPassage(cookie, libraryId);
+    const coloured = await value<{ revision: number; colour: string }>(cookie, "runtime:updateHighlight", {
+      libraryId, id: highlightId, bookId, text: "Every pane held a season.", expectedRevision: highlight.revision, colour: "purple",
+    });
+    expect(coloured.colour).toBe("purple");
+    expect(await value(cookie, "browse:highlight", { libraryId, highlightId })).toMatchObject({ colour: "purple" });
+    const legacy = await value<{ revision: number; colour: string }>(cookie, "runtime:updateHighlight", {
+      libraryId, id: highlightId, bookId, text: "A revised season.", expectedRevision: coloured.revision,
+    });
+    expect(legacy.colour).toBe("purple");
+    const invalid = await run(cookie, "runtime:updateHighlight", {
+      libraryId, id: highlightId, bookId, text: "A revised season.", expectedRevision: legacy.revision, colour: "red",
+    });
+    expect(invalid.http).toBe(400);
+    expect(await value(cookie, "runtime:updateHighlight", {
+      libraryId, id: highlightId, bookId, text: "A revised season.", expectedRevision: legacy.revision, colour: "yellow",
+    })).toMatchObject({ colour: "yellow" });
+  });
+});
+
 describe("schema", () => {
   it("keeps the version desktops check unchanged", async () => {
     await database.withClient(async (client) => {
@@ -384,6 +407,11 @@ describe("features", () => {
     expect(await value(cookie, "importRuntime:importAnnotations", { libraryId, sourceId, annotations }))
       .toMatchObject({ highlightsCreated: 0, notesCreated: 0, unchanged: 2, skipped: 1 });
 
+    await value(cookie, "runtime:updateHighlight", { libraryId, id: highlight!.id, bookId: book!.id,
+      text: annotations[0]!.text, expectedRevision: highlight!.revision, colour: "green" });
+    expect(await value(cookie, "importRuntime:importedVersion", { libraryId, highlightId: highlight!.id })).toMatchObject({ edited: false });
+    expect(await value(cookie, "browse:highlight", { libraryId, highlightId: highlight!.id })).toMatchObject({ importedVersion: { edited: false }, colour: "green" });
+
     // An untouched passage follows the source; an edited one becomes a conflict.
     const changed = [{ ...annotations[0], text: "Every pane held two seasons." }];
     expect(await value(cookie, "importRuntime:importAnnotations", { libraryId, sourceId, annotations: changed })).toMatchObject({ annotationsUpdated: 1 });
@@ -391,6 +419,7 @@ describe("features", () => {
       libraryId, bookId: book!.id, paginationOpts: { numItems: 10, cursor: null },
     })).page[0]!;
     expect(updated.text).toBe("Every pane held two seasons.");
+    expect(updated).toMatchObject({ colour: "green" });
     await value(cookie, "runtime:updateHighlight", { libraryId, id: updated.id, bookId: book!.id, text: "My own wording.", expectedRevision: updated.revision });
     const again = [{ ...annotations[0], text: "Every pane held three seasons." }];
     expect(await value(cookie, "importRuntime:importAnnotations", { libraryId, sourceId, annotations: again })).toMatchObject({ conflictsCreated: 1 });

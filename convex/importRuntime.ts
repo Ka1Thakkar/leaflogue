@@ -1,7 +1,7 @@
 import type { DataModelFromSchemaDefinition, DocumentByName, GenericDatabaseReader, GenericMutationCtx, MutationBuilder, QueryBuilder } from "convex/server";
 import { makeFunctionReference, mutationGeneric, queryGeneric } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
-import { canonicalImportJson } from "@leaflogue/domain";
+import { canonicalImportJson, importedHighlightDiffers } from "@leaflogue/domain";
 import { requireLibraryAccess } from "./accessControl";
 import schema from "./schema";
 
@@ -14,8 +14,8 @@ import schema from "./schema";
  * The rules match the desktop's: a record seen before and unchanged at the
  * source is skipped; one the reader deleted stays deleted; one the reader
  * edited becomes a conflict to review; anything else is updated in place; new
- * records are added. "Edited" means its revision moved since the import last
- * wrote it, whichever device made the edit. Writes go through the same
+ * records are added. "Edited" means its quotation, location, or note changed since the import,
+ * whichever device made the edit. Colour changes keep their provenance. Writes go through the same
  * library mutations as any web edit, so desktops pull them.
  */
 
@@ -279,7 +279,7 @@ export const importAnnotations = mutation({
         continue;
       }
       const edited = link.highlightId
-        ? highlight!.revision !== link.highlightRevision || (attached !== null && attached.deletedAt === undefined && attached.revision !== link.attachedNoteRevision)
+        ? importedHighlightDiffers(highlight!, JSON.parse(link.incoming) as { text?: string; location?: string }) || (attached !== null && attached.deletedAt === undefined && attached.revision !== link.attachedNoteRevision)
         : note!.revision !== link.noteRevision;
       if (edited) {
         const pending = await ctx.db.query("importConflicts").withIndex("by_source_record", (q) => q
@@ -382,7 +382,7 @@ export const importedVersion = query({
     if (!incoming.text?.trim()) return null;
     const { highlight, attached } = await currentRevisions(ctx, args.libraryId, link);
     if (!highlight || highlight.deletedAt !== undefined) return null;
-    const edited = highlight.revision !== link.highlightRevision ||
+    const edited = importedHighlightDiffers(highlight, incoming) ||
       (attached !== null && attached.deletedAt === undefined && attached.revision !== link.attachedNoteRevision);
     return {
       text: incoming.text,

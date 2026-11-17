@@ -92,6 +92,7 @@ export function createLibrary(client: LibraryClient): { readonly library: Librar
         id,
         bookId: input.bookId,
         text: input.text,
+        ...(input.colour !== undefined ? { colour: input.colour } : {}),
         ...(input.sourceLocation !== undefined ? { sourceLocation: input.sourceLocation } : {}),
         ...(noteMarkdown && noteId ? { noteId, noteMarkdown } : {}),
       });

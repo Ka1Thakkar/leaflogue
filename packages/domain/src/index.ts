@@ -254,3 +254,12 @@ export * from "./widgets";
 export * from "./library-statistics";
 export * from "./library-duplicates";
 export * from "./dashboards";
+
+/** Colour and membership changes do not edit the imported quotation. */
+export function importedHighlightDiffers(
+  highlight: { readonly text: string; readonly sourceLocation?: string },
+  source: { readonly text?: string; readonly location?: string },
+): boolean {
+  return highlight.text !== source.text?.trim() ||
+    (highlight.sourceLocation?.trim() || undefined) !== (source.location?.trim() || undefined);
+}

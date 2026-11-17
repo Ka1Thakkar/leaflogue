@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { BookId, HighlightId, NoteId } from "@leaflogue/contracts";
-import { canonicalImportJson } from "@leaflogue/domain";
+import { canonicalImportJson, importedHighlightDiffers } from "@leaflogue/domain";
 import { PostgresLibraryMutations, type PostgresClient } from "@leaflogue/remote";
 import type { RequestContext } from "./context";
 import { ServerError } from "./errors";
@@ -60,7 +60,7 @@ interface AnnotationLink extends Record<string, unknown> {
 }
 
 interface Current {
-  readonly highlight?: { id: string; bookId: string; revision: number; deleted: boolean };
+  readonly highlight?: { id: string; bookId: string; text: string; sourceLocation?: string; revision: number; deleted: boolean };
   readonly attached?: { id: string; bookId: string; revision: number; deleted: boolean; markdown: string };
   readonly note?: { id: string; bookId: string; revision: number; deleted: boolean; markdown: string };
 }
@@ -171,8 +171,8 @@ export async function importBooks(context: RequestContext, libraryId: string, ar
 
 async function current(client: PostgresClient, libraryId: string, link: Pick<AnnotationLink, "highlight_id" | "attached_note_id" | "note_id">): Promise<Current> {
   const highlight = link.highlight_id
-    ? (await client.query<{ id: string; book_id: string; revision: string | number; deleted: boolean }>(
-        "SELECT id::text AS id, book_id::text AS book_id, revision, deleted_at IS NOT NULL AS deleted FROM leaflogue.highlights WHERE library_id = $1 AND id = $2",
+    ? (await client.query<{ id: string; book_id: string; text: string; source_location: string | null; revision: string | number; deleted: boolean }>(
+        "SELECT id::text AS id, book_id::text AS book_id, text, source_location, revision, deleted_at IS NOT NULL AS deleted FROM leaflogue.highlights WHERE library_id = $1 AND id = $2",
         [libraryId, link.highlight_id],
       )).rows[0]
     : undefined;
@@ -187,7 +187,7 @@ async function current(client: PostgresClient, libraryId: string, link: Pick<Ann
   const attached = shape(await note(link.attached_note_id));
   const standalone = shape(await note(link.note_id));
   return {
-    ...(highlight ? { highlight: shape(highlight)! } : {}),
+    ...(highlight ? { highlight: { ...shape(highlight)!, ...(highlight.source_location ? { sourceLocation: highlight.source_location } : {}) } } : {}),
     ...(attached ? { attached } : {}),
     ...(standalone ? { note: standalone } : {}),
   };
@@ -311,7 +311,7 @@ export async function importAnnotations(context: RequestContext, libraryId: stri
         continue;
       }
       const edited = link.highlight_id
-        ? state.highlight!.revision !== link.highlight_revision ||
+        ? importedHighlightDiffers(state.highlight!, JSON.parse(link.incoming) as { text?: string; location?: string }) ||
           (state.attached !== undefined && !state.attached.deleted && state.attached.revision !== link.attached_note_revision)
         : state.note!.revision !== link.note_revision;
       if (edited) {
@@ -419,7 +419,7 @@ export async function importedVersion(context: RequestContext, libraryId: string
   if (!incoming.text?.trim()) return null;
   const state = await current(context.client, libraryId, link);
   if (!state.highlight || state.highlight.deleted) return null;
-  const edited = state.highlight.revision !== Number(link.highlight_revision) ||
+  const edited = importedHighlightDiffers(state.highlight, incoming) ||
     (state.attached !== undefined && !state.attached.deleted && state.attached.revision !== Number(link.attached_note_revision));
   return {
     text: incoming.text,

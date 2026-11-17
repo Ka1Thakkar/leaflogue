@@ -95,6 +95,7 @@ export function createThreads(client: LibraryClient): LeaflogueBridge["threads"]
           authors: passage.bookAuthors,
           text: passage.text,
           ...(passage.sourceLocation !== undefined ? { sourceLocation: passage.sourceLocation } : {}),
+        ...(passage.colour !== undefined ? { colour: passage.colour } : {}),
           notes: passageNotes(passage),
           addedAt: passage.addedAt,
         })),
@@ -130,6 +131,7 @@ export function createDaily(client: LibraryClient): LeaflogueBridge["daily"] {
         authors: passage.bookAuthors,
         text: passage.text,
         ...(passage.sourceLocation !== undefined ? { sourceLocation: passage.sourceLocation } : {}),
+        ...(passage.colour !== undefined ? { colour: passage.colour } : {}),
         notes: passageNotes(passage),
       },
       // The backend does not say whether another passage could be chosen.

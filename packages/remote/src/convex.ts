@@ -6,9 +6,10 @@ const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const SUPPORTED_SCHEMA_VERSION = 17;
 const MIN_SUPPORTED_MUTATION_CONTRACT_VERSION = 22;
-const MAX_SUPPORTED_MUTATION_CONTRACT_VERSION = 23;
+const MAX_SUPPORTED_MUTATION_CONTRACT_VERSION = 24;
 /** The first contract that replays threads and passage thread membership. */
 export const CONVEX_THREAD_CONTRACT_VERSION = 23;
+export const CONVEX_COLOUR_CONTRACT_VERSION = 24;
 
 interface ConvexDeploymentMetadata {
   readonly product: "leaflogue";

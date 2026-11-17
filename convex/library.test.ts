@@ -22,6 +22,7 @@ interface HighlightResult {
   bookId: string;
   text: string;
   sourceLocation?: string;
+  colour?: import("@leaflogue/contracts").HighlightColour;
   createdAt: number;
   updatedAt: number;
   revision: number;
@@ -40,8 +41,8 @@ interface NoteResult {
 
 const functions = {
   createBook: makeFunctionReference<"mutation", { libraryId: string; id: string; title: string; authors?: string[]; isbn13?: string }, { id: string; title: string; authors: string[]; isbn13?: string; revision: number; highlightCount: number }>("library:createBook"),
-  createHighlight: makeFunctionReference<"mutation", { libraryId: string; id: string; bookId: string; text: string; sourceLocation?: string; noteId?: string; noteMarkdown?: string }, HighlightResult>("library:createHighlight"),
-  updateHighlight: makeFunctionReference<"mutation", { libraryId: string; id: string; bookId: string; text: string; sourceLocation?: string; expectedRevision: number }, HighlightResult>("library:updateHighlight"),
+  createHighlight: makeFunctionReference<"mutation", { libraryId: string; id: string; bookId: string; text: string; colour?: import("@leaflogue/contracts").HighlightColour; sourceLocation?: string; noteId?: string; noteMarkdown?: string }, HighlightResult>("library:createHighlight"),
+  updateHighlight: makeFunctionReference<"mutation", { libraryId: string; id: string; bookId: string; text: string; colour?: import("@leaflogue/contracts").HighlightColour; sourceLocation?: string; expectedRevision: number }, HighlightResult>("library:updateHighlight"),
   createNote: makeFunctionReference<"mutation", { libraryId: string; id: string; bookId: string; highlightId?: string; markdown: string; origin?: "reader" | "ai" }, NoteResult>("library:createNote"),
   updateNote: makeFunctionReference<"mutation", { libraryId: string; id: string; bookId: string; markdown: string; expectedRevision: number }, NoteResult>("library:updateNote"),
   setBookArchived: makeFunctionReference<"mutation", { libraryId: string; id: string; archived: boolean; expectedRevision: number }, { bookId: string; archived: boolean; revision: number; updatedAt: number }>("library:setBookArchived"),
@@ -54,6 +55,27 @@ const functions = {
 };
 
 describe("Convex online mutation parity", () => {
+  it("stores shared colours and preserves them through older text edits", async () => {
+    const t = convexTest(schema, convexModules);
+    await seedLibrary(t);
+    const created = await t.mutation(functions.createHighlight, {
+      libraryId: LIBRARY, id: HIGHLIGHT, bookId: SOURCE_BOOK, text: "A shared line", colour: "green",
+    });
+    expect(created.colour).toBe("green");
+    const legacy = await t.mutation(functions.updateHighlight, {
+      libraryId: LIBRARY, id: HIGHLIGHT, bookId: SOURCE_BOOK, text: "A revised line", expectedRevision: created.revision,
+    });
+    expect(legacy.colour).toBe("green");
+    const reset = await t.mutation(functions.updateHighlight, {
+      libraryId: LIBRARY, id: HIGHLIGHT, bookId: SOURCE_BOOK, text: legacy.text, expectedRevision: legacy.revision, colour: "yellow",
+    });
+    expect(reset.colour).toBe("yellow");
+    expect(await t.run((ctx) => ctx.db.query("highlights").first())).toMatchObject({ colour: "yellow" });
+    await expect(t.mutation(functions.updateHighlight, {
+      libraryId: LIBRARY, id: HIGHLIGHT, bookId: SOURCE_BOOK, text: reset.text, expectedRevision: reset.revision, colour: "red" as never,
+    })).rejects.toThrow();
+  });
+
   it("creates a client-identified book and ordered sync change", async () => {
     const t = convexTest(schema, convexModules);
     await seedLibrary(t);

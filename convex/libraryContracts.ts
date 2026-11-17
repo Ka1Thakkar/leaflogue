@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+export const highlightColourValidator = v.union(v.literal("yellow"), v.literal("green"), v.literal("blue"), v.literal("pink"), v.literal("purple"));
 const readingStatus = v.union(
   v.literal("unread"),
   v.literal("reading"),
@@ -42,6 +43,7 @@ export const createHighlightArgs = {
   bookId: v.string(),
   text: v.string(),
   sourceLocation: v.optional(v.string()),
+  colour: v.optional(highlightColourValidator),
   noteId: v.optional(v.string()),
   noteMarkdown: v.optional(v.string()),
 };
@@ -62,6 +64,7 @@ export const updateHighlightArgs = {
   bookId: v.string(),
   text: v.string(),
   sourceLocation: v.optional(v.string()),
+  colour: v.optional(highlightColourValidator),
   expectedRevision: v.number(),
 };
 
@@ -136,7 +139,8 @@ export const syncedBookValidator = v.object({
 
 export const syncedHighlightValidator = v.object({
   id: v.string(), bookId: v.string(), text: v.string(),
-  sourceLocation: v.optional(v.string()), sourceCreatedAt: v.optional(v.number()),
+  sourceLocation: v.optional(v.string()),
+  colour: v.optional(highlightColourValidator), sourceCreatedAt: v.optional(v.number()),
   createdAt: v.number(), updatedAt: v.number(), revision: v.number(),
 });
 
@@ -258,6 +262,7 @@ export const highlightValidator = v.object({
   bookId: v.string(),
   text: v.string(),
   sourceLocation: v.optional(v.string()),
+  colour: v.optional(highlightColourValidator),
   sourceCreatedAt: v.optional(v.number()),
   createdAt: v.number(),
   updatedAt: v.number(),
@@ -294,6 +299,7 @@ export type CreateHighlightArgs = {
   readonly bookId: string;
   readonly text: string;
   readonly sourceLocation?: string;
+  readonly colour?: import("@leaflogue/contracts").HighlightColour;
 };
 
 export type CreateBookArgs = {
@@ -424,6 +430,7 @@ export interface HighlightResult {
   readonly bookId: string;
   readonly text: string;
   readonly sourceLocation?: string;
+  readonly colour?: import("@leaflogue/contracts").HighlightColour;
   readonly sourceCreatedAt?: number;
   readonly createdAt: number;
   readonly updatedAt: number;

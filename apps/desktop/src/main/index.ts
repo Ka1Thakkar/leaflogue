@@ -1,3 +1,4 @@
+import { normalizeHighlightColour } from "@leaflogue/contracts";
 import { CalibreLibrary } from "./calibre";
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL } from "@leaflogue/contracts";
 import { searchCatalog } from "@leaflogue/catalog";
@@ -1067,6 +1068,7 @@ function validateNewHighlight(value: unknown): NewHighlight {
     bookId: uuidField(input, "bookId") as BookId,
     text: textField(input, "text", 100_000),
     ...(sourceLocation ? { sourceLocation } : {}),
+    ...(input.colour !== undefined ? { colour: normalizeHighlightColour(input.colour) } : {}),
     ...(noteMarkdown ? { noteMarkdown } : {}),
   };
 }
@@ -1079,6 +1081,7 @@ function validateUpdateHighlight(value: unknown): UpdateHighlight {
     bookId: uuidField(input, "bookId") as BookId,
     text: textField(input, "text", 100_000),
     ...(sourceLocation ? { sourceLocation } : {}),
+    ...(input.colour !== undefined ? { colour: normalizeHighlightColour(input.colour) } : {}),
     expectedRevision: revisionField(input),
   };
 }

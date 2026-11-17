@@ -11,6 +11,6 @@ export const status = queryGeneric({
   handler: () => ({
     product: "leaflogue" as const,
     schemaVersion: 17,
-    mutationContractVersion: 23,
+    mutationContractVersion: 24,
   }),
 });

@@ -85,7 +85,7 @@ describe("PostgreSQL schema setup", () => {
   it("initializes inside an advisory-locked transaction", async () => {
     const client = new FakeClient();
     await expect(initializePostgres("postgres://user:secret@db/leaflogue", factoryFor(client)))
-      .resolves.toEqual({ reachable: true, initialized: true, schemaVersion: 13 });
+      .resolves.toEqual({ reachable: true, initialized: true, schemaVersion: 14 });
     expect(client.queries.map(({ text }) => text.trim().split(/\s+/).slice(0, 3).join(" "))).toEqual([
       "BEGIN",
       "SELECT pg_advisory_xact_lock(1279671367)",
@@ -116,6 +116,8 @@ describe("PostgreSQL schema setup", () => {
       "DROP INDEX IF",
       "INSERT INTO leaflogue.schema_migrations",
       "DROP INDEX IF",
+      "INSERT INTO leaflogue.schema_migrations",
+      "ALTER TABLE leaflogue.highlights",
       "INSERT INTO leaflogue.schema_migrations",
       "COMMIT",
     ]);

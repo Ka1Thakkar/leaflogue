@@ -1,3 +1,4 @@
+import { highlightColourValidator } from "./libraryContracts";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -38,6 +39,7 @@ export const highlightReadValidator = v.object({
   bookId: v.string(),
   text: v.string(),
   sourceLocation: v.optional(v.string()),
+  colour: v.optional(highlightColourValidator),
   sourceCreatedAt: v.optional(v.number()),
   archived: v.boolean(),
   deletedAt: v.optional(v.number()),

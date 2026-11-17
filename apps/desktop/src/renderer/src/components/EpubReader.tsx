@@ -1,5 +1,5 @@
 import { HighlightColourPicker } from "./HighlightColourPicker";
-import { HIGHLIGHT_COLOURS, highlightPalette, useHighlightColours } from "./highlight-colours";
+import { HIGHLIGHT_COLOURS, highlightColour, highlightPalette, useHighlightColours } from "./highlight-colours";
 import { usePdfPages } from "./pdf-pages";
 import { searchReader, readerTextRange } from "./reader-search";
 import { CalibrePicker } from "./CalibrePicker";
@@ -124,7 +124,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const ranges = matches.map((match) => match.range);
     inner.CSS.highlights.set("leaflogue-saved", new inner.Highlight(...ranges));
     for (const colour of HIGHLIGHT_COLOURS) {
-      const coloured = new inner.Highlight(...matches.filter(({ highlight }) => (highlightColours[highlight.id] ?? "yellow") === colour).map(({ range }) => range));
+      const coloured = new inner.Highlight(...matches.filter(({ highlight }) => highlightColour(highlight, highlightColours) === colour).map(({ range }) => range));
       coloured.priority = 1; inner.CSS.highlights.set(`leaflogue-colour-${colour}`, coloured);
     }
     refreshNoteMarkers.current();
@@ -485,7 +485,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       {!optionsOpen && !calibreOpen && active && noteMarkers.map((marker) => <button key={marker.id} className={styles.noteMarker} aria-label={marker.label} title={marker.label} style={{ left: marker.left, top: marker.top }} onClick={() => { setSelected(undefined); setActiveHighlight({ id: marker.id, left: Math.min(marker.left, window.innerWidth - 344), top: marker.top }); }}><Icon name="note-paper" size={15} aria-hidden="true" /></button>)}
       {activeHighlight && activePassage && !optionsOpen && <div data-reader-selection role="dialog" aria-label="Saved highlight actions" className={styles.selection} style={{ left: activeHighlight.left, top: Math.min(activeHighlight.top, window.innerHeight - (activeHighlight.note ? 280 : 160)) }} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActiveHighlight(undefined); } }}>
         {activeHighlight.note ? <><label className="ll-label">Note<textarea autoFocus className="ll-field" rows={3} maxLength={10000} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className="ll-button" disabled={savingHighlight || !note.trim()} onClick={() => void noteActiveHighlight()}>Save note</button></> : <>
-          <HighlightColourPicker highlightId={activePassage.id} /><p className={styles.activeExcerpt}>{activePassage.text.length > 100 ? `${activePassage.text.slice(0, 100)}…` : activePassage.text}</p>
+          <HighlightColourPicker highlight={activePassage} /><p className={styles.activeExcerpt}>{activePassage.text.length > 100 ? `${activePassage.text.slice(0, 100)}…` : activePassage.text}</p>
           {activePassage.notes.length > 0 && <div className={styles.activeNotes}>{activePassage.notes.map((note) => <MarkdownText key={note.id} text={note.markdown} />)}</div>}
           {onExplain && <button className="ll-button-secondary" onClick={() => { clearSelection(); onExplain(activePassage, contents?.book.archived ?? false); }}>Explain this passage</button>}
           <button className="ll-button-secondary" onClick={() => { onOpenInBook?.(activePassage.id); setActiveHighlight(undefined); }}>Open in book</button>

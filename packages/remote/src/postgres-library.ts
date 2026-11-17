@@ -1,3 +1,4 @@
+import { normalizeHighlightColour } from "@leaflogue/contracts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import type {
@@ -67,6 +68,7 @@ import type { PostgresClient } from "./postgres";
 import type { SyncPullPage } from "./sync";
 
 interface HighlightRow extends Record<string, unknown> {
+  colour: import("@leaflogue/contracts").HighlightColour | null;
   id: string;
   book_id: string;
   text: string;
@@ -218,7 +220,7 @@ const SYNCED_STATE_QUERIES = {
       (SELECT count(*) FROM leaflogue.highlights AS highlights
        WHERE highlights.library_id = $1 AND highlights.book_id = entity.id
          AND highlights.archived = false AND highlights.deleted_at IS NULL) AS highlight_count`),
-  highlight: syncedStateQuery("highlight", "highlights", `entity.book_id::text AS book_id, entity.text, entity.source_location,
+  highlight: syncedStateQuery("highlight", "highlights", `entity.book_id::text AS book_id, entity.text, entity.colour, entity.source_location,
       floor(extract(epoch FROM entity.source_created_at) * 1000)::bigint AS source_created_at_ms, entity.archived,
       (SELECT coalesce(jsonb_agg(links.tag_id ORDER BY links.tag_id), '[]'::jsonb)
        FROM leaflogue.highlight_tags AS links
@@ -556,21 +558,23 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
       const tagIds = await this.#activeSyncedContainers("tag", requireSyncIds(change.tagIds, "Passage tag membership"));
       const threadIds = await this.#activeSyncedContainers("thread",
         requireSyncIds(change.threadIds, "Passage thread membership", MAX_THREADS_PER_HIGHLIGHT));
+      const colour = normalizeHighlightColour(change.highlight.colour);
       const text = requiredText(change.highlight.text, "Highlight", 100_000);
       const location = optionalText(change.highlight.sourceLocation, 2_000);
       const written = await this.#client.query<{ revision: number }>(`
         INSERT INTO leaflogue.highlights
-          (library_id, id, book_id, text, source_location, source_created_at, archived, revision, created_at, updated_at)
-        SELECT $1, $2, books.id, $4, $5, to_timestamp($6::double precision / 1000.0), false, 1,
+          (library_id, id, book_id, text, source_location, source_created_at, colour, archived, revision, created_at, updated_at)
+        SELECT $1, $2, books.id, $4, $5, to_timestamp($6::double precision / 1000.0), $8, false, 1,
           to_timestamp($7::double precision / 1000.0), now()
         FROM leaflogue.books WHERE library_id = $1 AND id = $3 AND deleted_at IS NULL
         ON CONFLICT (library_id, id) DO UPDATE SET
           book_id = excluded.book_id, text = excluded.text, source_location = excluded.source_location,
+          colour = COALESCE(excluded.colour, leaflogue.highlights.colour),
           source_created_at = excluded.source_created_at, archived = false, deleted_at = NULL,
           revision = leaflogue.highlights.revision + 1, updated_at = now()
         RETURNING revision
       `, [this.#libraryId, entityId, bookId, text, location ?? null,
-        validEpoch(change.highlight.sourceCreatedAt, true), validEpoch(change.highlight.createdAt)]);
+        validEpoch(change.highlight.sourceCreatedAt, true), validEpoch(change.highlight.createdAt), colour ?? null]);
       revision = written.rows[0]?.revision;
       if (revision === undefined) throw new Error("Synced highlight's book no longer exists");
       await this.#client.query(
@@ -1051,6 +1055,7 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
 
   async createHighlight(input: NewHighlight & PostgresHighlightCreation): Promise<HighlightMutationResult> {
     const id = input.id === undefined ? randomUUID() : requiredEntityId(input.id, "Highlight");
+    const colour = normalizeHighlightColour(input.colour);
     const text = requiredText(input.text, "Highlight", 100_000);
     const location = optionalText(input.sourceLocation, 2_000);
     const noteMarkdown = input.noteMarkdown === undefined ? undefined : requiredNote(input.noteMarkdown);
@@ -1058,16 +1063,16 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
     return this.#transaction(async () => {
       const result = await this.#client.query<HighlightRow>(`
         INSERT INTO leaflogue.highlights
-          (library_id, id, book_id, text, source_location, source_created_at, revision, created_at, updated_at)
-        SELECT $1, $2, id, $4, $5, to_timestamp($6::double precision / 1000), 1, now(), now()
+          (library_id, id, book_id, text, source_location, source_created_at, colour, revision, created_at, updated_at)
+        SELECT $1, $2, id, $4, $5, to_timestamp($6::double precision / 1000), $7, 1, now(), now()
         FROM leaflogue.books
         WHERE library_id = $1 AND id = $3 AND archived = false AND deleted_at IS NULL
         ON CONFLICT (library_id, id) DO NOTHING
-        RETURNING id, book_id, text, source_location,
+        RETURNING id, book_id, text, colour, source_location,
           extract(epoch FROM source_created_at) * 1000 AS source_created_at_ms,
           extract(epoch FROM created_at) * 1000 AS created_at_ms,
           extract(epoch FROM updated_at) * 1000 AS updated_at_ms, revision
-      `, [this.#libraryId, id, input.bookId, text, location ?? null, sourceCreatedAt]);
+      `, [this.#libraryId, id, input.bookId, text, location ?? null, sourceCreatedAt, colour ?? null]);
       const row = result.rows[0];
       if (!row) throw new Error(input.id === undefined ? "Book no longer exists" : "Book no longer exists or the highlight ID is taken");
       let noteId: string | undefined;
@@ -1088,20 +1093,21 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
   }
 
   async updateHighlight(input: UpdateHighlight): Promise<HighlightMutationResult> {
+    const colour = normalizeHighlightColour(input.colour);
     const text = requiredText(input.text, "Highlight", 100_000);
     const location = optionalText(input.sourceLocation, 2_000);
     requireRevision(input.expectedRevision, "Highlight");
     return this.#transaction(async () => {
       const result = await this.#client.query<HighlightRow>(`
         UPDATE leaflogue.highlights
-        SET text = $4, source_location = $5, revision = revision + 1, updated_at = now()
+        SET text = $4, source_location = $5, colour = COALESCE($7, colour), revision = revision + 1, updated_at = now()
         WHERE library_id = $1 AND id = $2 AND book_id = $3 AND revision = $6
           AND archived = false AND deleted_at IS NULL
-        RETURNING id, book_id, text, source_location,
+        RETURNING id, book_id, text, colour, source_location,
           extract(epoch FROM source_created_at) * 1000 AS source_created_at_ms,
           extract(epoch FROM created_at) * 1000 AS created_at_ms,
           extract(epoch FROM updated_at) * 1000 AS updated_at_ms, revision
-      `, [this.#libraryId, input.id, input.bookId, text, location ?? null, input.expectedRevision]);
+      `, [this.#libraryId, input.id, input.bookId, text, location ?? null, input.expectedRevision, colour ?? null]);
       const row = result.rows[0];
       if (!row) throw new Error("Highlight changed elsewhere or no longer exists");
       const bookRevision = await this.#touchBook(input.bookId);
@@ -2132,6 +2138,7 @@ function mapHighlight(row: HighlightRow): HighlightMutationResult {
     bookId: row.book_id as BookId,
     text: row.text,
     ...(row.source_location ? { sourceLocation: row.source_location } : {}),
+    ...(row.colour ? { colour: row.colour } : {}),
     ...(row.source_created_at_ms !== null ? { sourceCreatedAt: Number(row.source_created_at_ms) } : {}),
     createdAt: Number(row.created_at_ms),
     updatedAt: Number(row.updated_at_ms),

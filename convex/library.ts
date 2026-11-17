@@ -676,6 +676,7 @@ export const createHighlight = internalMutation({
     await ctx.db.insert("highlights", {
       libraryId: args.libraryId, id, bookId: args.bookId, text,
       ...(sourceLocation ? { sourceLocation } : {}),
+      ...(args.colour ? { colour: args.colour } : {}),
       ...(args.sourceCreatedAt !== undefined && Number.isSafeInteger(args.sourceCreatedAt) && args.sourceCreatedAt >= 0 ? { sourceCreatedAt: args.sourceCreatedAt } : {}),
       dailyCandidateReady: true,
       archived: false, revision: 1, createdAt: now, updatedAt: now,
@@ -711,7 +712,8 @@ export const createHighlight = internalMutation({
       { entityType: "highlight", entityId: id, revision: 1 },
       ...(noteId ? [{ entityType: "note" as const, entityId: noteId, revision: 1 }] : []),
     ], now);
-    return { id, bookId: args.bookId, text, ...(sourceLocation ? { sourceLocation } : {}), createdAt: now, updatedAt: now, revision: 1 };
+    return { id, bookId: args.bookId, text, ...(sourceLocation ? { sourceLocation } : {}),
+      ...(args.colour ? { colour: args.colour } : {}), createdAt: now, updatedAt: now, revision: 1 };
   },
 });
 
@@ -731,7 +733,7 @@ export const updateHighlight = internalMutation({
     const now = Date.now();
     const revision = args.expectedRevision + 1;
     const bookRevision = Number(book.revision) + 1;
-    await ctx.db.patch(highlight._id, { text, sourceLocation, revision, updatedAt: now });
+    await ctx.db.patch(highlight._id, { text, sourceLocation, ...(args.colour ? { colour: args.colour } : {}), revision, updatedAt: now });
     await ctx.db.patch(book._id, {
       readingDataBytes: book.readingDataBytes - annotationBytes(String(highlight.text), optionalStoredText(highlight.sourceLocation)) + annotationBytes(text, sourceLocation),
       revision: bookRevision,
@@ -741,7 +743,7 @@ export const updateHighlight = internalMutation({
       { entityType: "book", entityId: args.bookId, revision: bookRevision },
       { entityType: "highlight", entityId: args.id, revision },
     ], now);
-    return { id: args.id, bookId: args.bookId, text, ...(sourceLocation ? { sourceLocation } : {}), ...(highlight.sourceCreatedAt !== undefined ? { sourceCreatedAt: Number(highlight.sourceCreatedAt) } : {}), createdAt: Number(highlight.createdAt), updatedAt: now, revision };
+    return { ...(args.colour ?? highlight.colour ? { colour: args.colour ?? highlight.colour } : {}), id: args.id, bookId: args.bookId, text, ...(sourceLocation ? { sourceLocation } : {}), ...(highlight.sourceCreatedAt !== undefined ? { sourceCreatedAt: Number(highlight.sourceCreatedAt) } : {}), createdAt: Number(highlight.createdAt), updatedAt: now, revision };
   },
 });
 
@@ -1205,11 +1207,12 @@ async function applySyncedHighlight(
     newBytes = annotationBytes(text, sourceLocation);
     if (wasActive) oldBytes = annotationBytes(String(current?.text), optionalStoredText(current?.sourceLocation));
     if (current) {
-      await ctx.db.patch(current._id, { bookId: suppliedBookId, text, sourceLocation,
+      await ctx.db.patch(current._id, { bookId: suppliedBookId, text, sourceLocation, ...(change.highlight.colour ? { colour: change.highlight.colour } : {}),
         sourceCreatedAt: change.highlight.sourceCreatedAt, archived: false, deletedAt: undefined, revision, updatedAt: now });
     } else {
       await ctx.db.insert("highlights", { libraryId: String(library.externalId), id: entityId, bookId: suppliedBookId,
         text, ...(sourceLocation ? { sourceLocation } : {}),
+        ...(change.highlight.colour ? { colour: change.highlight.colour } : {}),
         ...(change.highlight.sourceCreatedAt !== undefined ? { sourceCreatedAt: change.highlight.sourceCreatedAt } : {}),
         dailyCandidateReady: true, archived: false, revision, createdAt, updatedAt: now });
     }

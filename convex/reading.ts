@@ -185,6 +185,7 @@ function mapHighlight(highlight: DocumentByName<DataModel, "highlights">) {
     id: highlight.id,
     bookId: highlight.bookId,
     text: highlight.text,
+    ...(highlight.colour !== undefined ? { colour: highlight.colour } : {}),
     ...(highlight.sourceLocation !== undefined ? { sourceLocation: highlight.sourceLocation } : {}),
     ...(highlight.sourceCreatedAt !== undefined ? { sourceCreatedAt: highlight.sourceCreatedAt } : {}),
     archived: highlight.archived,

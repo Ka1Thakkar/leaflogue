@@ -1,7 +1,7 @@
 import pg from "pg";
 
 const { Client } = pg;
-export const REMOTE_SCHEMA_VERSION = 13;
+export const REMOTE_SCHEMA_VERSION = 14;
 
 export interface RemoteSchemaStatus {
   readonly reachable: boolean;
@@ -520,6 +520,11 @@ const SCHEMA_VERSION_13 = `
   ALTER TABLE leaflogue.daily_selections ALTER COLUMN created_at SET NOT NULL;
 `;
 
+const SCHEMA_VERSION_14 = `
+  ALTER TABLE leaflogue.highlights ADD COLUMN IF NOT EXISTS colour text
+    CHECK (colour IS NULL OR colour IN ('yellow','green','blue','pink','purple'));
+`;
+
 const REMOTE_SCHEMA_MIGRATIONS = [
   { version: 1, sql: SCHEMA_VERSION_1 },
   { version: 2, sql: SCHEMA_VERSION_2 },
@@ -534,4 +539,5 @@ const REMOTE_SCHEMA_MIGRATIONS = [
   { version: 11, sql: SCHEMA_VERSION_11 },
   { version: 12, sql: SCHEMA_VERSION_12 },
   { version: 13, sql: SCHEMA_VERSION_13 },
+  { version: 14, sql: SCHEMA_VERSION_14 },
 ] as const;
