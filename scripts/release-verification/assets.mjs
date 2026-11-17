@@ -87,6 +87,8 @@ for(const name of expected.filter(name=>name.endsWith('.build-inputs.json'))) {
 }
 const backend=JSON.parse(await readFile(join(directory,`Leaflogue-Convex-${version}.manifest.json`),'utf8'));
 assert(backend.version===version && backend.schemaVersion===17 && backend.mutationContractVersion===24,'Wrong backend version/contract');
+const webInfo=JSON.parse(execFileSync('python3',['-c','import sys,zipfile; print(zipfile.ZipFile(sys.argv[1]).read("build-info.json").decode())',join(directory,`Leaflogue-${version}-web.zip`)],{encoding:'utf8'}));
+assert(webInfo.commit===source && webInfo.desktopRelease===version,'Wrong self-hostable web source/version');
 const result={version,source,assets:expected.length,githubDigests:'passed',checksums:'passed',signedBetaFeeds:5,payloadHashes:'passed',productionAudits:'no high or critical findings',sboms:5,buildInputs:'exact tagged source',verifiedAt:new Date().toISOString()};
 await writeFile(join(directory,'verification-result.json'),JSON.stringify(result,null,2)+'\n');
 console.log(JSON.stringify(result,null,2));
