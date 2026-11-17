@@ -139,6 +139,12 @@ reader marking use the same choice; no additional colour tag is shown beside
 the date. All colours adapt to the active theme;
 changing themes retains the colour name rather than a fixed paint value.
 
-Colour choices are saved on this device and survive file unlinking or changing
-formats. They are display preferences, not part of library sync, SQLite backups
-or exports. The highlight text and notes still use normal library sync.
+Colour choices are saved with each highlight and sync between desktop,
+Libredex, and the self-hosted web app when they use the same library. They are
+included in SQLite backups and JSON exports and survive file unlinking or
+changing formats. Each device uses its own theme to render the saved colour.
+
+Existing choices saved on a device migrate automatically when it opens the
+updated app. A colour already saved in the shared library takes precedence.
+Update your desktop apps before upgrading a Convex backend to mutation contract
+24. Colour changes stay queued locally until that backend supports them.

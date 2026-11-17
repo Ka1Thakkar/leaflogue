@@ -1,3 +1,4 @@
+import { normalizeHighlightColour } from "@leaflogue/contracts";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
@@ -119,6 +120,7 @@ interface BookRow {
 }
 
 interface HighlightRow {
+  colour: import("@leaflogue/contracts").HighlightColour | null;
   id: string;
   book_id: string;
   text: string;
@@ -200,6 +202,7 @@ interface DailyCandidateRow {
 }
 
 interface ThreadPassageRow {
+  colour: import("@leaflogue/contracts").HighlightColour | null;
   highlight_id: string;
   added_at: number;
   book_id: string;
@@ -457,7 +460,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   ): SyncedChange | undefined {
     const query = type === "book" ? `${bookSelect} WHERE books.id = ?`
       : type === "highlight"
-        ? `SELECT id, book_id, text, source_location, source_created_at, created_at, updated_at, revision, archived, deleted
+        ? `SELECT id, book_id, text, colour, source_location, source_created_at, created_at, updated_at, revision, archived, deleted
            FROM highlights WHERE id = ?`
         : type === "note"
           ? `SELECT id, book_id, highlight_id, markdown, origin, created_at, updated_at, revision, deleted
@@ -526,6 +529,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
           bookId: row.book_id as BookId,
           text: row.text,
           ...(row.source_location ? { sourceLocation: row.source_location } : {}),
+        ...(row.colour ? { colour: row.colour } : {}),
           ...(row.source_created_at !== null ? { sourceCreatedAt: row.source_created_at } : {}),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -959,10 +963,14 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     const threadIds = change.threadIds === undefined
       ? undefined
       : activeOrTombstonedContainerIds(this.#database, "thread", change.threadIds);
+    const colour = normalizeHighlightColour(change.highlight.colour);
+    const previous = this.#database.prepare("SELECT text, source_location FROM highlights WHERE id = ?").get(entityId) as { text: string; source_location: string | null } | undefined;
     const text = requiredText(change.highlight.text, "Highlight", 100_000);
     const sourceLocation = optionalText(change.highlight.sourceLocation, 2_000);
     validIncomingEpoch(change.highlight.sourceCreatedAt, true);
-    const revision = current ? current.revision + 1 : 1;
+    // A new replica must inherit the observed writer clock. Otherwise its next
+    // edit can tie an older device's edit and lose by device ID ordering.
+    const revision = Math.max(current ? current.revision + 1 : 1, change.deviceRevision, change.highlight.revision);
     if (current) this.#database.prepare(
       `UPDATE highlights SET book_id = ?, text = ?, source_location = ?, source_created_at = ?, archived = 0,
        deleted = 0, deleted_at = NULL, updated_at = ?, revision = ? WHERE id = ?`,
@@ -973,7 +981,8 @@ export class LocalLibrary implements Disposable, LibraryRepository {
        VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?)`,
     ).run(entityId, bookId, text, sourceLocation ?? null, change.highlight.sourceCreatedAt ?? null,
       validIncomingEpoch(change.highlight.createdAt), now, revision);
-    this.#database.prepare("UPDATE source_annotations SET detached = 1 WHERE highlight_id = ?").run(entityId);
+    if (!previous || previous.text !== text || (previous.source_location ?? undefined) !== sourceLocation) this.#database.prepare("UPDATE source_annotations SET detached = 1 WHERE highlight_id = ?").run(entityId);
+    if (colour) this.#database.prepare("UPDATE highlights SET colour = ? WHERE id = ?").run(colour, entityId);
     this.#database.prepare("DELETE FROM sync_tombstones WHERE entity_type = 'highlight' AND entity_id = ?").run(entityId);
     this.#database.prepare("DELETE FROM highlight_tags WHERE highlight_id = ?").run(entityId);
     const insertTag = this.#database.prepare(
@@ -1483,7 +1492,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     if (!thread) return undefined;
     const passageStatement = this.#database.prepare(
       `SELECT thread_highlights.highlight_id, thread_highlights.added_at,
-              highlights.book_id, highlights.text, highlights.source_location,
+              highlights.book_id, highlights.text, highlights.colour, highlights.source_location,
               books.title AS book_title, books.authors_json
        FROM thread_highlights
        JOIN highlights ON highlights.id = thread_highlights.highlight_id
@@ -1533,6 +1542,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
         authors,
         text: row.text,
         ...(row.source_location ? { sourceLocation: row.source_location } : {}),
+        ...(row.colour ? { colour: row.colour } : {}),
         notes: notesByHighlight.get(row.highlight_id) ?? [],
         addedAt: row.added_at,
       };
@@ -2345,7 +2355,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     const book = this.getBook(id);
     if (!book) return undefined;
     const highlightRows = this.#database.prepare(
-      `SELECT id, book_id, text, source_location, source_created_at,
+      `SELECT id, book_id, text, colour, source_location, source_created_at,
               created_at, updated_at, revision
        FROM highlights
        WHERE book_id = ? AND archived = 0 AND deleted = 0
@@ -2374,6 +2384,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
         bookId: row.book_id as BookId,
         text: row.text,
         ...(row.source_location ? { sourceLocation: row.source_location } : {}),
+        ...(row.colour ? { colour: row.colour } : {}),
         ...(row.source_created_at !== null ? { sourceCreatedAt: row.source_created_at } : {}),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -2458,7 +2469,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
         : "COALESCE(highlights.source_created_at, highlights.created_at), highlights.created_at, highlights.id";
     return this.readSnapshot(() => {
       const rows = this.#database.prepare(
-        `SELECT highlights.id, highlights.book_id, highlights.text, highlights.source_location,
+        `SELECT highlights.id, highlights.book_id, highlights.text, highlights.colour, highlights.source_location,
                 highlights.source_created_at, highlights.created_at, highlights.updated_at,
                 highlights.revision, books.title AS book_title, books.authors_json,
                 ${imported} AS imported
@@ -2505,6 +2516,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
           bookId: row.book_id as BookId,
           text: row.text,
           ...(row.source_location ? { sourceLocation: row.source_location } : {}),
+        ...(row.colour ? { colour: row.colour } : {}),
           ...(row.source_created_at !== null ? { sourceCreatedAt: row.source_created_at } : {}),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -2521,6 +2533,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   }
 
   createHighlight(input: NewHighlight): BookContents["highlights"][number] {
+    const colour = normalizeHighlightColour(input.colour);
     const text = requiredText(input.text, "Highlight", 100_000);
     const sourceLocation = optionalText(input.sourceLocation, 2_000);
     const noteMarkdown = input.noteMarkdown === undefined ? undefined : requiredNote(input.noteMarkdown);
@@ -2534,6 +2547,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
           (id, book_id, text, source_location, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
       ).run(id, input.bookId, text, sourceLocation ?? null, now, now);
+      if (colour) this.#database.prepare("UPDATE highlights SET colour = ? WHERE id = ?").run(colour, id);
       if (noteMarkdown) {
         this.#database.prepare(
           `INSERT INTO notes (id, book_id, highlight_id, markdown, origin, created_at, updated_at)
@@ -2550,6 +2564,8 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   }
 
   updateHighlight(input: UpdateHighlight): BookContents["highlights"][number] {
+    const colour = normalizeHighlightColour(input.colour);
+    const previous = this.#requireHighlight(input.bookId, input.id);
     const text = requiredText(input.text, "Highlight", 100_000);
     const sourceLocation = optionalText(input.sourceLocation, 2_000);
     if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1) {
@@ -2560,11 +2576,11 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     try {
       const result = this.#database.prepare(
         `UPDATE highlights
-         SET text = ?, source_location = ?, updated_at = ?, revision = revision + 1
+         SET text = ?, source_location = ?, colour = COALESCE(?, colour), updated_at = ?, revision = revision + 1
          WHERE id = ? AND book_id = ? AND revision = ? AND archived = 0 AND deleted = 0`,
-      ).run(text, sourceLocation ?? null, now, input.id, input.bookId, input.expectedRevision);
+      ).run(text, sourceLocation ?? null, colour ?? null, now, input.id, input.bookId, input.expectedRevision);
       if (Number(result.changes) !== 1) throw new Error("Highlight changed elsewhere or no longer exists");
-      this.#database.prepare(
+      if (text !== previous.text || sourceLocation !== previous.sourceLocation) this.#database.prepare(
         "UPDATE source_annotations SET detached = 1 WHERE highlight_id = ?",
       ).run(input.id);
       this.#touchBook(input.bookId, now);
@@ -3318,7 +3334,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
 
   #dailyPassage(highlightId: HighlightId): DailyPassage | undefined {
     const row = this.#database.prepare(
-      `SELECT highlights.book_id, highlights.text, highlights.source_location,
+      `SELECT highlights.book_id, highlights.text, highlights.colour, highlights.source_location,
               books.title AS book_title, books.authors_json
        FROM highlights
        JOIN books ON books.id = highlights.book_id
@@ -3327,6 +3343,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     ).get(highlightId) as {
       book_id: string;
       text: string;
+      colour: import("@leaflogue/contracts").HighlightColour | null;
       source_location: string | null;
       book_title: string;
       authors_json: string;
@@ -3353,6 +3370,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
       authors: parseAuthors(row.authors_json, row.book_id),
       text: row.text,
       ...(row.source_location ? { sourceLocation: row.source_location } : {}),
+        ...(row.colour ? { colour: row.colour } : {}),
       notes,
     };
   }

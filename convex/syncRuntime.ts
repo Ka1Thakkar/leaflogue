@@ -488,6 +488,7 @@ async function resolveSyncedState(
         bookId: current.bookId,
         text: current.text,
         ...(current.sourceLocation !== undefined ? { sourceLocation: current.sourceLocation } : {}),
+        ...(current.colour ? { colour: current.colour } : {}),
         ...(current.sourceCreatedAt !== undefined ? { sourceCreatedAt: current.sourceCreatedAt } : {}),
         createdAt: current.createdAt,
         updatedAt: current.updatedAt,

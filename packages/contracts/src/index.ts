@@ -109,9 +109,19 @@ export interface CreateBook extends NewBook {
   readonly id: BookId;
 }
 
+export const HIGHLIGHT_COLOURS = ["yellow", "green", "blue", "pink", "purple"] as const;
+export type HighlightColour = typeof HIGHLIGHT_COLOURS[number];
+/** Only semantic names are persisted; each client adapts them to its theme. */
+export function normalizeHighlightColour(value: unknown): HighlightColour | undefined {
+  if (value === undefined) return undefined;
+  if (HIGHLIGHT_COLOURS.some((colour) => colour === value)) return value as HighlightColour;
+  throw new Error("Choose a supported highlight colour.");
+}
+
 export interface NewHighlight {
   readonly bookId: BookId;
   readonly text: string;
+  readonly colour?: HighlightColour;
   readonly sourceLocation?: string;
   /** Optional reader note created atomically with the passage. */
   readonly noteMarkdown?: string;
@@ -121,6 +131,7 @@ export interface UpdateHighlight {
   readonly id: HighlightId;
   readonly bookId: BookId;
   readonly text: string;
+  readonly colour?: HighlightColour;
   readonly sourceLocation?: string;
   readonly expectedRevision: number;
 }
@@ -324,6 +335,7 @@ export interface ThreadPassage {
   readonly bookTitle: string;
   readonly authors: readonly string[];
   readonly text: string;
+  readonly colour?: HighlightColour;
   readonly sourceLocation?: string;
   readonly notes: readonly Note[];
   readonly addedAt: number;
@@ -373,6 +385,7 @@ export interface DailyPassage {
   readonly bookTitle: string;
   readonly authors: readonly string[];
   readonly text: string;
+  readonly colour?: HighlightColour;
   readonly sourceLocation?: string;
   readonly notes: readonly Note[];
 }
@@ -423,6 +436,7 @@ export interface Highlight {
   readonly id: HighlightId;
   readonly bookId: BookId;
   readonly text: string;
+  readonly colour?: HighlightColour;
   readonly sourceLocation?: string;
   readonly sourceCreatedAt?: number;
   readonly createdAt: number;

@@ -1,3 +1,4 @@
+import { highlightColourValidator } from "./libraryContracts";
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
@@ -163,6 +164,7 @@ export const leaflogueTables = {
     bookId: v.string(),
     text: v.string(),
     sourceLocation: v.optional(v.string()),
+    colour: v.optional(highlightColourValidator),
     sourceCreatedAt: v.optional(v.number()),
     dailyCandidateReady: v.optional(v.boolean()),
     archived: v.boolean(),

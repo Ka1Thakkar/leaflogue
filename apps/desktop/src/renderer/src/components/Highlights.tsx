@@ -1,5 +1,5 @@
 import { HighlightColourPicker } from "./HighlightColourPicker";
-import { currentHighlightPalette, useHighlightColours } from "./highlight-colours";
+import { currentHighlightPalette, highlightColour, useHighlightColours } from "./highlight-colours";
 import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
@@ -25,7 +25,7 @@ const PAGE_SIZE = 20;
 function Annotation({ highlight, showBook, focused = false }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean }) {
   const contextWorkspace = useContextWorkspace();
   const colours = useHighlightColours();
-  const highlightInk = currentHighlightPalette()[colours[highlight.id] ?? "yellow"].ink;
+  const highlightInk = currentHighlightPalette()[highlightColour(highlight, colours)].ink;
   const { tags, reload, readOnly, aiEnabled, activeId, setActiveId } = useContext(PassageContext);
   const [confirm, confirmDialog] = useConfirm();
   const [editing, setEditing] = useState(false);
@@ -102,7 +102,7 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
           </div>
           {!readOnly && !deleted && (
             <div className={styles.actions}>
-              <HighlightColourPicker highlightId={highlight.id} />
+              <HighlightColourPicker highlight={highlight} onSaved={reload} />
               {aiEnabled && (
                 <button className="ll-icon-button" aria-label="Explain this passage" title="Explain this passage" ref={explainTrigger} onClick={() => contextWorkspace?.showAssistant({ highlight, reload, readOnly })}><Sparkles size={18} aria-hidden="true" /></button>
               )}

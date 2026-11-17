@@ -1,10 +1,10 @@
 /** @vitest-environment happy-dom */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILT_IN_THEMES } from "@leaflogue/appearance";
 import { contrastRatio } from "@leaflogue/ui";
-import { highlightPalette, readHighlightColours, saveHighlightColour } from "./highlight-colours";
+import { highlightColour, highlightPalette, migrateHighlightColours, readHighlightColours, saveHighlightColour } from "./highlight-colours";
 const id = "12345678-1234-4234-8234-123456789abc";
-afterEach(() => localStorage.clear());
+afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); });
 describe("per-highlight theme colours", () => {
   it("persists only supported named colours and resets yellow to the default", () => {
     saveHighlightColour(id, "green");
@@ -29,5 +29,29 @@ describe("per-highlight theme colours", () => {
     }
     const [first, second] = BUILT_IN_THEMES;
     expect(highlightPalette(first!.dark, true).green.fill).not.toBe(highlightPalette(second!.dark, true).green.fill);
+  });
+});
+
+describe("legacy colour migration", () => {
+  it("copies an old local choice to the record only after a successful save", async () => {
+    saveHighlightColour(id, "green");
+    const highlight = { id, bookId: id, text: "A line", revision: 2, createdAt: 1, updatedAt: 1, notes: [] };
+    const update = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ ...highlight, colour: "green" });
+    vi.stubGlobal("leaflogue", { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } });
+    await migrateHighlightColours();
+    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))[id]).toBe("green");
+    await migrateHighlightColours();
+    expect(update).toHaveBeenLastCalledWith({ id, bookId: id, text: "A line", expectedRevision: 2, colour: "green" });
+    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({});
+  });
+  it("keeps a shared choice authoritative over a stale local preference", async () => {
+    saveHighlightColour(id, "pink");
+    const highlight = { id, colour: "yellow" as const };
+    expect(highlightColour(highlight as never, { [id]: "pink" })).toBe("yellow");
+    const update = vi.fn();
+    vi.stubGlobal("leaflogue", { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } });
+    await migrateHighlightColours();
+    expect(update).not.toHaveBeenCalled();
+    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({});
   });
 });

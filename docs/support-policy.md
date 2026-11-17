@@ -29,9 +29,9 @@ or app-store distributions.
   supports. Connections to non-loopback servers must use TLS.
 - **Convex:** the cloud service or a self-hosted backend running a Leaflogue
   function bundle within the desktop's documented compatibility window. The
-  current window is schema 17 and mutation contracts 22–23. Contract 23 adds
-  thread replay; update desktops before the deployment, because older desktops
-  accept contracts only up to 22.
+  current window is schema 17 and mutation contracts 22–24. Contract 23 adds
+  thread replay and contract 24 adds shared highlight colours. Update desktops
+  before the deployment: previous desktops accept contracts only up to 23.
 
 Sync and the self-hosted web client are implemented and optional. They require
 the configuration described in the guides; release validation records must

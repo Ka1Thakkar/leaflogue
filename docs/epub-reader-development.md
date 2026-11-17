@@ -189,9 +189,15 @@ retain page-based navigation rather than a continuous document scroll.
 
 ## Next-beta highlight display colours
 
-Five named colour preferences are stored per highlight ID in the local renderer
-profile. Yellow is the default. Reader markings and passage dates share the
-choice; all five hues are adapted to theme tokens with contrast checks.
-Coordinates and imported annotation records are unchanged by recolouring.
-Preferences survive changing formats but are not synced/backed up with library
-data. This intentionally requires no Convex or PostgreSQL schema change.
+Five semantic colours are saved on highlight records (SQLite schema 18,
+PostgreSQL schema 14, Convex schema 17 / mutation contract 24). Yellow is the
+default. Reader markings, passage dates and hover bars share the choice; all
+five hues adapt to the active theme. SQLite backups and JSON exports retain
+colours, and normal library sync carries them between desktop and web clients.
+
+Legacy renderer preferences migrate on opening the updated app. Shared colours
+win over stale local choices; failed writes keep the local preference for retry.
+Colour-only changes retain import provenance. Older clients omitting the colour
+field preserve the stored value; choosing yellow saves an explicit value so it
+also overrides stale preferences. A contract-23 backend holds coloured passage
+updates unacknowledged until upgraded. Update desktop clients before the backend.

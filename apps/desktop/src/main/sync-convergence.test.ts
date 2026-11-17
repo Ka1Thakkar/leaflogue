@@ -89,6 +89,20 @@ function organization(library: LocalLibrary) {
 }
 
 describe("two-device sync convergence through PostgreSQL", () => {
+  it("syncs desktop colour changes to the web and web colour changes back", async () => {
+    const first = device("colour-first"), second = device("colour-second");
+    const book = first.library.createBook({ title: "Shared colours" });
+    const highlight = first.library.createHighlight({ bookId: book.id, text: "A shared line", colour: "green" });
+    await first.sync(); await second.sync();
+    expect(second.library.getBookContents(book.id)!.highlights[0]!.colour).toBe("green");
+    const web = new PostgresLibraryMutations(client, libraryId);
+    const row = (await client.query<{ revision: number }>("SELECT revision FROM leaflogue.highlights WHERE library_id=$1 AND id=$2", [libraryId, highlight.id])).rows[0]!;
+    await web.updateHighlight({ id: highlight.id, bookId: book.id, text: highlight.text, expectedRevision: Number(row.revision), colour: "purple" });
+    await first.sync(); await second.sync();
+    expect(first.library.getBookContents(book.id)!.highlights[0]!.colour).toBe("purple");
+    expect(second.library.getBookContents(book.id)!.highlights[0]!.colour).toBe("purple");
+  });
+
   it("brings web-client edits, including deletions, to a desktop", async () => {
     const web = new PostgresLibraryMutations(client, libraryId);
     const bookId = randomUUID();

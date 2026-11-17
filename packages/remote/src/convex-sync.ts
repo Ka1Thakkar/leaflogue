@@ -9,7 +9,7 @@ import {
   type SyncedChange,
   type SyncedChangeOutcome,
 } from "@leaflogue/contracts";
-import { CONVEX_THREAD_CONTRACT_VERSION } from "./convex";
+import { CONVEX_THREAD_CONTRACT_VERSION, CONVEX_COLOUR_CONTRACT_VERSION } from "./convex";
 import { readBoundedConvexResponse, validateConvexDeploymentUrl } from "./convex-http";
 import type { SyncBootstrapSource, SyncChangeSource, SyncPullPage, SyncSubmission, SyncTransport } from "./sync";
 
@@ -144,11 +144,13 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
   readonly #session: SessionArgs;
   readonly #deviceId: string;
   readonly #threadsSupported: boolean;
+  readonly #coloursSupported: boolean;
 
   constructor(options: ConvexSyncOptions & { readonly session: ConvexSyncSession }) {
     this.#connection = new ConvexConnection(options);
     this.#session = { libraryId: options.session.libraryId, syncKey: options.syncKey };
     this.#deviceId = options.session.deviceId;
+    this.#coloursSupported = (options.mutationContractVersion ?? CONVEX_COLOUR_CONTRACT_VERSION) >= CONVEX_COLOUR_CONTRACT_VERSION;
     this.#threadsSupported = (options.mutationContractVersion ?? CONVEX_THREAD_CONTRACT_VERSION) >= CONVEX_THREAD_CONTRACT_VERSION;
   }
 
@@ -169,6 +171,9 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
           change.entityType === "daily-selection" ||
           (change.entityType === "book" && change.operation === "upsert" && (change.statusEvents?.length ?? 0) > 0))) {
         return { operationIds, failure: codedError("Update the Convex deployment to sync threads, passages, reading history, and daily picks", "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED") };
+      }
+      if (!this.#coloursSupported && change.entityType === "highlight" && change.operation === "upsert" && change.highlight.colour !== undefined) {
+        return { operationIds, failure: codedError("Update the Convex deployment to sync highlight colours", "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED") };
       }
       try {
         const payload = convexSyncedChange(change);
@@ -361,7 +366,7 @@ export function convexSyncedChange(change: SyncedChange): Record<string, unknown
     // A local snapshot always carries membership; an empty list would erase it.
     if (change.threadIds === undefined) throw codedError("A passage snapshot has no thread membership", "LEAFLOGUE_PROVIDER_PROTOCOL");
     return { ...claim, tagIds: [...change.tagIds], threadIds: [...change.threadIds], highlight: defined({
-      id: highlight.id, bookId: highlight.bookId, text: highlight.text, sourceLocation: highlight.sourceLocation,
+      id: highlight.id, bookId: highlight.bookId, text: highlight.text, sourceLocation: highlight.sourceLocation, colour: highlight.colour,
       sourceCreatedAt: highlight.sourceCreatedAt, createdAt: highlight.createdAt, updatedAt: highlight.updatedAt,
       revision: highlight.revision,
     }) };

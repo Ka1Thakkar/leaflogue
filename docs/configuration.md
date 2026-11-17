@@ -594,10 +594,11 @@ After updating the desktop, download and verify that release's Convex bundle,
 extract it, and run its `deploy.sh` again (`--production` for production). The
 new extracted directory asks you to select the existing project; it never needs
 the desktop sync key to deploy. This desktop accepts Convex schema 17 with
-mutation contracts 22 or 23. Contract 23 adds thread sync, so **update every
-desktop first, then the deployment**: desktops older than this release accept
-contracts only up to 22 and refuse a contract-23 deployment until they are
-updated. Against a contract-22 deployment this desktop sends its queued
+mutation contracts 22–24. Contract 23 adds thread sync and contract 24 adds
+shared highlight colours. **Update every desktop first, then the deployment**:
+previous desktops accept contracts only up to 23 and refuse contract 24 until
+updated. Against contract 23, coloured passage updates stay queued until the
+backend is upgraded. Against a contract-22 deployment this desktop sends its queued
 changes in order until it reaches one that deployment cannot store (a thread,
 a new or edited passage, a book with reading history, or a daily pick). It
 stops there with "Update the Convex deployment…" in Settings, and that change

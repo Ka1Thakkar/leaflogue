@@ -123,6 +123,7 @@ interface HighlightRow extends Record<string, unknown> {
   book_id: string;
   text: string;
   source_location: string | null;
+  colour: import("@leaflogue/contracts").HighlightColour | null;
   source_created_at_ms: string | number | null;
   archived: boolean;
   deleted_at_ms: string | number | null;
@@ -135,7 +136,7 @@ export async function listHighlights(client: PostgresClient, libraryId: string, 
   const { limit, after } = pageBounds(args.paginationOpts);
   if (!UUID.test(args.bookId)) return paged([], limit, after, (row: HighlightRow) => row);
   const rows = await client.query<HighlightRow>(`
-    SELECT id::text AS id, book_id::text AS book_id, text, source_location,
+    SELECT id::text AS id, book_id::text AS book_id, text, colour, source_location,
       floor(extract(epoch FROM source_created_at) * 1000)::bigint AS source_created_at_ms, archived,
       floor(extract(epoch FROM deleted_at) * 1000)::bigint AS deleted_at_ms, revision,
       floor(extract(epoch FROM created_at) * 1000)::bigint AS created_at_ms,
@@ -149,6 +150,7 @@ export async function listHighlights(client: PostgresClient, libraryId: string, 
     bookId: row.book_id,
     text: row.text,
     ...(row.source_location !== null ? { sourceLocation: row.source_location } : {}),
+      ...(row.colour ? { colour: row.colour } : {}),
     ...(row.source_created_at_ms !== null ? { sourceCreatedAt: milliseconds(row.source_created_at_ms) } : {}),
     archived: row.archived,
     ...(row.deleted_at_ms !== null ? { deletedAt: milliseconds(row.deleted_at_ms) } : {}),

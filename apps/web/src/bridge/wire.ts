@@ -64,6 +64,7 @@ export interface WirePassage {
   readonly bookAuthors: readonly string[];
   readonly text: string;
   readonly sourceLocation?: string;
+  readonly colour?: import("@leaflogue/contracts").HighlightColour;
   readonly sourceCreatedAt?: number;
   readonly imported: boolean;
   readonly importedVersion: { readonly edited: boolean; readonly lastImportedAt: number } | null;
@@ -158,6 +159,7 @@ export function toHighlight(result: HighlightMutationResult, notes: readonly Not
     id: result.id,
     bookId: result.bookId,
     text: result.text,
+    ...(result.colour !== undefined ? { colour: result.colour } : {}),
     ...(result.sourceLocation !== undefined ? { sourceLocation: result.sourceLocation } : {}),
     ...(result.sourceCreatedAt !== undefined ? { sourceCreatedAt: result.sourceCreatedAt } : {}),
     createdAt: result.createdAt,

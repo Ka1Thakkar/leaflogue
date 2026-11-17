@@ -1,3 +1,4 @@
+import { migrateHighlightColours } from "./components/highlight-colours";
 import { ContextPanel, ContextPanelToggle, ContextWorkspaceProvider } from "./components/ContextPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Leaf, RefreshCw } from "./components/icons";
@@ -193,6 +194,14 @@ function Application() {
   const crumbs = [...baseCrumbs(route), ...(crumb ? [{ label: crumb }] : [])];
   const { expanded: sidebarExpanded, toggle: toggleSidebar } = sidebar;
   const syncOn = sync !== undefined && sync.state !== "off";
+  useEffect(() => {
+    if (!capabilities || capabilities.setupRequired) return;
+    const migrate = () => { void migrateHighlightColours().catch(() => undefined); };
+    migrate();
+    window.addEventListener("focus", migrate);
+    return () => window.removeEventListener("focus", migrate);
+  }, [capabilities]);
+
   const host = hostOf(capabilities?.host);
   const paletteShell = useMemo(() => ({ host, sidebarExpanded, toggleSidebar, syncOn }), [host, sidebarExpanded, toggleSidebar, syncOn]);
   const mac = document.documentElement.dataset.platform === "darwin";

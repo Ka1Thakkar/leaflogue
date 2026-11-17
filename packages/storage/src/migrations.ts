@@ -984,6 +984,10 @@ export const migrations: readonly Migration[] = [
       ORDER BY daily_selections.local_day, daily_selections.timezone;
     `,
   },
+  {
+    version: 18,
+    sql: `ALTER TABLE highlights ADD COLUMN colour TEXT CHECK (colour IS NULL OR colour IN ('yellow','green','blue','pink','purple'));`,
+  },
 ];
 
 export const latestSchemaVersion = migrations.at(-1)?.version ?? 0;

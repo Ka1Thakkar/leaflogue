@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { ThemeTokens } from "@leaflogue/contracts";
+import type { Highlight, ThemeTokens } from "@leaflogue/contracts";
 import { contrastRatio } from "@leaflogue/ui";
 import { readerColor } from "./reader-colors";
 export const HIGHLIGHT_COLOURS = ["yellow", "green", "blue", "pink", "purple"] as const;
@@ -37,6 +37,44 @@ export function saveHighlightColour(id: string, colour: HighlightColour) {
   const raw = JSON.stringify({ version: 1, colours: next });
   if (raw.length > 8 * 1024 * 1024) throw new Error("Highlight colour preferences are full.");
   localStorage.setItem(KEY, raw); publish(next);
+}
+/** The shared record wins over old per-device preferences, including explicit yellow. */
+export function highlightColour(highlight: Pick<Highlight, "id" | "colour">, legacy: Readonly<Record<string, HighlightColour>>) {
+  return highlight.colour ?? legacy[highlight.id] ?? "yellow";
+}
+export async function updateHighlightColour(highlight: Highlight, colour: HighlightColour) {
+  const result = await window.leaflogue.library.updateHighlight({
+    id: highlight.id, bookId: highlight.bookId, text: highlight.text,
+    ...(highlight.sourceLocation !== undefined ? { sourceLocation: highlight.sourceLocation } : {}),
+    expectedRevision: highlight.revision, colour,
+  });
+  // Only clear the old preference after a durable save. A failed request is retryable.
+  try { saveHighlightColour(highlight.id, "yellow"); } catch { /* shared record is authoritative */ }
+  window.dispatchEvent(new Event("leaflogue:annotations-changed"));
+  return result;
+}
+let migrating: Promise<void> | undefined;
+export function migrateHighlightColours(): Promise<void> {
+  if (migrating) return migrating;
+  migrating = (async () => {
+    const legacy = read();
+    if (!Object.keys(legacy).length) return;
+    for (let offset = 0; ; offset += 100) {
+      const page = await window.leaflogue.library.listHighlights({ offset, limit: 100, sort: "oldest" });
+      for (const highlight of page.entries) {
+        const colour = legacy[highlight.id];
+        if (!colour) continue;
+        if (highlight.colour !== undefined) {
+          try { saveHighlightColour(highlight.id, "yellow"); } catch { /* retry next time */ }
+        } else {
+          // Revision checks prevent overwriting a choice made elsewhere during migration.
+          try { await updateHighlightColour(highlight, colour); } catch { /* keep legacy for retry */ }
+        }
+      }
+      if (!page.hasMore) return;
+    }
+  })().finally(() => { migrating = undefined; });
+  return migrating;
 }
 const seeds: Record<HighlightColour, string> = { yellow: "#ffd84d", green: "#62bb78", blue: "#669ee8", pink: "#eb83b4", purple: "#ac89dc" };
 function blend(a: string, b: string) { return `#${[1, 3, 5].map((offset) => Math.round(parseInt(a.slice(offset, offset + 2), 16) * 0.55 + parseInt(b.slice(offset, offset + 2), 16) * 0.45).toString(16).padStart(2, "0")).join("")}`; }

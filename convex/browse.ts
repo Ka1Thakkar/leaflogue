@@ -1,3 +1,4 @@
+import { importedHighlightDiffers } from "@leaflogue/domain";
 import type {
   DataModelFromSchemaDefinition,
   DocumentByName,
@@ -147,7 +148,7 @@ async function passageView(ctx: Reader, libraryId: string, highlight: Highlight,
   let editedSinceImport = false;
   if (link) {
     const attached = link.attachedNoteId ? notes.find((note) => note.id === link.attachedNoteId) : undefined;
-    editedSinceImport = highlight.revision !== link.highlightRevision ||
+    editedSinceImport = importedHighlightDiffers(highlight, JSON.parse(link.incoming) as { text?: string; location?: string }) ||
       (attached !== undefined && attached.revision !== link.attachedNoteRevision);
   }
   return {
@@ -157,6 +158,7 @@ async function passageView(ctx: Reader, libraryId: string, highlight: Highlight,
     bookAuthors: owner.authors,
     text: highlight.text,
     ...(highlight.sourceLocation !== undefined ? { sourceLocation: highlight.sourceLocation } : {}),
+        ...(highlight.colour ? { colour: highlight.colour } : {}),
     ...(highlight.sourceCreatedAt !== undefined ? { sourceCreatedAt: highlight.sourceCreatedAt } : {}),
     imported: highlight.sourceCreatedAt !== undefined || link !== null || notes.some((note) => note.origin === "import"),
     importedVersion: link ? { edited: editedSinceImport, lastImportedAt: link.updatedAt } : null,

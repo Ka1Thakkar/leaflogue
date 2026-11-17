@@ -15,7 +15,7 @@ describe("SQLite migrations", () => {
     try {
       const library = new LocalLibrary(path);
       expect(statSync(path).mode & 0o777).toBe(0o600);
-      expect(library.schemaVersion).toBe(17);
+      expect(library.schemaVersion).toBe(latestSchemaVersion);
       const created = library.createBook({
         title: " Piranesi ",
         authors: ["Susanna Clarke"],
@@ -116,7 +116,7 @@ describe("SQLite migrations", () => {
   it("migrates collection and tag organisation while allowing synced name collisions", () => {
     const database = new DatabaseSync(":memory:", { enableForeignKeyConstraints: true });
     try {
-      expect(applyMigrations(database)).toBe(17);
+      expect(applyMigrations(database)).toBe(latestSchemaVersion);
       database.prepare(`INSERT INTO books
         (id, title, authors_json, status, archived, created_at, updated_at, revision)
         VALUES (?, ?, '[]', 'unread', 0, 1, 1, 1)`)
@@ -167,7 +167,7 @@ describe("SQLite migrations", () => {
       expect(database.prepare("SELECT max(sequence) AS sequence FROM sync_outbox").get()).toEqual({ sequence: 2 });
       database.prepare("DELETE FROM sync_outbox").run();
 
-      expect(applyMigrations(database)).toBe(17);
+      expect(applyMigrations(database)).toBe(latestSchemaVersion);
       database.prepare(`INSERT INTO collections
         (id, name, normalized_name, created_at, updated_at, revision)
         VALUES (?, 'Keepers', 'keepers', 3, 3, 1)`)
@@ -189,7 +189,7 @@ describe("SQLite migrations", () => {
           (singleton, device_id, remote_generation, remote_sequence, snapshot_required, updated_at)
         VALUES (1, 'device', 1, 42, 0, 1);
       `);
-      expect(applyMigrations(database)).toBe(17);
+      expect(applyMigrations(database)).toBe(latestSchemaVersion);
       expect(database.prepare(`SELECT remote_generation, remote_sequence, remote_checkpoint, snapshot_required
         FROM sync_state WHERE singleton = 1`).get()).toEqual({
         remote_generation: null,
@@ -482,7 +482,7 @@ describe("SQLite migrations", () => {
       database.close();
 
       const library = new LocalLibrary(path);
-      expect(library.schemaVersion).toBe(17);
+      expect(library.schemaVersion).toBe(latestSchemaVersion);
       library.importDocument({
         document: {
           formatVersion: 1,
@@ -529,7 +529,7 @@ describe("SQLite migrations", () => {
       database.close();
 
       const library = new LocalLibrary(path);
-      expect(library.schemaVersion).toBe(17);
+      expect(library.schemaVersion).toBe(latestSchemaVersion);
       expect(library.listImportSources("kobo")).toMatchObject([{
         id: sourceId,
         name: `Kobo library — ${sourceId.slice(0, 8)}`,
@@ -563,11 +563,11 @@ describe("SQLite migrations", () => {
       const inspection = new DatabaseSync(backupPath, { readOnly: true });
       expect(inspection.prepare("PRAGMA quick_check(1)").get()).toEqual({ quick_check: "ok" });
       expect(inspection.prepare("SELECT * FROM pragma_user_version(), pragma_application_id()").get())
-        .toEqual({ user_version: 17, application_id: 1279671367 });
+        .toEqual({ user_version: latestSchemaVersion, application_id: 1279671367 });
       inspection.close();
 
       const restored = new LocalLibrary(backupPath);
-      expect(restored.schemaVersion).toBe(17);
+      expect(restored.schemaVersion).toBe(latestSchemaVersion);
       expect(restored.getBookContents(book.id)?.book).toMatchObject({
         title: "The Left Hand of Darkness",
         authors: ["Ursula K. Le Guin"],
@@ -2967,7 +2967,7 @@ describe("thread synchronization", () => {
           VALUES ('50000000-0000-4000-8000-000000000000', '40000000-0000-4000-8000-000000000000', 1);
       `);
       const before = Number((database.prepare("SELECT count(*) AS count FROM sync_outbox").get() as { count: number }).count);
-      expect(applyMigrations(database)).toBe(17);
+      expect(applyMigrations(database)).toBe(latestSchemaVersion);
       const queued = database.prepare(
         "SELECT entity_type, entity_id, revision, operation FROM sync_outbox ORDER BY sequence",
       ).all().slice(before);
@@ -3133,4 +3133,62 @@ it("does not let retained tombstone rows reserve an ISBN after duplicate cleanup
     expect(inspection.prepare("SELECT count(*) count FROM sync_tombstones WHERE entity_type='book' AND entity_id=?").get(removed.id)).toMatchObject({ count: 1 });
     inspection.close();
   } finally { library.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+
+describe("shared highlight colours", () => {
+  it("retains import provenance and colour when an imported quotation is updated", () => {
+    const library = new LocalLibrary(":memory:");
+    const source = sourceProfile("portable:colour");
+    const document = { formatVersion: 1 as const, books: [{ providerRecordId: "book", title: "A book", authors: [] }],
+      annotations: [{ providerRecordId: "passage", bookProviderRecordId: "book", text: "Original", location: "Page 3" }] };
+    try {
+      const input = { document, source, fileName: "a.json", provider: "portable" as const, warnings: [] };
+      library.importDocument(input);
+      const book = library.listBooks()[0]!;
+      const highlight = library.getBookContents(book.id)!.highlights[0]!;
+      library.updateHighlight({ ...highlight, colour: "pink", expectedRevision: highlight.revision });
+      expect(library.getHighlightSource(book.id, highlight.id)).toMatchObject({ differs: false });
+      expect(library.importDocument({ ...input, document: { ...document, annotations: [{ ...document.annotations[0]!, text: "Revised original" }] } })).toMatchObject({ annotationsUpdated: 1, conflictsCreated: 0 });
+      expect(library.getBookContents(book.id)!.highlights[0]).toMatchObject({ text: "Revised original", colour: "pink" });
+    } finally { library.close(); }
+  });
+
+  it("persists semantic colours, keeps them during text edits, and rejects invalid values", () => {
+    const library = new LocalLibrary(":memory:");
+    try {
+      const book = library.createBook({ title: "Colour sync", authors: [] });
+      const highlight = library.createHighlight({ bookId: book.id, text: "A passage", colour: "green" });
+      expect(highlight.colour).toBe("green");
+      const edited = library.updateHighlight({ id: highlight.id, bookId: book.id, text: "An edited passage", expectedRevision: highlight.revision });
+      expect(edited.colour).toBe("green");
+      expect(library.listHighlights({}).entries.find((h) => h.id === highlight.id)?.colour).toBe("green");
+      expect(() => library.updateHighlight({ ...edited, colour: "url(evil)" as never, expectedRevision: edited.revision })).toThrow(/supported highlight colour/);
+      const reset = library.updateHighlight({ ...edited, colour: "yellow", expectedRevision: edited.revision });
+      expect(reset.colour).toBe("yellow");
+    } finally { library.close(); }
+  });
+  it("transfers colours in normal sync and preserves them when a legacy client omits the field", () => {
+    const first = new LocalLibrary(":memory:"), second = new LocalLibrary(":memory:");
+    try {
+      const book = first.createBook({ title: "A shared book", authors: [] });
+      const highlight = first.createHighlight({ bookId: book.id, text: "A shared passage", colour: "purple" });
+      second.bootstrapSync({ generation: 1, afterSequence: 0 });
+      let sequence = 0;
+      const changes = first.resolvePendingSyncChanges().changes;
+      for (const { change } of changes) second.applyIncomingSyncedChange({ change, sequence: sequence + 1, expectedCursor: { generation: 1, afterSequence: sequence }, nextCursor: { generation: 1, afterSequence: ++sequence } });
+      expect(second.getBookContents(book.id)!.highlights[0]!.colour).toBe("purple");
+      const item = changes.find(({ change }) => change.entityType === "highlight")!;
+      if (item.change.entityType !== "highlight" || item.change.operation !== "upsert") throw new Error("Missing highlight upsert");
+      const legacy = { ...item.change.highlight };
+      delete legacy.colour;
+      const incoming = { ...item.change, deviceRevision: item.change.deviceRevision + 10, highlight: { ...legacy, revision: highlight.revision + 10, text: "A legacy text edit" } };
+      second.applyIncomingSyncedChange({ change: incoming, sequence: sequence + 1, expectedCursor: { generation: 1, afterSequence: sequence }, nextCursor: { generation: 1, afterSequence: ++sequence } });
+      expect(second.getBookContents(book.id)!.highlights[0]).toMatchObject({ text: "A legacy text edit", colour: "purple" });
+      const current = second.getBookContents(book.id)!.highlights[0]!;
+      const next = second.updateHighlight({ ...current, colour: "blue", expectedRevision: current.revision });
+      expect(next.revision).toBeGreaterThan(incoming.deviceRevision);
+
+    } finally { first.close(); second.close(); }
+  });
 });

@@ -25,7 +25,7 @@ describe("Convex deployment status", () => {
     await expect(t.query(status, {})).resolves.toEqual({
       product: "leaflogue",
       schemaVersion: 17,
-      mutationContractVersion: 23,
+      mutationContractVersion: 24,
     });
   });
 });

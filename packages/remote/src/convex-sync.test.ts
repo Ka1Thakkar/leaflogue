@@ -13,6 +13,24 @@ function transport(fetch: typeof globalThis.fetch) {
 }
 
 describe("Convex sync transport", () => {
+  it("holds coloured passages for older backends instead of acknowledging lost data", async () => {
+    let requests = 0;
+    const older = new ConvexSyncTransport({
+      deploymentUrl: "https://example.convex.cloud", syncKey: SYNC_KEY, session: SESSION, mutationContractVersion: 23,
+      fetch: async () => { requests += 1; return Response.json({ status: "success", value: "applied", logLines: [] }); },
+    });
+    const change = {
+      entityType: "highlight", operation: "upsert", deviceId: SESSION.deviceId, deviceRevision: 1,
+      highlight: { id: "h", bookId: "b", text: "Passage", colour: "blue", createdAt: 1, updatedAt: 2, revision: 1 },
+      tagIds: [], threadIds: [],
+    } as unknown as SyncedChange;
+    expect(convexSyncedChange(change)).toMatchObject({ highlight: { colour: "blue" } });
+    const result = await older.submit([{ change, entries: [] }]);
+    expect(requests).toBe(0);
+    expect(result.operationIds).toEqual([]);
+    expect(result.failure).toMatchObject({ code: "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED" });
+  });
+
   it("projects local changes onto the exact provider shape", () => {
     const change = {
       entityType: "highlight", operation: "upsert", deviceId: SESSION.deviceId, deviceRevision: 3,

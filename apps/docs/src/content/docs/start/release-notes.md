@@ -37,6 +37,19 @@ first version is read-only. Source and packaged-client automation passed on Mac,
 the Linux ARM64 package also passed native ARM64 container checks. Read the [agent setup guide](/ai/mcp/). A connected cloud agent may receive the
 passages returned to it; local operation does not keep those responses on-device.
 
+## Next beta: shared highlight colours
+
+The next candidate includes [per-highlight colours](/library/epub/#highlight-colours-next-beta)
+shared by desktop, Libredex, and the self-hosted web app. Five colour names
+adapt to each device’s theme. Existing local choices migrate automatically;
+shared values take precedence. SQLite backups and JSON exports retain them.
+Colour-only changes keep imported passages attached to their source.
+
+This candidate uses SQLite schema **18**, PostgreSQL schema **14**, and Convex
+schema **17**, mutation contract **24**. Update desktop clients before the
+backend. Colour updates remain queued against a contract-23 backend. The
+public download below remains beta.4 until the new candidate is published.
+
 ## New in 0.1.1-beta.4
 
 This release adds:

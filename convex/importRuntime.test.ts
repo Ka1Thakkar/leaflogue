@@ -78,6 +78,17 @@ describe("import in a web client", () => {
     expect([...types].sort()).toEqual(["book", "highlight", "note"]);
   });
 
+  it("retains imported provenance when only a shared colour changes", async () => {
+    const { owner, libraryId, run, bookId, passages } = await setup();
+    await run([passage]);
+    const [highlight] = await passages();
+    await owner.mutation(updateHighlight, { libraryId, id: highlight!.id, bookId: await bookId(), text: passage.text,
+      sourceLocation: passage.location, expectedRevision: highlight!.revision, colour: "pink" });
+    expect(await owner.query(importedVersion, { libraryId, highlightId: highlight!.id })).toMatchObject({ edited: false });
+    expect(await run([{ ...passage, text: "An updated original." }])).toMatchObject({ annotationsUpdated: 1, conflictsCreated: 0 });
+    expect(await passages()).toMatchObject([{ text: "An updated original.", colour: "pink" }]);
+  });
+
   it("skips what is unchanged and updates what the reader has not touched", async () => {
     const { run, passages } = await setup();
     await run([passage]);

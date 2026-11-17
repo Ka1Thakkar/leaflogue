@@ -95,9 +95,33 @@ function organization(library: LocalLibrary) {
 }
 
 describe("two-device sync convergence through Convex", () => {
+  it("queues colours until the backend upgrades, then syncs changes between installations", async () => {
+    const deployment: { contract?: number } = { contract: 23 };
+    const first = await device("colour-first", SYNC_KEY, deployment);
+    const second = await device("colour-second");
+    const book = first.library.createBook({ title: "Shared colours" });
+    const highlight = first.library.createHighlight({ bookId: book.id, text: "A shared line" });
+    await first.sync();
+    let edited = highlight;
+    for (const colour of ["pink", "purple", "green"] as const) {
+      edited = first.library.updateHighlight({ ...edited, colour, expectedRevision: edited.revision });
+    }
+    expect(await first.run()).toMatchObject({ status: "failed", problem: { kind: "schema" } });
+    expect(first.library.listPendingSyncChanges().length).toBeGreaterThan(0);
+    delete deployment.contract;
+    await first.sync(); await second.sync();
+    const onSecond = second.library.getBookContents(book.id)!.highlights[0]!;
+    expect(onSecond.colour).toBe("green");
+    second.library.updateHighlight({ ...onSecond, colour: "blue", expectedRevision: onSecond.revision });
+    await second.sync(); await first.sync();
+    expect(first.library.getBookContents(book.id)!.highlights[0]!.colour).toBe("blue");
+    expect(first.library.listPendingSyncChanges()).toEqual([]);
+    expect(second.library.listPendingSyncChanges()).toEqual([]);
+  });
+
   it("brings a second installation up to date, including organization, and keeps device identities", async () => {
     await expect(assertCompatibleConvexDeployment(DEPLOYMENT, { fetch: convexFetch(() => backend) }))
-      .resolves.toEqual({ mutationContractVersion: 23 });
+      .resolves.toEqual({ mutationContractVersion: 24 });
     const first = await device("first");
     const second = await device("second");
     const book = first.library.createBook({ title: "Piranesi" });

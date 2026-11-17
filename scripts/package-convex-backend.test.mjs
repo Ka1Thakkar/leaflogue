@@ -22,7 +22,7 @@ test("builds a deterministic, self-contained Convex deployment bundle", () => {
       format: "leaflogue-convex-backend",
       version: "1.2.3-test.1",
       schemaVersion: 17,
-      mutationContractVersion: 23,
+      mutationContractVersion: 24,
       node: ">=22.22.2",
       convex: "1.45.0",
     });

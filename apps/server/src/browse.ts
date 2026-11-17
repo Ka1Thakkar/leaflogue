@@ -1,3 +1,4 @@
+import { importedHighlightDiffers } from "@leaflogue/domain";
 import type { PostgresClient } from "@leaflogue/remote";
 import { isUuid } from "./context";
 import { ServerError } from "./errors";
@@ -93,12 +94,14 @@ interface PassageRow extends Record<string, unknown> {
   authors: unknown;
   text: string;
   source_location: string | null;
+  colour: import("@leaflogue/contracts").HighlightColour | null;
   source_created_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
   revision: string | number;
   link_updated_at: Date | string | null;
   link_highlight_revision: string | number | null;
+  link_incoming: string | null;
   link_attached_note_id: string | null;
   link_attached_note_revision: string | number | null;
   has_import_note: boolean;
@@ -109,16 +112,16 @@ const PASSAGE_FROM = `
   FROM leaflogue.highlights AS h
   JOIN leaflogue.books AS b ON b.library_id = h.library_id AND b.id = h.book_id AND b.deleted_at IS NULL AND b.archived = false
   LEFT JOIN LATERAL (
-    SELECT links.updated_at, links.highlight_revision, links.attached_note_id, links.attached_note_revision
+    SELECT links.incoming, links.updated_at, links.highlight_revision, links.attached_note_id, links.attached_note_revision
     FROM leaflogue_web.import_source_annotations AS links
     WHERE links.library_id = h.library_id AND links.highlight_id = h.id
     ORDER BY links.updated_at DESC LIMIT 1
   ) AS link ON true
 `;
 const PASSAGE_COLUMNS = `
-  h.id::text AS id, h.book_id::text AS book_id, b.title, b.authors, h.text, h.source_location,
+  h.id::text AS id, h.book_id::text AS book_id, b.title, b.authors, h.text, h.colour, h.source_location,
   h.source_created_at, h.created_at, h.updated_at, h.revision,
-  link.updated_at AS link_updated_at, link.highlight_revision AS link_highlight_revision,
+  link.incoming AS link_incoming, link.updated_at AS link_updated_at, link.highlight_revision AS link_highlight_revision,
   link.attached_note_id::text AS link_attached_note_id, link.attached_note_revision AS link_attached_note_revision,
   EXISTS (SELECT 1 FROM leaflogue.notes AS n WHERE n.library_id = h.library_id AND n.highlight_id = h.id
     AND n.deleted_at IS NULL AND n.origin = 'import') AS has_import_note
@@ -147,7 +150,7 @@ async function passageViews(client: PostgresClient, libraryId: string, rows: Pas
     }));
     const linked = row.link_updated_at !== null;
     const attached = row.link_attached_note_id ? own.find((note) => note.id === row.link_attached_note_id) : undefined;
-    const edited = linked && (Number(row.revision) !== Number(row.link_highlight_revision) ||
+    const edited = linked && (importedHighlightDiffers({ text: row.text, ...(row.source_location ? { sourceLocation: row.source_location } : {}) }, JSON.parse(row.link_incoming!) as { text?: string; location?: string }) ||
       (attached !== undefined && attached.revision !== Number(row.link_attached_note_revision)));
     return {
       id: row.id,
@@ -156,6 +159,7 @@ async function passageViews(client: PostgresClient, libraryId: string, rows: Pas
       bookAuthors: json<string[]>(row.authors),
       text: row.text,
       ...(row.source_location !== null ? { sourceLocation: row.source_location } : {}),
+      ...(row.colour ? { colour: row.colour } : {}),
       ...(row.source_created_at !== null ? { sourceCreatedAt: ms(row.source_created_at) } : {}),
       imported: row.source_created_at !== null || linked || row.has_import_note,
       importedVersion: linked ? { edited, lastImportedAt: ms(row.link_updated_at) } : null,
