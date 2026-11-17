@@ -45,9 +45,9 @@ adapt to each device’s theme. Existing local choices migrate automatically;
 shared values take precedence. SQLite backups and JSON exports retain them.
 Colour-only changes keep imported passages attached to their source.
 
-This candidate uses SQLite schema **18**, PostgreSQL schema **14**, and Convex
+This candidate uses SQLite schema **19**, PostgreSQL schema **14**, and Convex
 schema **17**, mutation contract **24**. Update desktop clients before the
-backend. Colour updates remain queued against a contract-23 backend. The
+backend. Colour choices wait in a durable local queue against a contract-23 backend while ordinary data continues syncing. The
 public download below remains beta.4 until the new candidate is published.
 
 ## New in 0.1.1-beta.4

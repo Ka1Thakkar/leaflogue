@@ -27,6 +27,8 @@ export interface ConvexSyncOptions {
   readonly syncKey: string;
   /** The deployment's accepted contract; defaults to the newest this desktop speaks. */
   readonly mutationContractVersion?: number;
+  /** Only set after LocalLibrary durably journals unsupported colour intent. */
+  readonly colourCompatibilityPrepared?: boolean;
   readonly fetch?: typeof globalThis.fetch;
   readonly timeoutMs?: number;
 }
@@ -145,8 +147,10 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
   readonly #deviceId: string;
   readonly #threadsSupported: boolean;
   readonly #coloursSupported: boolean;
+  readonly #colourCompatibilityPrepared: boolean;
 
   constructor(options: ConvexSyncOptions & { readonly session: ConvexSyncSession }) {
+    this.#colourCompatibilityPrepared = options.colourCompatibilityPrepared === true;
     this.#connection = new ConvexConnection(options);
     this.#session = { libraryId: options.session.libraryId, syncKey: options.syncKey };
     this.#deviceId = options.session.deviceId;
@@ -172,11 +176,14 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
           (change.entityType === "book" && change.operation === "upsert" && (change.statusEvents?.length ?? 0) > 0))) {
         return { operationIds, failure: codedError("Update the Convex deployment to sync threads, passages, reading history, and daily picks", "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED") };
       }
-      if (!this.#coloursSupported && change.entityType === "highlight" && change.operation === "upsert" && change.highlight.colour !== undefined) {
+      if (!this.#coloursSupported && !this.#colourCompatibilityPrepared && change.entityType === "highlight" && change.operation === "upsert" && change.highlight.colour !== undefined) {
         return { operationIds, failure: codedError("Update the Convex deployment to sync highlight colours", "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED") };
       }
       try {
         const payload = convexSyncedChange(change);
+        if (!this.#coloursSupported && this.#colourCompatibilityPrepared && payload.highlight && typeof payload.highlight === "object") {
+          delete (payload.highlight as Record<string, unknown>).colour;
+        }
         // A contract-22 backend has no history field; only an empty one reaches here.
         if (!this.#threadsSupported) delete payload.statusEvents;
         const outcome = await this.#connection.call(signal, (client) => client.mutation(pushReference, {

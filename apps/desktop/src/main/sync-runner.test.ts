@@ -258,7 +258,7 @@ describe("main-process sync runner", () => {
     expect(describeSyncProblem("push", { code: "40001" }).kind).toBe("busy");
     expect(describeSyncProblem("connect", { code: "LEAFLOGUE_CONVEX_VERSION_UNSUPPORTED", message: "secret" }))
       .toEqual({ phase: "connect", kind: "schema",
-        message: "The Convex backend version is unsupported. Check connection in Settings for upgrade steps." });
+        message: "Your backend needs an update. Open Settings for the installed versions and upgrade instructions. Queued edits remain on this device." });
     expect(describeSyncProblem("push", new Error("Synced note's book or highlight no longer exists")))
       .toEqual({ phase: "push", kind: "stopped", message: "Synchronization stopped before finishing. Unsent changes remain queued." });
   });

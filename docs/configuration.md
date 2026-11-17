@@ -597,8 +597,7 @@ the desktop sync key to deploy. This desktop accepts Convex schema 17 with
 mutation contracts 22–24. Contract 23 adds thread sync and contract 24 adds
 shared highlight colours. **Update every desktop first, then the deployment**:
 previous desktops accept contracts only up to 23 and refuse contract 24 until
-updated. Against contract 23, coloured passage updates stay queued until the
-backend is upgraded. Against a contract-22 deployment this desktop sends its queued
+updated. Against contract 23, ordinary data continues syncing while unsupported colours are retained in a durable local queue until the backend is upgraded. Against a contract-22 deployment this desktop sends its queued
 changes in order until it reaches one that deployment cannot store (a thread,
 a new or edited passage, a book with reading history, or a daily pick). It
 stops there with "Update the Convex deployment…" in Settings, and that change

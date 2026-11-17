@@ -211,7 +211,16 @@ export function describeSyncProblem(phase: SyncProblem["phase"], error: unknown)
     return { phase, kind: "schema", message: "Update the Convex deployment to this Leaflogue release to sync threads, passages, reading history, and daily picks. Earlier changes were sent; the rest wait on this device, and nothing is lost." };
   }
   else if (code === "LEAFLOGUE_CONVEX_VERSION_UNSUPPORTED") {
-    return { phase, kind: "schema", message: "The Convex backend version is unsupported. Check connection in Settings for upgrade steps." };
+    const detail = error && typeof error === "object" && "backendUpdate" in error ? error.backendUpdate : undefined;
+    const backendUpdate = detail && typeof detail === "object" && "requiredContract" in detail && detail.requiredContract === 24 &&
+      "requiredSchema" in detail && detail.requiredSchema === 17 &&
+      "installedContract" in detail && Number.isSafeInteger(detail.installedContract) &&
+      "installedSchema" in detail && Number.isSafeInteger(detail.installedSchema)
+      ? { requiredContract: 24, requiredSchema: 17, installedContract: Number(detail.installedContract), installedSchema: Number(detail.installedSchema),
+          updateDesktop: Number(detail.installedContract) > 24 || Number(detail.installedSchema) > 17 } : undefined;
+    return { phase, kind: "schema", ...(backendUpdate ? { backendUpdate } : {}), message: backendUpdate?.updateDesktop
+      ? "Your desktop app needs an update. The backend is newer than this app supports. Queued edits remain on this device."
+      : "Your backend needs an update. Open Settings for the installed versions and upgrade instructions. Queued edits remain on this device." };
   }
   else if (code === "LEAFLOGUE_SYNC_KEY_UNCONFIGURED") kind = "configuration";
   else if (code === "LEAFLOGUE_SYNC_KEY_INVALID") kind = "credentials";

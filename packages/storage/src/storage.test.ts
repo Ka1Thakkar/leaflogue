@@ -3137,6 +3137,28 @@ it("does not let retained tombstone rows reserve an ISBN after duplicate cleanup
 
 
 describe("shared highlight colours", () => {
+  it("retains deferred colours across restart and atomically re-enqueues them after upgrade", () => {
+    const directory = mkdtempSync(join(tmpdir(), "leaflogue-deferred-colour-"));
+    const file = join(directory, "library.sqlite");
+    let library = new LocalLibrary(file);
+    try {
+      const book = library.createBook({ title: "Transition" });
+      const highlight = library.createHighlight({ bookId: book.id, text: "A line", colour: "purple" });
+      expect(library.prepareHighlightColourSync(23)).toBe(1);
+      const pending = library.listPendingSyncChanges(100);
+      library.acknowledgeSyncChanges(pending, { operationIds: pending.map((entry) => `${entry.deviceId}:${entry.sequence}`) });
+      library.close(); library = new LocalLibrary(file);
+      expect(library.prepareHighlightColourSync(23)).toBe(1);
+      const before = library.getBookContents(book.id)!.highlights[0]!;
+      expect(library.prepareHighlightColourSync(24)).toBe(0);
+      const replay = library.getBookContents(book.id)!.highlights[0]!;
+      expect(replay).toMatchObject({ id: highlight.id, colour: "purple", revision: before.revision + 1 });
+      expect(library.countPendingSyncChanges()).toBeGreaterThan(0);
+      library.prepareHighlightColourSync(24);
+      expect(library.getBookContents(book.id)!.highlights[0]!.revision).toBe(replay.revision);
+    } finally { library.close(); rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it("retains import provenance and colour when an imported quotation is updated", () => {
     const library = new LocalLibrary(":memory:");
     const source = sourceProfile("portable:colour");
