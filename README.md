@@ -70,7 +70,7 @@ in [`tests/marketing`](tests/marketing/README.md); dictionary credits are in
 
 ## Get Leaflogue
 
-**[0.1.1-beta.4 is available as an experimental beta](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.4).**
+**[0.1.1-beta.6 is available as an experimental beta](https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.1.1-beta.6).**
 Automated checks and signed update-feed validation pass. Clean-desktop
 installation, manual updates/uninstall,
 and actual Orca, VoiceOver, and Narrator acceptance are still pending.
@@ -115,9 +115,10 @@ Deployment variables are documented in
 
 ## Reader beta and next steps
 
-**0.1.1-beta.4** adds a paged local EPUB reader, a right context sidebar,
-read-only Calibre linking with EPUB/KEPUB choice and no duplicate files, shared library
-highlights and notes, and navigation between a passage and its EPUB context.
+**0.1.1-beta.6** includes paged local EPUB and PDF reading, a right context sidebar,
+read-only Calibre linking with EPUB/KEPUB/PDF choice and no duplicate files, shared library
+highlights and notes, and navigation between a passage and its reader context.
+Per-highlight colours sync across desktop and web clients and adapt to each theme.
 Add book searches Google Books as you type, with Open Library fallback.
 Desktop imports review existing books after sync, and Settings shows live sync
 phases, transfer counts, and queued edits.
@@ -126,7 +127,8 @@ See the [reader guide](https://leaflogue-docs.vercel.app/library/epub/) and
 
 Book files, links, and reading positions remain local and are excluded from
 SQLite backups and library exports. File sync and cross-device progress,
-PDFs, bookmarks, book search, and richer match review remain follow-ups.
+and browser book-file reading remain follow-ups. Book search, local bookmarks,
+reviewed ambiguous matches and per-highlight theme-adapted colours are included.
 The opt-in read-only MCP server remains available; see the
 [agent setup guide](apps/docs/src/content/docs/ai/mcp.md).
 

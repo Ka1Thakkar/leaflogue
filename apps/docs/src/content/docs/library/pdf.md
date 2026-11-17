@@ -3,10 +3,7 @@ title: Read local PDFs
 description: Read PDF pages and share selectable-text highlights with your library.
 ---
 
-:::note[Next beta]
-PDF support is in development after 0.1.1-beta.4. It is not in the published
-beta.4 downloads.
-:::
+PDF reading is included in **0.1.1-beta.6**. See the [release notes](/start/release-notes/) for downloads and limits.
 
 ## Link one file
 
@@ -35,7 +32,7 @@ Select text and choose **Highlight** or **Add note** to save it. Selecting
 alone does not create a highlight. Reader highlights and the book page use
 the same records: notes, removal and normal library sync continue to work.
 Click an existing reader highlight to open its actions, choose a
-[theme-adapted colour](/library/epub/#highlight-colours-next-beta), or return to
+[theme-adapted colour](/library/epub/#highlight-colours), or return to
 the book page. **Read in context** opens a matched passage in its PDF page.
 
 When an existing highlight's text is unique in the linked edition, it can

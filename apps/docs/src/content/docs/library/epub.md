@@ -3,14 +3,14 @@ title: Read an EPUB
 description: Link a local EPUB, turn pages, and keep highlights and notes beside your book.
 ---
 
-The EPUB reader is included in the experimental **0.1.1-beta.4** desktop
+The EPUB reader is included in the experimental **0.1.1-beta.6** desktop
 release. See the [release notes](/start/release-notes/) for downloads and
 known limitations.
 
 ## Link your book file
 
 In the desktop app, open a book and choose **Read**. In the right-hand
-**Reader** tab, choose **Attach EPUB** (**Attach book file** in the next beta) and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
+**Reader** tab, choose **Attach book file** and select a DRM-free, reflowable EPUB or Kobo KEPUB file (`.epub`, `.kepub`, or
 `.kepub.epub`).
 Leaflogue links the original file; it does not make another copy. Keep that
 file available where you attached it. If Calibre manages your books, use
@@ -83,13 +83,13 @@ The reader preserves supported publisher formatting, images, and fonts while
 blocking scripts and external resources. IDPF and Adobe font obfuscation is
 restored locally when the book identifier permits it; otherwise the reader
 uses fallback fonts. Adobe page templates are ignored. DRM, fixed-layout
-fidelity, audio/video, PDFs, and book-file sync are not supported
-in this version. EPUBs must be no larger than 50 MB; malformed or oversized
+fidelity, audio/video, and book-file sync are not supported
+in this version. For PDFs, use the [PDF reader](/library/pdf/). EPUBs must be no larger than 50 MB; malformed or oversized
 resources may also be rejected.
 
-## Search and bookmarks (next beta)
+## Search and bookmarks
 
-In the next beta, open reader options with right-click or **Shift+F10**.
+Open reader options with right-click or **Shift+F10**.
 Expand **Search this book**, type literal text, and choose a result to open
 its location. Search ignores case and shows up to 100 matches; narrow the
 query to find more. Results do not create saved highlights.
@@ -99,7 +99,7 @@ entry to return or **Remove** to delete it. Bookmarks belong to the exact
 linked edition, stay on this device, and are removed when the file is
 unlinked. They are not included in library sync, SQLite backups, or exports.
 
-## Explain a passage (next beta)
+## Explain a passage
 
 With optional AI enabled and a provider configured in Settings, click a saved
 highlight and choose **Explain this passage**. For a new selection, choose
@@ -111,7 +111,7 @@ Selecting text alone does not save or send it. Previously accepted providers
 can answer immediately after you explicitly choose Explain. Saved highlights
 and notes use normal library sync; the book file stays local.
 
-## Review highlight locations (next beta)
+## Review highlight locations
 
 Reader options includes **Review highlight locations**. Choose a saved passage
 to see exact-text candidates, allowing whitespace and quotation-mark differences.
@@ -129,7 +129,7 @@ Use Tab and Shift+Tab within reader options; Escape closes options and returns
 focus to the reader. These keyboard checks do not replace actual screen-reader
 acceptance, which remains pending.
 
-## Highlight colours (next beta)
+## Highlight colours
 
 Each highlight has a colour: yellow by default, with green, blue, pink and
 purple alternatives. Choose a swatch in the highlight’s actions on the book page
