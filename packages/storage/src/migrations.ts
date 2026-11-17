@@ -988,6 +988,13 @@ export const migrations: readonly Migration[] = [
     version: 18,
     sql: `ALTER TABLE highlights ADD COLUMN colour TEXT CHECK (colour IS NULL OR colour IN ('yellow','green','blue','pink','purple'));`,
   },
+  {
+    version: 19,
+    sql: `CREATE TABLE sync_deferred_colours (
+      highlight_id TEXT PRIMARY KEY REFERENCES highlights(id) ON DELETE CASCADE,
+      colour TEXT NOT NULL CHECK (colour IN ('yellow','green','blue','pink','purple'))
+    );`,
+  },
 ];
 
 export const latestSchemaVersion = migrations.at(-1)?.version ?? 0;

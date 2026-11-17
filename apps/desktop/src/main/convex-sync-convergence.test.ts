@@ -40,19 +40,22 @@ afterEach(() => {
 });
 
 /** `deployment.contract` stands in for the version an older deployment reports at preflight. */
-async function device(name: string, syncKey = SYNC_KEY, deployment: { contract?: number } = {}) {
+async function device(name: string, syncKey = SYNC_KEY, deployment: { contract?: number; transition?: boolean } = {}) {
   const library = new LocalLibrary(join(directory, `${name}.sqlite`));
   opened.push(library);
   const options = { deploymentUrl: DEPLOYMENT, syncKey, fetch: convexFetch(() => backend) };
   const { deviceId } = library.getSyncState();
   // Every device resolves the same one library through the key.
   await expect(ensureConvexLibrary(options)).resolves.toBe(libraryId);
-  const runner = () => createSyncRunner({
+  const runner = () => {
+    if (deployment.transition) library.prepareHighlightColourSync(deployment.contract ?? 24);
+    return createSyncRunner({
     ledger: library,
     transport: new ConvexSyncTransport({
-      ...options, session: { libraryId, deviceId }, mutationContractVersion: deployment.contract,
+      ...options, session: { libraryId, deviceId }, mutationContractVersion: deployment.contract, colourCompatibilityPrepared: deployment.transition && (deployment.contract ?? 24) >= 23,
     }),
   });
+  };
   return {
     library,
     run: () => runner().run(),
@@ -95,6 +98,32 @@ function organization(library: LocalLibrary) {
 }
 
 describe("two-device sync convergence through Convex", () => {
+  it("continues ordinary sync on contract 23 and replays retained colours after upgrade", async () => {
+    const deployment = { contract: 23, transition: true };
+    const first = await device("transition-first", SYNC_KEY, deployment);
+    const second = await device("transition-second", SYNC_KEY, deployment);
+    const book = first.library.createBook({ title: "Transition" });
+    const highlight = first.library.createHighlight({ bookId: book.id, text: "Ordinary data", colour: "green" });
+    await first.sync(); await second.sync();
+    expect(first.library.countPendingSyncChanges()).toBe(0);
+    expect(first.library.prepareHighlightColourSync(23)).toBe(1);
+    const remote = second.library.getBookContents(book.id)!.highlights[0]!;
+    expect(remote.text).toBe("Ordinary data"); expect(remote.colour).toBeUndefined();
+    second.library.createNote({ bookId: book.id, highlightId: remote.id, markdown: "A note from the other device" });
+    await second.sync(); await first.sync();
+    expect(first.library.getBookContents(book.id)!.highlights[0]).toMatchObject({ colour: "green", notes: [{ markdown: "A note from the other device" }] });
+    const edited = first.library.getBookContents(book.id)!.highlights[0]!;
+    first.library.updateHighlight({ ...edited, text: "A text edit during the transition", colour: "blue", expectedRevision: edited.revision });
+    await first.sync(); await second.sync();
+    expect(second.library.getBookContents(book.id)!.highlights[0]).toMatchObject({ text: "A text edit during the transition" });
+    deployment.contract = 24;
+    await first.sync(); await second.sync();
+    expect(second.library.getBookContents(book.id)!.highlights[0]).toMatchObject({ colour: "blue", text: "A text edit during the transition" });
+    expect(first.library.prepareHighlightColourSync(24)).toBe(0);
+    expect(first.library.countPendingSyncChanges()).toBe(0);
+    expect(first.library.getBookContents(book.id)!.highlights[0]!.id).toBe(highlight.id);
+  });
+
   it("queues colours until the backend upgrades, then syncs changes between installations", async () => {
     const deployment: { contract?: number } = { contract: 23 };
     const first = await device("colour-first", SYNC_KEY, deployment);

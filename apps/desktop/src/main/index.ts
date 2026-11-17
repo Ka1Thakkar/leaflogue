@@ -282,9 +282,11 @@ const syncService = createDesktopSyncService({
     const migration = await prepareConvexLibrary(options, libraryId, {
       ...(runOptions.confirmDetachNoteId ? { confirmDetachNoteId: runOptions.confirmDetachNoteId } : {}),
     }, signal);
+    const deferredColours = library!.prepareHighlightColourSync(mutationContractVersion);
     return {
       migration,
-      transport: new ConvexSyncTransport({ ...options, session: { libraryId, deviceId } }),
+      ...(mutationContractVersion < 24 ? { backendUpdate: { installedContract: mutationContractVersion, installedSchema: 17, requiredContract: 24, requiredSchema: 17, deferredColours } } : {}),
+      transport: new ConvexSyncTransport({ ...options, colourCompatibilityPrepared: mutationContractVersion >= 23, session: { libraryId, deviceId } }),
     };
   },
 });

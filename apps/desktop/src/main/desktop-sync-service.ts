@@ -35,6 +35,7 @@ export function createDesktopSyncService(options: {
   ) => Promise<{
     readonly transport: SyncTransport & SyncChangeSource & SyncBootstrapSource;
     readonly migration: ConvexMigrationPreparation;
+    readonly backendUpdate?: import("@leaflogue/contracts").SyncBackendUpdate;
   }>;
 }): DesktopSyncService {
   let inFlight: Promise<SyncRunResult> | undefined;
@@ -138,7 +139,7 @@ export function createDesktopSyncService(options: {
     }
     runner = createSyncRunner({ ledger: library, transport: prepared.transport, onProgress: report });
     try {
-      const result = await runUntilSettled(runner);
+      const result = { ...await runUntilSettled(runner), ...(prepared.backendUpdate ? { backendUpdate: prepared.backendUpdate } : {}) };
       return prepared.migration.updated > 0 || prepared.migration.detached > 0
         ? { ...result, migration: prepared.migration }
         : result;

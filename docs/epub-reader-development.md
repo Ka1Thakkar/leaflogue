@@ -189,7 +189,7 @@ retain page-based navigation rather than a continuous document scroll.
 
 ## Next-beta highlight display colours
 
-Five semantic colours are saved on highlight records (SQLite schema 18,
+Five semantic colours are saved on highlight records (SQLite schema 19,
 PostgreSQL schema 14, Convex schema 17 / mutation contract 24). Yellow is the
 default. Reader markings, passage dates and hover bars share the choice; all
 five hues adapt to the active theme. SQLite backups and JSON exports retain
@@ -199,5 +199,4 @@ Legacy renderer preferences migrate on opening the updated app. Shared colours
 win over stale local choices; failed writes keep the local preference for retry.
 Colour-only changes retain import provenance. Older clients omitting the colour
 field preserve the stored value; choosing yellow saves an explicit value so it
-also overrides stale preferences. A contract-23 backend holds coloured passage
-updates unacknowledged until upgraded. Update desktop clients before the backend.
+also overrides stale preferences. With a contract-23 backend, ordinary data syncs while a separate durable local queue retains colours until upgraded. Update desktop clients before the backend.

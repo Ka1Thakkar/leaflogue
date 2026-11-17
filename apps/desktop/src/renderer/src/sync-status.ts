@@ -32,6 +32,8 @@ export function describeSyncStatus(status: SyncStatus): { readonly label: string
   const result = status.lastResult;
   if (!result) return { label: "Ready to sync", tone: "ready", detail: "Not synced since Leaflogue opened." };
   const detail = describeSyncResult(result);
+  if (result.status === "complete" && result.backendUpdate) return { label: "Backend update available", tone: "attention", detail };
+  if (result.status === "failed" && result.problem.backendUpdate) return { label: result.problem.backendUpdate.updateDesktop ? "App update needed" : "Backend update needed", tone: "attention", detail };
   if (result.status === "complete") {
     const at = status.lastFinishedAt === undefined ? "" : ` at ${new Date(status.lastFinishedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
     return { label: "Synced", tone: "synced", detail: `Last synced${at}. ${detail}` };
@@ -50,7 +52,8 @@ export function describeSyncResult(result: SyncRunResult): string {
     const migration = result.migration && (result.migration.updated > 0 || result.migration.detached > 0)
       ? ` Remote setup updated ${result.migration.updated} legacy records${result.migration.detached > 0 ? ` and preserved ${result.migration.detached} as standalone notes` : ""}.`
       : "";
-    return `Sync complete. ${result.pushed} sent, ${result.pulled} received, ${result.superseded} already current.${migration}`;
+    const compatibility = result.backendUpdate ? ` Ordinary library data synced. ${result.backendUpdate.deferredColours ?? 0} highlight colour choices remain saved locally until the backend is updated.` : "";
+    return `Sync complete. ${result.pushed} sent, ${result.pulled} received, ${result.superseded} already current.${migration}${compatibility}`;
   }
   if (result.status === "incomplete") return "Sync paused at its safety limit. Run it again to continue.";
   if (result.status === "unsupported-change") return "Sync stopped before data this version cannot apply. Update Leaflogue and try again.";

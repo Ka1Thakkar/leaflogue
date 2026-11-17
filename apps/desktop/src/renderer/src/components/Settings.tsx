@@ -583,6 +583,8 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
   const [location, setLocation] = useState<"default" | "choose">("default");
   const [message, setMessage] = useState("");
   const [syncKey, setSyncKey] = useState("");
+  const [desktopVersion, setDesktopVersion] = useState("");
+  useEffect(() => { void window.leaflogue.system.getCapabilities().then((next) => setDesktopVersion(next.appVersion)).catch(() => undefined); }, []);
   const syncStatus = useSyncStatus();
   const syncing = syncStatus?.state === "syncing";
   const progress = syncStatus?.progress ? describeSyncProgress(syncStatus.progress) : undefined;
@@ -598,6 +600,10 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
     return () => onDirtyChange(false);
   }, [config, onDirtyChange, provider, syncKey, value]);
   const convexSaved = savedProviderSelected && provider === "convex";
+  const syncResult = syncStatus?.lastResult;
+  const backendUpdate = (syncResult?.status === "failed" ? syncResult.problem.backendUpdate : undefined) ?? syncResult?.backendUpdate ?? status?.backendUpdate ??
+    (status?.mutationContractVersion !== undefined && status.mutationContractVersion < 24 ? { installedContract: status.mutationContractVersion, installedSchema: status.schemaVersion, requiredContract: 24, requiredSchema: 17, updateDesktop: false } : undefined);
+  const safeVersion = /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/u.test(desktopVersion) ? desktopVersion : "VERSION";
   const keyNeeded = provider === "convex" && !(config?.provider === "convex" && config.syncKeySaved);
   const failed = (problem: string): RemoteDatabaseStatus => ({ ...config, configured: config?.configured ?? false, reachable: false, initialized: false, problem });
   return (
@@ -612,6 +618,21 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
         {syncing && <progress aria-label="Sync progress" />}
         <p role="status">{syncing ? progress?.counts ?? "Waiting for the sync provider…" : describeSyncStatus(syncStatus).detail}</p>
         {syncing && <small className="ll-muted">The remote total is not known yet; received changes update as each batch finishes.</small>}
+      </section>}
+      {config?.provider === "convex" && backendUpdate && <section className={styles.syncProgress} aria-label="Backend upgrade guidance">
+        <h3>{backendUpdate.updateDesktop ? "Your desktop app needs an update" : "Your backend needs an update"}</h3>
+        <p>Installed backend: schema {backendUpdate.installedSchema ?? "unknown"}, contract {backendUpdate.installedContract ?? "unknown"}. This app supports schema {backendUpdate.requiredSchema}, contracts 22–24; shared highlight colours need contract {backendUpdate.requiredContract}.</p>
+        <p>Your local database upgrades automatically when the desktop app opens. Convex is a separate upgrade, performed once by the deployment owner. Queued edits and deferred colour choices remain saved on this device.</p>
+        {backendUpdate.updateDesktop ? <p>Install a desktop version that supports this newer backend before syncing.</p> : <>
+          <p>Using someone else’s hosted backend? Ask its administrator to upgrade. If you own the deployment:</p>
+          <ol><li>Download <code>Leaflogue-Convex-{safeVersion}.tar.gz</code> and its checksum from the matching release and verify them.</li>
+          <li>Extract the bundle and select your existing Convex project.</li>
+          <li>For production, sign in with the Convex CLI and run <code>CONVEX_DEPLOYMENT=prod:YOUR_PRODUCTION_DEPLOYMENT ./leaflogue-convex-{safeVersion}/deploy.sh --production</code>. For development omit <code>--production</code>.</li>
+          <li>Choose Check connection, then Sync now. Do not create a replacement project or reset your library.</li></ol>
+        </>}
+        <p>Contract 23 can sync ordinary library data while colour choices wait locally for contract 24. Older, incompatible backends may require an upgrade before any sync is safe.</p>
+        <button className="ll-button-secondary" onClick={() => { void window.leaflogue.system.openExternal("https://leaflogue-docs.vercel.app/sync/convex/#upgrading-an-existing-deployment"); }}>Upgrade instructions</button>
+        <button className="ll-button-secondary" onClick={() => { void window.leaflogue.system.openExternal(backendUpdate.updateDesktop ? RELEASES_URL : `${RELEASES_URL}/tag/v${safeVersion}`); }}>{backendUpdate.updateDesktop ? "Desktop releases" : "Matching release"}</button>
       </section>}
       {config === undefined ? (
         <Loading>Reading configuration…</Loading>

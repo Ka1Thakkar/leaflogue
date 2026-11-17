@@ -1559,11 +1559,23 @@ export interface RemoteDatabaseStatus extends RemoteConfigurationSummary {
   readonly reachable: boolean;
   readonly initialized: boolean;
   readonly schemaVersion?: number;
+  readonly mutationContractVersion?: number;
+  readonly backendUpdate?: SyncBackendUpdate;
 }
 
 export type SyncProblemKind = "configuration" | "schema" | "library" | "credentials" | "permission" | "unreachable" | "busy" | "stopped";
 
+export interface SyncBackendUpdate {
+  readonly installedContract?: number;
+  readonly installedSchema?: number;
+  readonly requiredContract: number;
+  readonly requiredSchema: number;
+  readonly deferredColours?: number;
+  readonly updateDesktop?: boolean;
+}
+
 export interface SyncProblem {
+  readonly backendUpdate?: SyncBackendUpdate;
   readonly phase: "connect" | "push" | "pull";
   readonly kind: SyncProblemKind;
   /** Fixed product copy only; never a provider or driver message. */
@@ -1598,13 +1610,13 @@ type SyncExchangeStatus = (
 
 export type SyncExchangeRunResult = SyncRunCounts & SyncExchangeStatus;
 
-export type SyncRunResult =
+export type SyncRunResult = (
   | (SyncExchangeRunResult & { readonly migration?: SyncMigrationProgress })
   | (SyncRunCounts & { readonly status: "migration-incomplete"; readonly migration: SyncMigrationProgress })
   | (SyncRunCounts & { readonly status: "migration-review-required"; readonly migration: SyncMigrationProgress & {
     readonly reviewNoteId: NoteId;
     readonly reviewReason: "oversized" | "too-many";
-  } });
+  } })) & { readonly backendUpdate?: SyncBackendUpdate };
 
 /**
  * Background sync as the header shows it. `off` means no sync provider is set

@@ -23,6 +23,7 @@ export interface ConvexConnectionStatus {
   readonly schemaVersion?: number;
   readonly mutationContractVersion?: number;
   readonly problem?: string;
+  readonly backendUpdate?: import("@leaflogue/contracts").SyncBackendUpdate;
 }
 
 const deploymentStatus = makeFunctionReference<"query", Record<string, never>, ConvexDeploymentMetadata>("setup:status");
@@ -73,10 +74,15 @@ export async function checkConvex(
       problem: "The deployment responded, but its Leaflogue schema metadata is invalid.",
     };
   }
+  const versions = { schemaVersion: result.schemaVersion, mutationContractVersion: result.mutationContractVersion,
+    backendUpdate: { installedContract: result.mutationContractVersion, installedSchema: result.schemaVersion,
+      requiredContract: MAX_SUPPORTED_MUTATION_CONTRACT_VERSION, requiredSchema: SUPPORTED_SCHEMA_VERSION,
+      updateDesktop: result.schemaVersion > SUPPORTED_SCHEMA_VERSION || result.mutationContractVersion > MAX_SUPPORTED_MUTATION_CONTRACT_VERSION } };
   if (result.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
     return {
       reachable: true,
       initialized: false,
+      ...versions,
       problem: `This desktop supports Convex schema ${SUPPORTED_SCHEMA_VERSION}; the deployment reports schema ${result.schemaVersion}.${upgradeInstruction(options.releaseVersion)}`,
     };
   }
@@ -85,6 +91,7 @@ export async function checkConvex(
     return {
       reachable: true,
       initialized: false,
+      ...versions,
       problem: `This desktop supports Convex mutation contracts ${MIN_SUPPORTED_MUTATION_CONTRACT_VERSION}–${MAX_SUPPORTED_MUTATION_CONTRACT_VERSION}; the deployment reports contract ${result.mutationContractVersion}.${upgradeInstruction(options.releaseVersion)}`,
     };
   }
@@ -109,6 +116,7 @@ export async function assertCompatibleConvexDeployment(
   }
   throw Object.assign(new Error("Convex deployment is not compatible with this desktop"), {
     code: status.reachable ? "LEAFLOGUE_CONVEX_VERSION_UNSUPPORTED" : "ECONNREFUSED",
+    ...(status.backendUpdate ? { backendUpdate: status.backendUpdate } : {}),
   });
 }
 

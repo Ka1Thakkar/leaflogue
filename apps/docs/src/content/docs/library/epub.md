@@ -147,4 +147,4 @@ changing formats. Each device uses its own theme to render the saved colour.
 Existing choices saved on a device migrate automatically when it opens the
 updated app. A colour already saved in the shared library takes precedence.
 Update your desktop apps before upgrading a Convex backend to mutation contract
-24. Colour changes stay queued locally until that backend supports them.
+24. Colour choices stay in a separate durable local queue until that backend supports them; ordinary library data continues syncing with contract 23.
