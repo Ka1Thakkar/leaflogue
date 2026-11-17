@@ -421,6 +421,9 @@ test("persists a per-highlight colour across passage and reader views", async ()
     await expect.poll(async () => card.locator("time").evaluate((node) => getComputedStyle(node).color)).not.toBe(dateBefore);
     const ink = await card.locator("time").evaluate((node) => getComputedStyle(node).color);
     await expect(card).toHaveCSS("box-shadow", `${ink} 2px 0px 0px 0px inset`);
+    const coloured = (await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), saved.bookId))!.highlights[0]!;
+    expect(coloured).toEqual({ ...saved, colour: "green", revision: saved.revision + 1, updatedAt: expect.any(Number) });
+    expect(coloured.updatedAt).toBeGreaterThanOrEqual(saved.updatedAt);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
     await page.getByRole("button", { name: "Attach book file", exact: true }).click();
@@ -434,7 +437,7 @@ test("persists a per-highlight colour across passage and reader views", async ()
     await expect(page.locator(`#highlight-${saved.id}`).getByRole("radio", { name: "green", exact: true })).toBeChecked();
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await expect.poll(painted).toBe(1);
-    expect((await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), saved.bookId))!.highlights).toEqual([saved]);
+    expect((await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), saved.bookId))!.highlights).toEqual([coloured]);
     await session.close();
   } finally { await removeProfile(profile); }
 });
