@@ -4,7 +4,7 @@ import { BUILT_IN_THEMES } from "@leaflogue/appearance";
 import { contrastRatio } from "@leaflogue/ui";
 import { highlightColour, highlightPalette, migrateHighlightColours, readHighlightColours, saveHighlightColour } from "./highlight-colours";
 const id = "12345678-1234-4234-8234-123456789abc";
-afterEach(() => localStorage.clear());
+afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); });
 describe("per-highlight theme colours", () => {
   it("persists only supported named colours and resets yellow to the default", () => {
     saveHighlightColour(id, "green");
@@ -37,7 +37,7 @@ describe("legacy colour migration", () => {
     saveHighlightColour(id, "green");
     const highlight = { id, bookId: id, text: "A line", revision: 2, createdAt: 1, updatedAt: 1, notes: [] };
     const update = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ ...highlight, colour: "green" });
-    window.leaflogue = { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } } as never;
+    vi.stubGlobal("leaflogue", { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } });
     await migrateHighlightColours();
     expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))[id]).toBe("green");
     await migrateHighlightColours();
@@ -49,7 +49,7 @@ describe("legacy colour migration", () => {
     const highlight = { id, colour: "yellow" as const };
     expect(highlightColour(highlight as never, { [id]: "pink" })).toBe("yellow");
     const update = vi.fn();
-    window.leaflogue = { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } } as never;
+    vi.stubGlobal("leaflogue", { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } });
     await migrateHighlightColours();
     expect(update).not.toHaveBeenCalled();
     expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({});
