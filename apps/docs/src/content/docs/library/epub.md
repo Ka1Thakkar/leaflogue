@@ -30,8 +30,8 @@ work while the Reader tab is visible, unless you are typing or using another
 control or dialog. Reading position saves automatically.
 
 Right-click the page, or press **Shift+F10**, to open reader options over the
-book. Choose a chapter under **Contents**, change **Typography**, or check
-reading progress. Press **Escape** or click outside to return to the page.
+book. The **Book** tab contains chapter navigation, search and bookmarks.
+The **Text**, **Layout**, **Appearance** and **Presets** tabs control reading preferences. Press **Escape** or click outside to return to the page.
 Page-turn buttons are not part of this menu.
 
 - **Dark mode** starts with black paper and white text. Turn it off for white
@@ -43,6 +43,29 @@ Page-turn buttons are not part of this menu.
 Display choices are remembered on this device. Changing text size or panel
 width reflows the pages, so the page count can change while your place stays
 anchored to the text.
+
+## Reading preferences in development
+
+The next desktop build adds adjustable text size, weight, alignment, line and
+paragraph spacing, indentation, letter/word spacing and hyphenation. Font-family
+selection is not included. Publisher settings remain available; headings and
+centered dedications retain their alignment and emphasis.
+
+Use **Layout** for side/top/bottom margins, reading width and automatic, one- or
+two-column spreads. Narrow readers stay single-column. Enable **Reading progress**,
+**Chapter information** or **Clock** to show them below the page while options are
+closed. These indicators are off by default.
+
+**Appearance** adds sepia and a page/app surround choice alongside dark mode and
+theme colours. Theme colours take precedence over sepia. **Presets** saves named
+combinations, restores publisher typography, resets preferences and optionally
+keeps different preferences for this book. Preferences are local to this device;
+they are not library data or synchronized annotations.
+
+Changes preview immediately and repaginate around the current text location.
+PDFs keep their fixed layout and use zoom rather than these typography controls.
+Automatic hyphenation depends on the language information and available browser
+dictionaries; some embedded fonts offer only limited weight variation.
 
 ## Save highlights and notes
 

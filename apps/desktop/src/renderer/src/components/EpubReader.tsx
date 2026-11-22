@@ -1,3 +1,5 @@
+import { ReaderPreferenceControls, READER_TABS, type ReaderTab } from "./ReaderPreferences";
+import { applyReaderTypography, useReaderPreferences } from "./reader-preferences";
 import { HighlightColourPicker } from "./HighlightColourPicker";
 import { HIGHLIGHT_COLOURS, highlightColour, highlightPalette, useHighlightColours } from "./highlight-colours";
 import { usePdfPages } from "./pdf-pages";
@@ -39,51 +41,59 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   const turn = useRef<(page: number) => void>(() => undefined);
   const menu = useRef<(x: number, y: number) => void>(() => undefined);
   const [chapter, setChapter] = useState(0);
-  const [fontSize, setFontSize] = useState(18);
+  const { preferences, update: updatePreferences, override, setOverride, presets, savePreset, removePreset } = useReaderPreferences(bookId);
+  const [optionsTab, setOptionsTab] = useState<ReaderTab>("Book");
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => {
+    if (!preferences.clock || !active) return;
+    setClock(new Date());
+    const timer = setInterval(() => setClock(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, [preferences.clock, active]);
   const [pdfZoom, setPdfZoom] = useState("page");
   const [page, setPage] = useState(0);
   const [count, setCount] = useState(1);
   const [loaded, setLoaded] = useState(0);
-  const [readerDisplay, setReaderDisplay] = useState<{ dark: boolean; theme: boolean }>(() => {
-    try { const value = JSON.parse(localStorage.getItem("leaflogue.reader-display") ?? "null") as { dark?: unknown; theme?: unknown } | null; return { dark: typeof value?.dark === "boolean" ? value.dark : true, theme: value?.theme === true }; }
-    catch { return { dark: true, theme: false }; }
-  });
+  const readerDisplay = useMemo(() => ({ dark: preferences.dark, theme: preferences.theme }), [preferences.dark, preferences.theme]);
   const [appearance, setAppearance] = useState<AppearanceConfiguration>();
-  const pdfTokens = appearance?.themes.find((theme) => theme.id === appearance.themeId)?.[readerDisplay.dark ? "dark" : "light"];
-  const readerPaper = readerDisplay.theme && pdfTokens ? pdfTokens.paper : readerDisplay.dark ? "#000000" : "#ffffff";
-  usePdfPages(book, bookId, frame, loaded, chapter, setError, readerDisplay, pdfTokens);
+  const themeTokens = appearance?.themes.find((theme) => theme.id === appearance.themeId)?.[readerDisplay.dark ? "dark" : "light"];
+  const pdfTokens = useMemo(() => readerDisplay.theme ? themeTokens : preferences.palette === "sepia" && themeTokens ? { ...themeTokens, paper: readerDisplay.dark ? "#211b14" : "#f4ecd8", ink: readerDisplay.dark ? "#e8dcc5" : "#352b20" } : undefined, [readerDisplay, themeTokens, preferences.palette]);
+  const readerPaper = pdfTokens ? pdfTokens.paper : readerDisplay.dark ? "#000000" : "#ffffff";
+  usePdfPages(book, bookId, frame, loaded, chapter, setError, { dark: readerDisplay.dark, theme: Boolean(pdfTokens) }, pdfTokens);
   useEffect(() => {
     let active = true;
     void window.leaflogue.appearance.describe().then((value) => { if (active) setAppearance(value); }).catch(() => undefined);
     const stop = window.leaflogue.appearance.onChanged((value) => { if (active) setAppearance(value); });
     return () => { active = false; stop(); };
   }, []);
-  useEffect(() => { try { localStorage.setItem("leaflogue.reader-display", JSON.stringify(readerDisplay)); } catch { /* session preference */ } }, [readerDisplay]);
   useEffect(() => {
     const doc = frame.current?.contentDocument;
     if (!loaded || !doc?.getElementById("reader-pages")) return;
     if (book?.format === "pdf") {
       // Paint the iframe canvas itself: transparent body pixels can otherwise
       // expose Chromium's white document backdrop around the fitted PDF.
-      doc.documentElement.style.setProperty("background", readerPaper, "important");
-      doc.body.style.setProperty("background", readerPaper, "important");
+      const surround = preferences.surround === "app" ? getComputedStyle(document.documentElement).getPropertyValue("--ui-bg") : readerPaper;
+      doc.documentElement.style.setProperty("background", surround, "important");
+      doc.body.style.setProperty("background", surround, "important");
       return;
     }
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
-    applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : undefined);
-  }, [loaded, appearance, readerDisplay, book?.format, readerPaper]);
+    applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : preferences.palette === "sepia" ? pdfTokens : undefined);
+    if (preferences.surround === "app") doc.body.style.setProperty("background-color", getComputedStyle(document.documentElement).getPropertyValue("--ui-bg"), "important");
+    doc.getElementById("reader-scroll")?.style.setProperty("background-color", readerPaper, "important");
+  }, [loaded, appearance, readerDisplay, book?.format, readerPaper, preferences.palette, preferences.surround, pdfTokens]);
   useEffect(() => {
     const doc = frame.current?.contentDocument;
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
     if (!loaded || !doc || !definition) return;
     const dark = readerDisplay.dark;
     const tokens = definition[dark ? "dark" : "light"];
-    const paper = readerDisplay.theme ? tokens.paper : dark ? "#000000" : "#ffffff";
+    const paper = readerPaper;
     const palette = highlightPalette({ ...tokens, paper }, dark);
     let style = doc.getElementById("leaflogue-colour-rules");
     if (!style) { style = doc.createElement("style"); style.id = "leaflogue-colour-rules"; doc.head.append(style); }
     style.textContent = HIGHLIGHT_COLOURS.map((colour) => `::highlight(leaflogue-colour-${colour}){background:${palette[colour].fill};color:${palette[colour].text}}`).join("\n");
-  }, [loaded, appearance, readerDisplay, book?.format]);
+  }, [loaded, appearance, readerDisplay, book?.format, readerPaper]);
   const [saved, setSaved] = useState("");
   const [query, setQuery] = useState("");
   const [bookmarks, setBookmarks] = useState<readonly Position[]>([]);
@@ -222,7 +232,8 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const view = doc?.getElementById("reader-scroll");
     const content = doc?.getElementById("reader-pages");
     if (!opened || !book || !doc || !view || !content) return;
-    doc.body.style.setProperty("font-size", `${fontSize}px`);
+    if (book.format !== "pdf") applyReaderTypography(doc, preferences);
+    let spreadPitch = 1;
     const nodes = () => Array.from(content.querySelectorAll<HTMLElement>("[data-paragraph]"));
     for (const node of nodes()) node.dataset.chapter = node.closest<HTMLElement>("article[data-chapter]")!.dataset.chapter;
     const textNodes = (element: Element) => {
@@ -274,11 +285,18 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       // Lock the CSS column width to the same whole-pixel pitch used for turns.
       // Auto-expanded fractional columns otherwise accumulate drift hundreds of pages in.
       view.style.removeProperty("width");
-      const width = Math.floor(view.getBoundingClientRect().width);
+      const available = Math.max(0, doc.body.clientWidth - preferences.horizontal * 2);
+      const columns = preferences.columns !== "one" && available >= (preferences.columns === "two" ? 640 : 1000) ? 2 : 1;
+      view.style.setProperty("max-width", `${preferences.width * columns}ch`, "important");
+      const measured = Math.floor(view.getBoundingClientRect().width);
+      const columnWidth = Math.floor((measured - GAP * (columns - 1)) / columns);
+      const width = columns * columnWidth + GAP * (columns - 1);
       view.style.setProperty("width", `${width}px`, "important");
       content.style.setProperty("width", `${width}px`, "important");
-      content.style.setProperty("column-width", `${width}px`, "important");
-      const pitch = width + GAP;
+      content.style.setProperty("column-width", `${columnWidth}px`, "important");
+      content.style.setProperty("column-count", String(columns), "important");
+      const pitch = columns * (columnWidth + GAP);
+      spreadPitch = pitch;
       const total = Math.max(1, Math.ceil((content.scrollWidth + GAP) / pitch));
       countRef.current = total; setCount(total);
       const target = content.querySelector<HTMLElement>(`[data-chapter="${anchor.current.chapter}"][data-paragraph="${anchor.current.paragraph}"]`);
@@ -294,7 +312,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       const index = Math.max(0, Math.min(countRef.current - 1, value));
       pageRef.current = index; setPage(index);
       if (book.format === "pdf") { setChapter(index); pdfLayout(index); save.current({ chapter: index, paragraph: 0 }); return; }
-      view.scrollLeft = index * (view.clientWidth + GAP); updateNoteMarkers();
+      view.scrollLeft = index * spreadPitch; updateNoteMarkers();
       const bounds = view.getBoundingClientRect();
       const first = nodes().find((node) => Array.from(node.getClientRects()).some((rect) => rect.right > bounds.left + 1 && rect.left < bounds.right - 1));
       if (!first) return;
@@ -312,7 +330,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       }
       const start = range.cloneRange(); start.collapse(true);
       const rect = start.getBoundingClientRect();
-      const index = Math.floor((rect.left - content.getBoundingClientRect().left + 1) / (view.clientWidth + GAP));
+      const index = Math.floor((rect.left - content.getBoundingClientRect().left + 1) / spreadPitch);
       showPage(index);
       const inner = doc.defaultView as Window & typeof globalThis;
       inner.CSS.highlights.set("leaflogue-target", new inner.Highlight(range));
@@ -327,7 +345,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     jump.current = (index) => {
       if (book.format === "pdf") { showPage(index); return; }
       const target = content.querySelector<HTMLElement>(`article[data-chapter="${index}"]`);
-      if (target) showPage(Math.floor((target.getBoundingClientRect().left - content.getBoundingClientRect().left + 1) / (view.clientWidth + GAP)));
+      if (target) showPage(Math.floor((target.getBoundingClientRect().left - content.getBoundingClientRect().left + 1) / spreadPitch));
     };
     const key = (event: KeyboardEvent) => {
       if (!visible() || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
@@ -368,7 +386,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
         event.preventDefault(); const [path, id] = link.dataset.readerLink!.split("#");
         const article = Array.from(content.querySelectorAll<HTMLElement>("article[data-path]")).find((item) => item.dataset.path === path);
         const destination = id ? Array.from(article?.querySelectorAll<HTMLElement>("[id]") ?? []).find((item) => item.id === id) : article;
-        if (destination) showPage(Math.floor((destination.getBoundingClientRect().left - content.getBoundingClientRect().left + 1) / (view.clientWidth + GAP)));
+        if (destination) showPage(Math.floor((destination.getBoundingClientRect().left - content.getBoundingClientRect().left + 1) / spreadPitch));
         return;
       }
       if (doc.getSelection()?.toString()) return;
@@ -402,7 +420,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     doc.addEventListener("selectionchange", selectionChanged);
     doc.addEventListener("wheel", wheel, { passive: false }); doc.addEventListener("click", click); doc.addEventListener("mouseup", selection); doc.addEventListener("keyup", selection);
     return () => { active = false; doc.removeEventListener("selectionchange", selectionChanged); doc.removeEventListener("contextmenu", contextMenu); observer.disconnect(); window.removeEventListener("keydown", key, true); doc.removeEventListener("keydown", key, true); doc.removeEventListener("wheel", wheel); doc.removeEventListener("click", click); doc.removeEventListener("mouseup", selection); doc.removeEventListener("keyup", selection); };
-  }, [book, opened, loaded, fontSize, chapter, pdfZoom]);
+  }, [book, opened, loaded, preferences, chapter, pdfZoom]);
 
   useEffect(() => {
     const doc = frame.current?.contentDocument;
@@ -479,7 +497,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : "Read EPUB"}</button>}
     {calibreOpen && <div className={styles.overlay}><div role="dialog" aria-label="Calibre library" className={styles.options} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setCalibreOpen(false); } }}><CalibrePicker bookId={bookId} title={contents?.book.title ?? ""} onClose={() => setCalibreOpen(false)} onLinked={(next) => { anchor.current = next.position; setBook(next); setChapter(next.position.chapter); setCalibreOpen(false); setOptionsOpen(false); setOpened(true); setError(""); }} /></div></div>}
     {opened && book && <>
-      <div className={styles.viewport} ref={viewport} style={book.format === "pdf" ? { background: readerPaper } : undefined} role="region" aria-label="Book pages" onContextMenu={(event) => { event.preventDefault(); menu.current(event.clientX, event.clientY); }}>
+      <div className={styles.viewport} ref={viewport} style={{ background: preferences.surround === "app" ? "var(--ui-bg)" : readerPaper }} role="region" aria-label="Book pages" onContextMenu={(event) => { event.preventDefault(); menu.current(event.clientX, event.clientY); }}>
         <iframe ref={frame} className={styles.frame} title={book.format === "pdf" ? "PDF pages" : "EPUB pages"} sandbox="allow-same-origin" srcDoc={source} onLoad={() => setLoaded((value) => value + 1)} />
       </div>
       {!optionsOpen && !calibreOpen && active && noteMarkers.map((marker) => <button key={marker.id} className={styles.noteMarker} aria-label={marker.label} title={marker.label} style={{ left: marker.left, top: marker.top }} onClick={() => { setSelected(undefined); setActiveHighlight({ id: marker.id, left: Math.min(marker.left, window.innerWidth - 344), top: marker.top }); }}><Icon name="note-paper" size={15} aria-hidden="true" /></button>)}
@@ -511,6 +529,14 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
           }
         }}>
           <div className={styles.optionHeading}><div><p className="ui-label">Reader</p><h2>{contents?.book.title ?? "Reading"}</h2></div><button className="ll-icon-button" aria-label="Close reader options" onClick={() => { setOptionsOpen(false); frame.current?.focus(); }}><Icon name="close" size={17} aria-hidden="true" /></button></div>
+          <div role="tablist" aria-label="Reader settings" className={styles.preferenceTabs}>{READER_TABS.map((tab) => <button key={tab} id={`reader-tab-${tab}`} role="tab" aria-selected={optionsTab === tab} aria-controls="reader-preferences-panel" tabIndex={optionsTab === tab ? 0 : -1} onClick={() => setOptionsTab(tab)} onKeyDown={(event) => {
+            const index = READER_TABS.indexOf(tab);
+            const next = event.key === "ArrowRight" ? (index + 1) % READER_TABS.length : event.key === "ArrowLeft" ? (index + READER_TABS.length - 1) % READER_TABS.length : event.key === "Home" ? 0 : event.key === "End" ? READER_TABS.length - 1 : -1;
+            if (next < 0) return; event.preventDefault(); setOptionsTab(READER_TABS[next]!); document.getElementById(`reader-tab-${READER_TABS[next]}`)?.focus();
+          }}>{tab}</button>)}</div>
+          <div role="tabpanel" id="reader-preferences-panel" aria-labelledby={`reader-tab-${optionsTab}`} className={styles.preferencePanel}>
+          <ReaderPreferenceControls tab={optionsTab} pdf={book.format === "pdf"} preferences={preferences} onChange={updatePreferences} override={override} onOverride={setOverride} presets={presets} onSavePreset={savePreset} onRemovePreset={removePreset} />
+          <div hidden={optionsTab !== "Book"}>
           <div className={styles.progress}><span>Page {page + 1} of {count}</span><span>{Math.round((page + 1) / count * 100)}%</span></div><progress className={styles.progressBar} value={page + 1} max={count} aria-label="Reading progress" />
           <label className="ll-label">Contents<Select aria-label="Chapter" value={String(chapter)} onValueChange={(value) => { jump.current(Number(value)); setOptionsOpen(false); }}>{book.chapters.map((item, index) => <SelectItem value={String(index)} key={item.id}>{index + 1}. {item.title}</SelectItem>)}</Select></label>
           <details className={styles.readerTools}>
@@ -530,11 +556,6 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
             {!bookmarks.length && <p className="ll-muted">No bookmarks yet.</p>}
             <ol className={styles.locationList}>{bookmarks.map((item, index) => <li key={`${item.chapter}:${item.paragraph}:${item.offset ?? 0}`}><button className="ll-button-secondary" onClick={() => visit(item)}><strong>{book.chapters[item.chapter]?.title}</strong><span>{(book.chapters[item.chapter]?.paragraphs ?? book.chapters[item.chapter]?.text.split("\n\n"))?.[item.paragraph]?.slice(item.offset ?? 0, (item.offset ?? 0) + 100)}</span></button><button className="ll-button-secondary" disabled={savingBookmark} aria-label={`Remove bookmark ${index + 1}`} onClick={() => void updateBookmarks(bookmarks.filter((_, i) => i !== index))}>Remove</button></li>)}</ol>
           </details>
-          {book.format !== "pdf" && <label className="ll-label">Typography<Select aria-label="Text size" value={String(fontSize)} onValueChange={(value) => setFontSize(Number(value))}>{[16, 18, 20, 24, 28].map((size) => <SelectItem key={size} value={String(size)}>{size} px</SelectItem>)}</Select></label>}
-          <div className={styles.displayPreferences}>
-            <label><span><strong>Dark mode</strong><small>Black background, white text</small></span><input type="checkbox" role="switch" aria-label="Dark mode" checked={readerDisplay.dark} onChange={(event) => setReaderDisplay((value) => ({ ...value, dark: event.target.checked }))} /></label>
-            <label><span><strong>Use theme colours</strong><small>{book.format === "pdf" ? "Use theme paper and text colours: " : "Adapt book colours to "}{appearance?.themes.find((theme) => theme.id === appearance.themeId)?.name ?? "your theme"}</small></span><input type="checkbox" role="switch" aria-label="Use theme colours" checked={readerDisplay.theme} onChange={(event) => setReaderDisplay((value) => ({ ...value, theme: event.target.checked }))} /></label>
-          </div>
           {book.format === "pdf" && <><label className="ll-label">Zoom<Select aria-label="PDF zoom" value={pdfZoom} onValueChange={setPdfZoom}><SelectItem value="page">Fit page</SelectItem><SelectItem value="width">Fit width</SelectItem>{[100, 150, 200].map((value) => <SelectItem key={value} value={String(value)}>{value}%</SelectItem>)}</Select></label><p className="ll-muted">PDF pages keep their original layout.</p></>}
           <details className={styles.readerTools}>
             <summary>Review highlight locations</summary>
@@ -554,7 +575,13 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
           {window.leaflogue.calibre && <button className="ll-button-secondary" onClick={() => setCalibreOpen(true)}>Manage Calibre link</button>}
           {window.leaflogue.epub?.unlink && <button className="ll-button-secondary" onClick={() => void unlink()}>Unlink book file</button>}
           <details className={styles.shortcuts}><summary>Keyboard shortcuts</summary><dl><dt>Next page</dt><dd>→ / Space / Page Down</dd><dt>Previous page</dt><dd>← / Shift+Space / Page Up</dd><dt>Reader options</dt><dd>Shift+F10</dd></dl></details>
+          </div></div>
         </div>
+      </div>}
+      {(preferences.progress || preferences.chapter || preferences.clock) && <div className={styles.readingInfo} aria-label="Reading information">
+        {preferences.chapter && <span>{book.chapters[chapter]?.title}</span>}
+        {preferences.progress && <span>{page + 1} / {count} · {Math.round((page + 1) / count * 100)}%</span>}
+        {preferences.clock && <time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>}
       </div>}
       <span className="sr-only" role="status">Page {page + 1} of {count}. {saved}</span>
     </>}

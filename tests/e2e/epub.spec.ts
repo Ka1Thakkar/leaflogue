@@ -137,10 +137,17 @@ test("preserves publisher formatting and offers in-app reader options on right c
     await heading.click({ button: "right" });
     const options = page.getByRole("dialog", { name: "Reader options", exact: true });
     await expect(options).toBeVisible();
-    await expect(options.getByRole("combobox", { name: "Text size", exact: true })).toBeVisible();
+    await options.getByRole("tab", { name: "Text", exact: true }).click();
+    await expect(options.getByRole("slider", { name: "Text size", exact: true })).toBeVisible();
+    await options.getByRole("spinbutton", { name: "Text size value", exact: true }).fill("23");
+    await options.getByRole("button", { name: "Increase text weight", exact: true }).click();
+    await options.getByRole("button", { name: "Left", exact: true }).click();
+    await expect(reader.locator("em")).toHaveCSS("font-style", "italic");
+    await expect(heading).toHaveCSS("text-align", "center");
     const body = reader.locator("body");
     await expect(body).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(body).toHaveCSS("color", "rgb(255, 255, 255)");
+    await options.getByRole("tab", { name: "Appearance", exact: true }).click();
     await options.getByRole("switch", { name: "Dark mode", exact: true }).uncheck();
     await expect(body).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await options.getByRole("switch", { name: "Use theme colours", exact: true }).check();
