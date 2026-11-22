@@ -223,9 +223,16 @@ test("keeps line ends inside each page with publisher padding and fractional wid
     await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("heading", { name: "A quiet beginning" })).toBeVisible();
     await page.getByRole("button", { name: "Expand context panel", exact: true }).click();
-    await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => (frame as HTMLIFrameElement).contentDocument!.getElementById("reader-scroll")!.style.setProperty("max-width", "311.375px", "important"));
+    // Constrain the host viewport, not the content width owned by pagination.
+    // Otherwise the next layout replaces the override and can enable a spread,
+    // reaching this fixture's short final chapter before the six-page check.
+    await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => { (frame as HTMLIFrameElement).style.width = "311.375px"; });
     await session.resize(1319, 901);
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } });
+    await expect.poll(() => page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
+      const doc = (frame as HTMLIFrameElement).contentDocument!;
+      return Number(doc.defaultView!.getComputedStyle(doc.getElementById("reader-pages")!).columnCount);
+    })).toBe(1);
     for (let index = 0; index < 6; index++) {
       const metrics = await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
         const doc = (frame as HTMLIFrameElement).contentDocument!; const view = doc.getElementById("reader-scroll")!;
