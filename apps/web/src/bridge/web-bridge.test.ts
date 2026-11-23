@@ -88,20 +88,55 @@ describe("listHighlights", () => {
     expect(transport.called("browse:highlights")[3]?.args.paginationOpts).toEqual({ numItems: 50, cursor: null });
   });
 
-  it("asks for a local day by its date and keeps only passages inside it", async () => {
-    const from = new Date(2026, 9, 8).getTime();
-    const before = new Date(2026, 9, 9).getTime();
-    transport.on("browse:highlights", () => ({
-      page: [passage(1, { createdAt: from + 60_000 }), passage(2, { createdAt: before + 60_000 })],
+  it("asks for a local day by its exact bounds, either side of UTC", async () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    // 8 October in India (UTC+5:30) starts at 18:30 UTC on 7 October; in
+    // California (UTC-7 in October) it ends at 07:00 UTC on 9 October.
+    const india = Date.UTC(2026, 9, 8) - 5.5 * 60 * 60 * 1000;
+    const california = Date.UTC(2026, 9, 8) + 7 * 60 * 60 * 1000;
+    transport.on("browse:highlights", (args) => ({
+      page: [
+        passage(1, { createdAt: (args.dateFrom as number) + 60_000 }),
+        passage(2, { createdAt: (args.dateFrom as number) + DAY + 60_000 }),
+      ],
       isDone: true,
       continueCursor: "",
     }));
-    const page = await bridge().library.listHighlights({ dateKind: "created", dateFrom: from, dateBefore: before });
-    expect(transport.calls[0]?.args).toMatchObject({ date: "2026-10-08", dateKind: "added" });
+    const library = bridge().library;
+    const page = await library.listHighlights({ dateKind: "created", dateFrom: india, dateBefore: india + DAY });
+    expect(transport.calls[0]?.args).toMatchObject({ dateFrom: india, dateBefore: india + DAY, dateKind: "added" });
+    expect(transport.calls[0]?.args).not.toHaveProperty("date");
     expect(page.entries.map(({ id }) => id)).toEqual(["h1"]);
 
-    await bridge().library.listHighlights({ dateKind: "imported", dateFrom: from, dateBefore: before });
-    expect(transport.calls[1]?.args).toMatchObject({ date: "2026-10-08", dateKind: "imported" });
+    await library.listHighlights({ dateKind: "imported", dateFrom: california, dateBefore: california + DAY });
+    expect(transport.calls[1]?.args).toMatchObject({ dateFrom: california, dateBefore: california + DAY, dateKind: "imported" });
+    expect(transport.calls[1]?.args).not.toHaveProperty("date");
+  });
+
+  it("falls back to a UTC date for a backend that refuses exact bounds", async () => {
+    const from = new Date(2026, 9, 8).getTime();
+    const before = new Date(2026, 9, 9).getTime();
+    transport.on("browse:highlights", (args) => {
+      if ("dateFrom" in args) throw new BackendError("The library could not complete that request. Try again shortly.");
+      return { page: [passage(1, { createdAt: from + 60_000 }), passage(2, { createdAt: before + 60_000 })], isDone: true, continueCursor: "" };
+    });
+    const library = bridge().library;
+    const page = await library.listHighlights({ dateKind: "created", dateFrom: from, dateBefore: before });
+    expect(page.entries.map(({ id }) => id)).toEqual(["h1"]);
+    expect(transport.calls.map(({ args }) => args.date)).toEqual([undefined, "2026-10-08"]);
+    expect(transport.calls[1]?.args).not.toHaveProperty("dateFrom");
+
+    // Later reads go straight to the older form.
+    await library.listHighlights({ dateKind: "imported", dateFrom: from, dateBefore: before });
+    expect(transport.calls[2]?.args).toMatchObject({ date: "2026-10-08", dateKind: "imported" });
+
+    // Errors a newer backend gives are not mistaken for an older one.
+    const offline = new FakeTransport().on("browse:highlights", () => {
+      throw new BackendError("Offline", "LEAFLOGUE_OFFLINE");
+    });
+    transport = offline;
+    await expect(bridge().library.listHighlights({ dateFrom: from, dateBefore: before })).rejects.toMatchObject({ code: "LEAFLOGUE_OFFLINE" });
+    expect(offline.calls).toHaveLength(1);
   });
 });
 

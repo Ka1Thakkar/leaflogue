@@ -137,10 +137,17 @@ test("preserves publisher formatting and offers in-app reader options on right c
     await heading.click({ button: "right" });
     const options = page.getByRole("dialog", { name: "Reader options", exact: true });
     await expect(options).toBeVisible();
-    await expect(options.getByRole("combobox", { name: "Text size", exact: true })).toBeVisible();
+    await options.getByRole("tab", { name: "Text", exact: true }).click();
+    await expect(options.getByRole("slider", { name: "Text size", exact: true })).toBeVisible();
+    await options.getByRole("spinbutton", { name: "Text size value", exact: true }).fill("23");
+    await options.getByRole("button", { name: "Increase text weight", exact: true }).click();
+    await options.getByRole("button", { name: "Left", exact: true }).click();
+    await expect(reader.locator("em")).toHaveCSS("font-style", "italic");
+    await expect(heading).toHaveCSS("text-align", "center");
     const body = reader.locator("body");
     await expect(body).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(body).toHaveCSS("color", "rgb(255, 255, 255)");
+    await options.getByRole("tab", { name: "Appearance", exact: true }).click();
     await options.getByRole("switch", { name: "Dark mode", exact: true }).uncheck();
     await expect(body).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await options.getByRole("switch", { name: "Use theme colours", exact: true }).check();
@@ -216,9 +223,16 @@ test("keeps line ends inside each page with publisher padding and fractional wid
     await page.getByRole("button", { name: "Attach book file", exact: true }).click();
     await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("heading", { name: "A quiet beginning" })).toBeVisible();
     await page.getByRole("button", { name: "Expand context panel", exact: true }).click();
-    await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => (frame as HTMLIFrameElement).contentDocument!.getElementById("reader-scroll")!.style.setProperty("max-width", "311.375px", "important"));
+    // Constrain the host viewport, not the content width owned by pagination.
+    // Otherwise the next layout replaces the override and can enable a spread,
+    // reaching this fixture's short final chapter before the six-page check.
+    await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => { (frame as HTMLIFrameElement).style.width = "311.375px"; });
     await session.resize(1319, 901);
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } });
+    await expect.poll(() => page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
+      const doc = (frame as HTMLIFrameElement).contentDocument!;
+      return Number(doc.defaultView!.getComputedStyle(doc.getElementById("reader-pages")!).columnCount);
+    })).toBe(1);
     for (let index = 0; index < 6; index++) {
       const metrics = await page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
         const doc = (frame as HTMLIFrameElement).contentDocument!; const view = doc.getElementById("reader-scroll")!;

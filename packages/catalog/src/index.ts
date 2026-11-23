@@ -25,7 +25,7 @@ export class CatalogUnavailableError extends Error {
 
 const MAX_QUERY_BYTES = 200;
 const MAX_RESULTS = 20;
-const MAX_RESPONSE_CHARACTERS = 2_000_000;
+const MAX_RESPONSE_BYTES = 2_000_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RETRY_ATTEMPTS = 3;
 const GOOGLE_COVER_HOSTS = new Set(["books.google.com", "books.googleusercontent.com"]);
@@ -81,6 +81,41 @@ function texts(value: unknown, maxItems: number, maxBytes: number): string[] {
   return Array.isArray(value) ? value.slice(0, maxItems).map((item) => text(item, maxBytes)).filter((item): item is string => Boolean(item)) : [];
 }
 
+/**
+ * The response body as text, refused once it passes `maxBytes`. The body is
+ * read in chunks and dropped as soon as it is too long, so an oversized or
+ * endless response is never held in memory whole; a declared length that is
+ * already too long is refused before reading.
+ */
+async function cappedText(response: Response, maxBytes: number): Promise<string> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new CatalogUnavailableError();
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new CatalogUnavailableError();
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
 async function requestJson(url: URL, options: CatalogOptions): Promise<unknown> {
   const fetchImplementation = options.fetch ?? ((input: string, init?: RequestInit) => fetch(input, init));
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
@@ -94,9 +129,7 @@ async function requestJson(url: URL, options: CatalogOptions): Promise<unknown> 
         await response.body?.cancel();
       } else {
         if (!response.ok) throw new CatalogUnavailableError();
-        const raw = await response.text();
-        if (raw.length > MAX_RESPONSE_CHARACTERS) throw new CatalogUnavailableError();
-        return JSON.parse(raw) as unknown;
+        return JSON.parse(await cappedText(response, MAX_RESPONSE_BYTES)) as unknown;
       }
     } catch {
       throw new CatalogUnavailableError();

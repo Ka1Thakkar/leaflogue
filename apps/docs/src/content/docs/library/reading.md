@@ -29,6 +29,13 @@ On a book's page, passages keep loading as you scroll, so long books open
 quickly. A passage you reach from a link, such as Today's highlight or a
 search result, is marked so your eye lands on it.
 
+## Write about the whole book
+
+Some thoughts aren't about one passage: what stayed with you, what you'd tell a
+friend, or how the book changed your mind. On a book's page, choose **Write a
+book note** at the top. Your book notes appear under **Book notes**, above the
+book's passages, and you can edit or delete them there.
+
 ## Organise
 
 - **Tags** go on books and on individual passages.

@@ -714,7 +714,7 @@
 /* Desktop additions: shapes the hosted app does not need, drawn from the
    same materials. */
 .archivedNotice { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--ui-line); border-left: 3px solid var(--stamp); border-radius: var(--ui-radius); background: var(--ruled); font-size: var(--text-sm); }
-.standaloneNotes { display: grid; gap: 0.75rem; margin-top: 2rem; }
+.standaloneNotes { display: grid; gap: 0.75rem; margin-bottom: 0.75rem; }
 .standaloneNotes > h2 { font-size: var(--text-lg); }
 .overflowPanel .menuAction { display: flex; align-items: center; gap: 0.5rem; min-height: 30px; padding: 4px 10px; border-radius: 4px; white-space: nowrap; font-size: var(--text-sm); font-weight: 600; }
 .overflowPanel .menuAction:hover:not(:disabled) { background: var(--muted); }

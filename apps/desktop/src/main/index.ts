@@ -3,7 +3,7 @@ import { CalibreLibrary } from "./calibre";
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL } from "@leaflogue/contracts";
 import { searchCatalog } from "@leaflogue/catalog";
 import { CATALOG_SEARCH_CHANNEL } from "@leaflogue/contracts";
-import { PDF_BYTES_CHANNEL, EPUB_ANCHOR_CHANNEL, EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL } from "@leaflogue/contracts";
+import { PDF_BYTES_CHANNEL, EPUB_ANCHOR_CHANNEL, EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL, EPUB_RELOCATE_CHANNEL } from "@leaflogue/contracts";
 import { EpubStore } from "./epub";
 import { mcpAccessEnabled, mcpAccessFile, saveMcpAccess } from "./mcp-access";
 import { serveLocalMcp } from "./mcp-server";
@@ -194,7 +194,7 @@ import {
   type ReadonlyDatabase,
 } from "@leaflogue/importers";
 import { collectBooxExports, collectKOReaderSidecars } from "./reader-folders";
-import { LocalLibrary, recoverInterruptedFileReplacement, replaceFileWithRollback, validateLibraryBackup } from "@leaflogue/storage";
+import { LocalLibrary, recoverInterruptedFileReplacement, recoverLibraryAfterRollback, replaceFileWithRollback, validateLibraryBackup } from "@leaflogue/storage";
 import { CURRENT_SETUP_VERSION, ConvexSyncTransport, acceptAiProviderTerms, assertCompatibleConvexDeployment, canonicalConfigPath, checkConvex, checkPostgres, createPostgresClient, ensureConvexLibrary, explainPassageDisclosure, explainPassageRequest, generateAiText, type CompanionInput, companionInScope, companionNeedsScopeCheck, companionOutOfScope, companionRequest, companionScopeRequest, parseCompanionAnswer, validateCompanionInput, importThemeFile, loadUpdatePreferences, writeUpdatePreferences, loadDashboardLayouts, writeDashboardLayout, writeCustomWidget, deleteCustomWidget, importCustomWidgetFiles, writeCustomWidgetExport, initializePostgres, loadAiRuntimeProvider, parseExplanation, loadAppearanceConfig, loadRemoteConfig, prepareConvexLibrary, resolveAppearanceFiles, setupCompletedVersion, summarizeAiConfig, summarizeRemoteConfig, writeAiConfig, writeAppearanceConfig, writeRemoteConfig, writeSetupCompletion, writeThemeExport } from "@leaflogue/remote";
 import { readingStatusHistoryPage, registerTrustedHandler, validateAiSettings, validateCommitImport, validateConflictResolution, validateDailyRequest, validateExternalUrl, validateHighlightQuery, validateNoteOrigin, validateSetBookCompletionDate, validateSetBookReadingStatus, validateSyncConflictResolution, validateSyncRunOptions, validateThreadCreate, validateThreadDelete, validateThreadMembership, validateThreadUpdate } from "./ipc-security";
 import { applicationMenuTemplate } from "./application-menu";
@@ -207,7 +207,7 @@ import { createSyncStatusTracker } from "./sync-status";
 import { rendererContentPolicyForRequest, validateDevelopmentRendererUrl } from "./content-policy";
 import { TRUSTED_UPDATE_KEYS } from "./update-keys";
 import { DesktopUpdater } from "./update-service";
-import { installNativeUpdate, nativeUpdateUnavailable } from "./update-native";
+import { checkNativeUpdateStartup, clearNativeUpdateNotice, installNativeUpdate, markNativeUpdateHealthy, nativeUpdateNoticeText, nativeUpdateUnavailable, readNativeUpdateNotice } from "./update-native";
 import { scheduleAutomaticUpdateChecks } from "./update-scheduler";
 import { writeMarkdownExport } from "./markdown-export";
 import { mountRoots, watchConnectedReaders, type DetectedReader } from "./connected-readers";
@@ -329,6 +329,20 @@ function dominantCoverAccent(bytes: Uint8Array): string | undefined {
   return `rgb(${Math.round(red / weight)} ${Math.round(green / weight)} ${Math.round(blue / weight)})`;
 }
 
+function updateHealthEnvironment() {
+  return { platform: process.platform, directory: desktopPaths.stateDirectory, version: app.getVersion(), executable: process.execPath };
+}
+
+/** Once, after a Mac update was undone: say so, and what happened to the library. */
+async function showNativeUpdateNotice(): Promise<void> {
+  const environment = updateHealthEnvironment();
+  const notice = await readNativeUpdateNotice(environment);
+  if (!notice || !mainWindow) return;
+  const { message, detail } = nativeUpdateNoticeText(notice);
+  await dialog.showMessageBox(mainWindow, { type: notice.library === "not-needed" ? "info" : "warning", title: "Leaflogue update undone", message, detail, buttons: ["OK"] });
+  await clearNativeUpdateNotice(environment);
+}
+
 function createWindow(): void {
   const appearance = describeAppearance();
   const backgroundColor = applyNativeAppearance(appearance, nativeTheme);
@@ -360,8 +374,16 @@ function createWindow(): void {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event) => event.preventDefault());
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
+    if (app.isPackaged) void showNativeUpdateNotice().catch(() => undefined);
+  });
   mainWindow.once("closed", () => { mainWindow = undefined; });
+  // A Mac update keeps the previous app until this point: the window loaded
+  // and the library opened. Only then is the previous copy let go.
+  mainWindow.webContents.once("did-finish-load", () => {
+    if (app.isPackaged && library) void markNativeUpdateHealthy(updateHealthEnvironment()).catch(() => undefined);
+  });
 
   void mainWindow.loadURL(developmentRendererUrl ?? "leaflogue://app/index.html");
 }
@@ -454,6 +476,20 @@ void app.whenReady().then(async () => {
     return;
   }
 
+  // Before the library opens: a Mac update that never started healthily goes
+  // back to the previous version instead of trying again (update-native.ts).
+  if (app.isPackaged) {
+    const update = await checkNativeUpdateStartup({
+      ...updateHealthEnvironment(), pid: process.pid, args: process.argv.slice(1), quit: () => app.quit(),
+      // The newer version may have migrated the library before it failed.
+      recoverLibrary: (snapshotNotBefore) => {
+        recoverInterruptedRestore(desktopPaths.libraryFile);
+        return recoverLibraryAfterRollback(desktopPaths.libraryFile, { snapshotNotBefore });
+      },
+    }).catch(() => "none");
+    if (update === "rolling-back") return;
+  }
+
   const menu = applicationMenuTemplate(process.platform);
   Menu.setApplicationMenu(menu ? Menu.buildFromTemplate(menu) : null);
   installApplicationProtocol();
@@ -493,10 +529,16 @@ void app.whenReady().then(async () => {
     if (typeof query !== "string") throw new Error("Enter a title, author, or ISBN.");
     return searchCatalog(query);
   });
+  // One store per library keeps its parsed-edition cache across position saves.
+  let epubStoreInstance: { root: string; store: EpubStore } | undefined;
   const epubStore = () => {
     if (!libraryPath) throw new Error("Local library unavailable");
-    return new EpubStore(`${libraryPath}.epubs`, (reference) => calibre().resolve(reference));
+    const root = `${libraryPath}.epubs`;
+    if (epubStoreInstance?.root !== root) epubStoreInstance = { root, store: new EpubStore(root, (reference) => calibre().resolve(reference)) };
+    return epubStoreInstance.store;
   };
+  /** A located file that turned out to be another edition, awaiting the reader's confirmation. */
+  const pendingRelocations = new Map<BookId, string>();
   const epubBook = (id: unknown) => {
     if (!library || typeof id !== "string" || !isUuid(id) || !library.getBookContents(id as BookId)) throw new Error("Book request is invalid");
     return id as BookId;
@@ -533,6 +575,25 @@ void app.whenReady().then(async () => {
     const path = chosen.filePaths[0];
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
     return store.attach(bookId, path);
+  });
+  registerTrustedHandler(ipcMain, EPUB_RELOCATE_CHANNEL, () => app.isPackaged, async (id: unknown, accept: unknown) => {
+    const bookId = epubBook(id);
+    const store = epubStore();
+    if (accept === true) {
+      // Only a path the reader chose in the native dialog can be linked.
+      const path = pendingRelocations.get(bookId);
+      pendingRelocations.delete(bookId);
+      if (!path) throw new Error("Choose the book file again.");
+      return store.relocate(bookId, path, true);
+    }
+    pendingRelocations.delete(bookId);
+    const chosen = await dialog.showOpenDialog({ title: "Locate this book's file", properties: ["openFile"], filters: [{ name: "EPUB, Kobo EPUB and PDF books", extensions: ["epub", "kepub", "pdf"] }] });
+    if (chosen.canceled || !chosen.filePaths[0]) return { status: "cancelled" };
+    const path = chosen.filePaths[0];
+    if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
+    const result = await store.relocate(bookId, path, false);
+    if (result.status === "different-edition") pendingRelocations.set(bookId, path);
+    return result;
   });
   registerTrustedHandler(ipcMain, PDF_BYTES_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown) => epubStore().readPdf(epubBook(id), hash));
   registerTrustedHandler(ipcMain, EPUB_ANCHOR_CHANNEL, () => app.isPackaged, (id: unknown, hash: unknown, highlightId: unknown, location: unknown) => epubStore().saveAnchor(epubBook(id), hash, highlightId, location));
@@ -847,7 +908,7 @@ void app.whenReady().then(async () => {
     return runExclusiveFileOperation(() => exportMarkdown(includeArchived));
   });
   // Update checks run only when the reader asks (ADR 0007).
-  const nativeUpdateOptions = { platform: process.platform, executable: process.execPath, args: process.argv.slice(1), quit: () => app.quit() };
+  const nativeUpdateOptions = { platform: process.platform, executable: process.execPath, args: process.argv.slice(1), quit: () => app.quit(), healthDirectory: desktopPaths.stateDirectory };
   const updater = new DesktopUpdater({
     currentVersion: app.getVersion(),
     architecture: process.arch,

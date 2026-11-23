@@ -107,6 +107,47 @@ describe("browsing a PostgreSQL library", () => {
     await expect(browse.highlights(client, libraryId, { date: "2026-02-30", paginationOpts: page() })).rejects.toThrow("valid calendar date");
   });
 
+  it("finds passages by words in their notes, but not in deleted notes", async () => {
+    const { atlas, third } = await shelf();
+    const note = await library.createNote({ bookId: atlas as never, highlightId: third.id, markdown: "Lanterns on the hill" });
+    await library.createNote({ bookId: atlas as never, highlightId: third.id, markdown: "More lanterns" });
+    // A book note belongs to no passage.
+    await library.createNote({ bookId: atlas as never, markdown: "lanterns everywhere" });
+    expect(texts(await browse.highlights(client, libraryId, { search: "lanterns", paginationOpts: page() })))
+      .toEqual(["Rain is a map of where the sky has been."]);
+    expect(texts(await browse.highlights(client, libraryId, { search: "windows", paginationOpts: page() })))
+      .toEqual(["Every pane held a season."]);
+    await library.updateNote({ id: note.id, bookId: atlas as never, markdown: "Candles on the hill", expectedRevision: note.revision });
+    expect(texts(await browse.highlights(client, libraryId, { search: "hill", paginationOpts: page() })))
+      .toEqual(["Rain is a map of where the sky has been."]);
+    const edited = (await browse.highlight(client, libraryId, third.id))!.notes.find((entry) => entry.id === note.id)!;
+    await library.deleteNote({ id: note.id, bookId: atlas as never, expectedRevision: edited.revision });
+    expect(texts(await browse.highlights(client, libraryId, { search: "hill", paginationOpts: page() }))).toEqual([]);
+  });
+
+  it("filters by an exact local day, including the hours either side of UTC midnight", async () => {
+    const { orchard } = await shelf();
+    const kolkata = await library.createHighlight({ bookId: orchard as never, text: "Early in Kolkata." });
+    const oakland = await library.createHighlight({ bookId: orchard as never, text: "Late in Oakland." });
+    // 01:30 on 3 January in India (UTC+5:30) is still 2 January in UTC;
+    // 19:00 on 3 January in California (UTC-8) is already 4 January in UTC.
+    await client.query("UPDATE leaflogue.highlights SET created_at = $2::timestamptz WHERE library_id = $1 AND id = $3", [libraryId, "2026-01-02T20:00:00Z", kolkata.id]);
+    await client.query("UPDATE leaflogue.highlights SET created_at = $2::timestamptz WHERE library_id = $1 AND id = $3", [libraryId, "2026-01-04T03:00:00Z", oakland.id]);
+    const DAY = 24 * 60 * 60 * 1000;
+    const day = async (start: number) => texts(await browse.highlights(client, libraryId, { dateFrom: start, dateBefore: start + DAY, paginationOpts: page() }));
+    const india = Date.UTC(2026, 0, 3) - 5.5 * 60 * 60 * 1000;
+    const california = Date.UTC(2026, 0, 3) + 8 * 60 * 60 * 1000;
+    expect(await day(india)).toEqual(["Early in Kolkata.", "The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
+    expect(await day(california)).toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been.", "Late in Oakland."]);
+    expect(await day(india + DAY)).not.toContain("Early in Kolkata.");
+    // The end is excluded, and an open end reads to the last passage.
+    expect(texts(await browse.highlights(client, libraryId, { dateBefore: Date.parse("2026-01-02T20:00:00Z"), paginationOpts: page() })))
+      .toEqual(["Every pane held a season."]);
+    expect(texts(await browse.highlights(client, libraryId, { dateFrom: Date.parse("2026-01-04T03:00:00Z"), paginationOpts: page() })))
+      .toEqual(["Late in Oakland."]);
+    await expect(browse.highlights(client, libraryId, { date: "2026-01-03", dateFrom: india, paginationOpts: page() })).rejects.toThrow("not both");
+  });
+
   it("shows threads, memberships, reading history, and export pages", async () => {
     const { orchard, atlas, first, third } = await shelf();
     const thread = randomUUID() as never;

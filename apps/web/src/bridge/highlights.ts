@@ -1,4 +1,5 @@
 import { MAX_HIGHLIGHT_PAGE, type HighlightListEntry, type HighlightPage, type HighlightQuery } from "@leaflogue/contracts";
+import { BackendError } from "../transport/transport";
 import type { LibraryClient, Page } from "./client";
 import { toHighlightEntry, type WirePassage } from "./wire";
 
@@ -19,12 +20,21 @@ interface Stream {
   readonly items: HighlightListEntry[];
   cursor: string | null;
   done: boolean;
+  /** Read with the older UTC-date argument, for a backend that predates exact bounds. */
+  legacy: boolean;
   /** Reads run one after another so two "load more"s never skip a page. */
   tail: Promise<void>;
 }
 
 interface Translated {
+  /** Arguments with exact date bounds (`dateFrom`/`dateBefore`). */
   readonly args: Record<string, unknown>;
+  /**
+   * The same query for a backend from before exact bounds, which refuses
+   * them: it takes one UTC calendar `date`, so passages from the hours a
+   * local day does not share with it are missed.
+   */
+  readonly legacyArgs: Record<string, unknown>;
   /** What the backend cannot filter exactly, checked here. */
   readonly keep: (passage: WirePassage) => boolean;
 }
@@ -40,33 +50,54 @@ export function translateHighlightQuery(query: HighlightQuery): Translated {
   const before = query.dateBefore ?? Number.POSITIVE_INFINITY;
   const dated = query.dateFrom !== undefined || query.dateBefore !== undefined;
   const imported = query.dateKind === "imported";
-  // The backend filters by one UTC calendar day. The interface asks for one
-  // local day, so the backend is given that day's date (the UTC day that
-  // overlaps it most) and the exact bounds are checked here. Passages from
-  // the hours the two days do not share are missed; other ranges are only
-  // checked here, which reads every passage.
-  const span = before - from;
-  const oneDay = Number.isFinite(span) && span >= LOCAL_DAY_MS.shortest && span <= LOCAL_DAY_MS.longest;
-  const args: Record<string, unknown> = {
+  // The backend filters by the exact span the interface asks for, such as
+  // one local day: [its local midnight, the next local midnight).
+  const base: Record<string, unknown> = {
     ...(query.bookId ? { bookId: query.bookId } : {}),
     ...(search ? { search } : {}),
     ...(query.tagId ? { tagId: query.tagId } : {}),
     ...(query.notes ? { notes: query.notes } : {}),
     ...(query.source ? { source: query.source === "manual" ? "typed" : "imported" } : {}),
-    ...(oneDay ? { date: calendarDate(from), dateKind: imported ? "imported" : "added" } : {}),
     ...(query.sort ? { sort: query.sort } : {}),
+  };
+  const args: Record<string, unknown> = {
+    ...base,
+    ...(query.dateFrom !== undefined ? { dateFrom: query.dateFrom } : {}),
+    ...(query.dateBefore !== undefined ? { dateBefore: query.dateBefore } : {}),
+    ...(dated ? { dateKind: imported ? "imported" : "added" } : {}),
+  };
+  // An older backend filters by one UTC calendar day, so it is given the
+  // local day's date (the UTC day that overlaps it most) and the exact
+  // bounds are checked here. Other ranges are only checked here.
+  const span = before - from;
+  const oneDay = Number.isFinite(span) && span >= LOCAL_DAY_MS.shortest && span <= LOCAL_DAY_MS.longest;
+  const legacyArgs: Record<string, unknown> = {
+    ...base,
+    ...(oneDay ? { date: calendarDate(from), dateKind: imported ? "imported" : "added" } : {}),
   };
   const keep = (passage: WirePassage) => {
     if (!dated) return true;
     const at = imported ? passage.importedVersion?.lastImportedAt : passage.createdAt;
     return at !== undefined && at >= from && at < before;
   };
-  return { args, keep };
+  return { args, legacyArgs, keep };
+}
+
+/**
+ * Whether a refused first read may be a backend from before exact date
+ * bounds. Such a backend refuses the unknown arguments: apps/server says the
+ * request is invalid, and a production Convex deployment hides its argument
+ * error behind an uncoded one.
+ */
+function mayPredateExactBounds(error: unknown): boolean {
+  return error instanceof BackendError && (error.code === undefined || error.code === "LEAFLOGUE_REQUEST_INVALID");
 }
 
 export class HighlightPages {
   readonly #client: LibraryClient;
   readonly #streams = new Map<string, Stream>();
+  /** Set once the backend has refused exact date bounds; later reads use its older form. */
+  #legacyDates = false;
 
   constructor(client: LibraryClient) {
     this.#client = client;
@@ -79,7 +110,7 @@ export class HighlightPages {
     const key = JSON.stringify(translated.args) + `|${query.dateFrom ?? ""}|${query.dateBefore ?? ""}`;
     let stream = this.#streams.get(key);
     if (!stream || offset === 0) {
-      stream = { items: [], cursor: null, done: false, tail: Promise.resolve() };
+      stream = { items: [], cursor: null, done: false, legacy: this.#legacyDates, tail: Promise.resolve() };
       this.#streams.delete(key);
       this.#streams.set(key, stream);
       for (const stale of this.#streams.keys()) {
@@ -97,11 +128,26 @@ export class HighlightPages {
 
   #fill(stream: Stream, translated: Translated, wanted: number): Promise<void> {
     const run = stream.tail.then(async () => {
+      const read = (legacy: boolean) => this.#client.query<Page<WirePassage>>("browse:highlights", {
+        ...(legacy ? translated.legacyArgs : translated.args),
+        paginationOpts: { numItems: BROWSE_PAGE, cursor: stream.cursor },
+      });
+      const datedDiffers = JSON.stringify(translated.args) !== JSON.stringify(translated.legacyArgs);
       while (!stream.done && stream.items.length < wanted) {
-        const result = await this.#client.query<Page<WirePassage>>("browse:highlights", {
-          ...translated.args,
-          paginationOpts: { numItems: BROWSE_PAGE, cursor: stream.cursor },
-        });
+        let result: Page<WirePassage>;
+        try {
+          result = await read(stream.legacy);
+        } catch (error) {
+          // A cursor belongs to the form it was read with, so only a first read falls back.
+          if (stream.legacy || !datedDiffers || stream.cursor !== null || !mayPredateExactBounds(error)) throw error;
+          try {
+            result = await read(true);
+          } catch {
+            throw error;
+          }
+          stream.legacy = true;
+          this.#legacyDates = true;
+        }
         stream.items.push(...result.page.filter(translated.keep).map(toHighlightEntry));
         stream.cursor = result.continueCursor;
         stream.done = result.isDone;

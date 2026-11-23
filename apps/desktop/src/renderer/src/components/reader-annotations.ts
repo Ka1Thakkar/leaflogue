@@ -1,5 +1,8 @@
 import type { EpubDocument, Highlight as SavedHighlight } from "@leaflogue/contracts";
 
+/** The reading document, or an inert copy of the whole book (template contents) used for matching. */
+export type ReaderRoot = Document | DocumentFragment;
+const ownerOf = (root: ReaderRoot) => root.nodeType === 9 ? root as Document : root.ownerDocument!;
 export function normalizedQuote(value: string) { return value.replace(/[‘’]/gu, "'").replace(/[“”]/gu, '"').replace(/\s+/gu, " ").trim(); }
 
 export function textPoint(doc: Document, element: Element, offset: number): [Node, number] | undefined {
@@ -12,10 +15,25 @@ export function textPoint(doc: Document, element: Element, offset: number): [Nod
   }
   return undefined;
 }
-function rangeAt(doc: Document, chapter: number, paragraph: number, start: number, endParagraph: number, end: number) {
-  const first = doc.querySelector(`[data-chapter="${chapter}"][data-paragraph="${paragraph}"]`);
-  const last = doc.querySelector(`[data-chapter="${chapter}"][data-paragraph="${endParagraph}"]`);
+/** Chapter-scoped paragraph coordinates, as saved in `epub:<edition>:chapter:paragraph:start:endParagraph:end`. */
+export interface ReaderLocation { readonly chapter: number; readonly paragraph: number; readonly start: number; readonly endParagraph: number; readonly end: number }
+export function parseReaderLocation(location: string | undefined, edition?: string): ReaderLocation | undefined {
+  if (!location?.startsWith("epub:")) return undefined;
+  const [, hash, ...values] = location.split(":");
+  const numbers = values.map(Number);
+  if (numbers.length !== 5 || !numbers.every((value) => Number.isSafeInteger(value) && value >= 0) || (edition !== undefined && hash !== edition)) return undefined;
+  const [chapter, paragraph, start, endParagraph, end] = numbers as [number, number, number, number, number];
+  return { chapter, paragraph, start, endParagraph, end };
+}
+/** A location as a live range in whichever document currently holds its chapter. */
+export function readerLocationRange(doc: ReaderRoot, location: ReaderLocation): Range | undefined {
+  return rangeAt(doc, location.chapter, location.paragraph, location.start, location.endParagraph, location.end);
+}
+function rangeAt(root: ReaderRoot, chapter: number, paragraph: number, start: number, endParagraph: number, end: number) {
+  const first = root.querySelector(`[data-chapter="${chapter}"][data-paragraph="${paragraph}"]`);
+  const last = root.querySelector(`[data-chapter="${chapter}"][data-paragraph="${endParagraph}"]`);
   if (!first || !last || start < 0 || end < 0) return undefined;
+  const doc = ownerOf(root);
   const a = textPoint(doc, first, start); const b = textPoint(doc, last, end);
   if (!a || !b) return undefined;
   const range = doc.createRange(); range.setStart(...a); range.setEnd(...b);
@@ -27,8 +45,8 @@ interface IndexedChapter {
   normalized: string;
   offsets: Int32Array;
 }
-const editionIndexes = new WeakMap<Document, { hash: string; first: Element | null; chapters: IndexedChapter[] }>();
-function editionIndex(doc: Document, book: EpubDocument) {
+const editionIndexes = new WeakMap<ReaderRoot, { hash: string; first: Element | null; chapters: IndexedChapter[] }>();
+function editionIndex(doc: ReaderRoot, book: EpubDocument) {
   const first = doc.querySelector("[data-chapter][data-paragraph]");
   const cached = editionIndexes.get(doc);
   if (cached?.hash === book.sha256 && cached.first === first) return cached.chapters;
@@ -52,26 +70,31 @@ function editionIndex(doc: Document, book: EpubDocument) {
 }
 
 /** Explicit edition anchors first; imported quotes are placed only when unique. */
-export function matchReaderHighlight(doc: Document, book: EpubDocument, highlight: SavedHighlight): Range | undefined {
+export function matchReaderHighlight(doc: ReaderRoot, book: EpubDocument, highlight: SavedHighlight): Range | undefined {
+  const location = matchReaderLocation(doc, book, highlight);
+  return location && readerLocationRange(doc, location);
+}
+/** Where a saved highlight sits in this edition, independent of which chapters are on screen. */
+export function matchReaderLocation(doc: ReaderRoot, book: EpubDocument, highlight: SavedHighlight): ReaderLocation | undefined {
   const quote = normalizedQuote(highlight.text);
   if (!quote) return undefined;
   if (highlight.sourceLocation?.startsWith("epub:")) {
-    const [prefix, hash, ...values] = highlight.sourceLocation.split(":");
-    const numbers = values.map(Number);
-    if (prefix !== "epub" || numbers.length !== 5 || !numbers.every((value) => Number.isSafeInteger(value) && value >= 0)) return undefined;
+    const [, hash] = highlight.sourceLocation.split(":");
+    const location = parseReaderLocation(highlight.sourceLocation);
+    if (!location) return undefined;
     if (hash === book.sha256) {
-      const range = rangeAt(doc, numbers[0]!, numbers[1]!, numbers[2]!, numbers[3]!, numbers[4]!);
-      return range && normalizedQuote(range.toString()) === quote ? range : undefined;
+      const range = readerLocationRange(doc, location);
+      return range && normalizedQuote(range.toString()) === quote ? location : undefined;
     }
     // A deliberately attached replacement file may locate the unchanged quote,
     // but never inherits coordinates from a different edition or format.
   }
   const candidates = readerHighlightCandidates(doc, book, highlight.text, 2);
-  return candidates.length === 1 ? candidates[0]!.range : undefined;
+  return candidates.length === 1 ? parseReaderLocation(candidates[0]!.location) : undefined;
 }
 export interface ReaderHighlightCandidate { range: Range; chapter: number; location: string; excerpt: string }
 /** Explicit review may find an imported quote in several places or a new edition. */
-export function readerHighlightCandidates(doc: Document, book: EpubDocument, text: string, limit = 100): ReaderHighlightCandidate[] {
+export function readerHighlightCandidates(doc: ReaderRoot, book: EpubDocument, text: string, limit = 100): ReaderHighlightCandidate[] {
   const quote = normalizedQuote(text);
   if (!quote) return [];
   const found: ReaderHighlightCandidate[] = [];

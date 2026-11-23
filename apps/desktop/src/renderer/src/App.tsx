@@ -242,7 +242,8 @@ function Application() {
         <div id="content" tabIndex={-1} className="ui-main">
           <Page key={pageKey}>
             {route.name === "library" && <LibraryPage {...(route.collectionId ? { initialCollectionId: route.collectionId } : {})} {...(route.tagId ? { initialTagId: route.tagId } : {})} />}
-            {route.name === "book" && <BookPage bookId={route.bookId} focusHighlightId={route.highlightId} mergeWith={route.mergeWith} />}
+            {/* Keyed by book as well as by page, so a late reply for the previous book can never land on this one. */}
+            {route.name === "book" && <BookPage key={route.bookId} bookId={route.bookId} focusHighlightId={route.highlightId} mergeWith={route.mergeWith} />}
             {route.name === "highlights" && <HighlightsPage {...(route.search ? { initialSearch: route.search } : {})} {...(route.tagId ? { initialTagId: route.tagId } : {})} {...(route.bookId ? { initialBookId: route.bookId } : {})} />}
             {(route.name === "threads" || route.name === "thread") && <ThreadsPage {...(route.name === "thread" ? { selectedId: route.threadId } : {})} />}
             {route.name === "statistics" && <StatisticsPage />}

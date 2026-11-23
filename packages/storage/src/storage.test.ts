@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { MAX_NOTE_BYTES, MAX_NOTES_PER_HIGHLIGHT, MAX_SYNC_ORGANIZATION_MEMBERSHIPS, normalizeOrganizationName } from "@leaflogue/contracts";
 import type { SyncedChange } from "@leaflogue/contracts";
-import { LocalLibrary, applyMigrations, latestSchemaVersion, migrations, recoverInterruptedFileReplacement, replaceFileWithRollback, validateLibraryBackup } from "./index";
+import { LocalLibrary, applyMigrations, latestSchemaVersion, migrations, recoverInterruptedFileReplacement, recoverLibraryAfterRollback, replaceFileWithRollback, validateLibraryBackup } from "./index";
 
 describe("SQLite migrations", () => {
   it("creates and reopens a durable library", () => {
@@ -73,6 +73,111 @@ describe("SQLite migrations", () => {
       expect(statSync(snapshot).isFile()).toBe(true);
     } finally {
       rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  describe("a library migrated by a newer release that was then undone", () => {
+    function migratedByNewerRelease() {
+      const directory = mkdtempSync(join(tmpdir(), "leaflogue-rollback-"));
+      const path = join(directory, "library.sqlite");
+      const snapshot = join(directory, `library.before-upgrade.schema-${latestSchemaVersion}.sqlite`);
+      const before = new LocalLibrary(path);
+      before.createBook({ title: "Before", authors: [] });
+      before.close();
+      const live = new DatabaseSync(path);
+      live.prepare("VACUUM INTO ?").run(snapshot);
+      // Even a migration that only adds an index makes this release refuse it.
+      live.exec(`INSERT INTO books (id, title, authors_json, created_at, updated_at)
+          VALUES ('20000000-0000-4000-8000-000000000000', 'After', '[]', 2, 2);
+        CREATE INDEX books_newer_release ON books(title);
+        PRAGMA user_version = ${latestSchemaVersion + 1};`);
+      live.close();
+      return { directory, path, snapshot };
+    }
+    const titles = (path: string) => {
+      const database = new DatabaseSync(path, { readOnly: true });
+      try { return database.prepare("SELECT title FROM books ORDER BY title").all().map((row) => row.title); }
+      finally { database.close(); }
+    };
+
+    it("is refused rather than opened or changed", () => {
+      const { directory, path } = migratedByNewerRelease();
+      try {
+        const size = statSync(path).size;
+        expect(() => new LocalLibrary(path)).toThrow(/newer than this Leaflogue build supports/);
+        expect(() => new LocalLibrary(path, { readOnly: true })).toThrow(/matching Leaflogue desktop app/);
+        expect(statSync(path).size).toBe(size);
+        expect(titles(path)).toEqual(["After", "Before"]);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("puts back the copy saved before the upgrade and keeps the newer library beside it", () => {
+      const { directory, path, snapshot } = migratedByNewerRelease();
+      try {
+        const result = recoverLibraryAfterRollback(path, { snapshotNotBefore: 0, now: () => 7 });
+        const setAsidePath = join(directory, `library.newer-schema-${latestSchemaVersion + 1}.7.sqlite`);
+        expect(result).toEqual({ outcome: "restored", newerSchemaVersion: latestSchemaVersion + 1, setAsidePath });
+        const restored = new LocalLibrary(path);
+        expect(restored.schemaVersion).toBe(latestSchemaVersion);
+        expect(restored.listBooks().map((book) => book.title)).toEqual(["Before"]);
+        expect(restored.getSyncState().snapshotRequired).toBe(true);
+        restored.close();
+        expect(titles(setAsidePath)).toEqual(["After", "Before"]);
+        expect(statSync(setAsidePath).mode & 0o777).toBe(0o600);
+        expect(existsSync(snapshot)).toBe(true);
+        expect(readdirSync(directory).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+        expect(recoverLibraryAfterRollback(path, { snapshotNotBefore: 0 })).toEqual({ outcome: "not-needed" });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("leaves the newer library untouched without a pre-upgrade copy from this update", () => {
+      const { directory, path, snapshot } = migratedByNewerRelease();
+      try {
+        const stale = { outcome: "kept-newer", newerSchemaVersion: latestSchemaVersion + 1 };
+        expect(recoverLibraryAfterRollback(path, { snapshotNotBefore: Date.now() + 60_000 })).toEqual(stale);
+        rmSync(snapshot);
+        expect(recoverLibraryAfterRollback(path, { snapshotNotBefore: 0 })).toEqual(stale);
+        expect(titles(path)).toEqual(["After", "Before"]);
+        expect(readdirSync(directory).filter((name) => name.includes("newer-schema"))).toEqual([]);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("does nothing to a library this release can open", () => {
+      const directory = mkdtempSync(join(tmpdir(), "leaflogue-rollback-"));
+      const path = join(directory, "library.sqlite");
+      try {
+        expect(recoverLibraryAfterRollback(path, { snapshotNotBefore: 0 })).toEqual({ outcome: "not-needed" });
+        new LocalLibrary(path).close();
+        expect(recoverLibraryAfterRollback(path, { snapshotNotBefore: 0 })).toEqual({ outcome: "not-needed" });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it("looks up a highlight's import provenance through an index instead of scanning source annotations", () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      applyMigrations(database);
+      // Same correlated provenance check listHighlights uses for every row.
+      const plan = database.prepare(`EXPLAIN QUERY PLAN
+        SELECT highlights.id FROM highlights
+        WHERE EXISTS (SELECT 1 FROM source_annotations WHERE source_annotations.highlight_id = highlights.id)`)
+        .all()
+        .map((row) => String(row.detail));
+      const lookups = plan.filter((detail) => detail.includes("source_annotations"));
+      expect(lookups.length).toBeGreaterThan(0);
+      expect(lookups.every((detail) => detail.startsWith("SEARCH"))).toBe(true);
+      expect(lookups.join("\n")).toContain("source_annotations_highlight (highlight_id=?)");
+      expect(plan.join("\n")).not.toMatch(/SCAN source_annotations/u);
+    } finally {
+      database.close();
     }
   });
 

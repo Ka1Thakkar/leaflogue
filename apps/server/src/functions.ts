@@ -85,6 +85,8 @@ export const FUNCTIONS: Readonly<Record<string, ServerFunction>> = {
     notes: optional(literal("with", "without")),
     source: optional(literal("typed", "imported")),
     date: optional(string(10)),
+    dateFrom: optional(number),
+    dateBefore: optional(number),
     dateKind: optional(literal("added", "imported")),
     sort: optional(literal("newest", "oldest", "updated", "relevance")),
     paginationOpts,

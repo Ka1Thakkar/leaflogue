@@ -16,6 +16,21 @@ Leaflogue links the original file; it does not make another copy. Keep that
 file available where you attached it. If Calibre manages your books, use
 [Link from Calibre](/library/calibre/) so Leaflogue can follow catalogue renames.
 
+### If the book file moves or changes
+
+If Leaflogue can't open the linked file, the Reader tab explains what happened:
+the file was moved or deleted, it has changed (perhaps to a different edition),
+or it can't be read. Choose **Locate file…** and pick the file in its new place.
+
+- If it is the same edition, Leaflogue links it again and keeps your reading
+  position, bookmarks and highlight locations.
+- If it is a different edition, Leaflogue asks first, because your place and
+  highlight locations may shift. Bookmarks that still exist in the new file are
+  kept.
+
+Books linked from Calibre show **Reconnect from Calibre** instead. You can also
+choose **Unlink book file** and link the book again from scratch.
+
 The Reader and Assistant share the right context panel. Drag its left edge to
 resize it, or choose **Expand context panel** for more reading space.
 **Restore split view** brings the book page back beside it. The header's
@@ -27,11 +42,12 @@ The reader uses pages. Use the arrow keys, **Space** or **Page Down** to move
 forward; **Shift+Space** or **Page Up** goes back. Mouse-wheel movement and
 clicking near the left or right page edge also turn pages. Keyboard page turns
 work while the Reader tab is visible, unless you are typing or using another
-control or dialog. Reading position saves automatically.
+control, menu, list or dialog. Those keep their own keys, including
+**Shift+F10**. Reading position saves automatically.
 
 Right-click the page, or press **Shift+F10**, to open reader options over the
-book. Choose a chapter under **Contents**, change **Typography**, or check
-reading progress. Press **Escape** or click outside to return to the page.
+book. The **Book** tab contains chapter navigation, search and bookmarks.
+The **Text**, **Layout**, **Appearance** and **Presets** tabs control reading preferences. Press **Escape** or click outside to return to the page.
 Page-turn buttons are not part of this menu.
 
 - **Dark mode** starts with black paper and white text. Turn it off for white
@@ -42,7 +58,37 @@ Page-turn buttons are not part of this menu.
 
 Display choices are remembered on this device. Changing text size or panel
 width reflows the pages, so the page count can change while your place stays
-anchored to the text.
+anchored to the text. In a long book the total page count starts as an
+estimate and may shift by a few pages as you read; your current page always
+moves forward one page at a time. Each new chapter starts on a fresh page.
+
+## Reading preferences in development
+
+The next desktop build adds adjustable text size, weight, alignment, line and
+paragraph spacing, indentation, letter/word spacing and hyphenation. Font-family
+selection is not included. Publisher settings remain available; headings and
+centered dedications retain their alignment and emphasis.
+
+Use **Layout** for side/top/bottom margins, reading width and automatic, one- or
+two-column spreads. Narrow readers stay single-column. Enable **Reading progress**,
+**Chapter information** or **Clock** to show them below the page while options are
+closed. These indicators are off by default.
+
+**Appearance** adds sepia and a page/app surround choice alongside dark mode and
+theme colours. Theme colours take precedence over sepia. **Presets** saves named
+combinations, restores publisher typography, resets preferences and optionally
+keeps different preferences for this book. Turning **Use separate preferences
+for this book** off keeps that book's settings, so turning it back on restores
+them; choose **Forget this book's settings** to remove them. Preferences are local to this device;
+they are not library data or synchronized annotations.
+
+Changes preview immediately and repaginate around the current text location.
+Your alignment, line spacing, paragraph spacing and indentation take priority
+over the book's own paragraph styles, while titles, captions and verse keep
+their layout.
+PDFs keep their fixed layout and use zoom rather than these typography controls.
+Automatic hyphenation depends on the language information and available browser
+dictionaries; some embedded fonts offer only limited weight variation.
 
 ## Save highlights and notes
 
@@ -63,6 +109,11 @@ highlight**, or **Open in book** to find it on the book page. Highlights with
 notes have a margin note icon; click it to read the notes. Removing a
 highlight asks for confirmation, including its attached notes.
 
+To use the keyboard instead, open reader options and expand **Highlights in
+this book**. Choose a highlight to go to its page and open the same actions,
+including its colour, **Add note** and **Remove highlight**. Press **Escape**
+or choose **Cancel** to return to the page.
+
 From a library passage's actions, choose **Read in context** to open its
 matching EPUB page. If you have not linked a file, link it when prompted.
 Missing or ambiguous matches produce a message instead of a guessed jump.
@@ -74,9 +125,10 @@ sync, SQLite backups, or JSON/Markdown exports. Link the file separately on
 each computer and keep your original EPUBs backed up. See
 [Back up and restore](/library/backups/#epub-files-and-reading-positions).
 
-**Unlink book file** in reader options removes the local link and reading
-position after confirmation. It keeps the original file, library book,
-highlights, and notes. Unlink before attaching another edition. Existing
+**Unlink book file** in reader options removes the local link after
+confirmation, along with your reading position, bookmarks and reviewed
+highlight locations for that file, and its Calibre link if it has one. It keeps
+the original file, library book, highlights, and notes. Unlink before attaching another edition. Existing
 edition-specific highlight anchors may not match a replacement file.
 
 The reader preserves supported publisher formatting, images, and fonts while
