@@ -242,7 +242,7 @@ export class EpubStore {
   }
   /** Damaged optional state is kept beside the original for recovery, never deleted. */
   private async setAside(target: string) {
-    await rename(target, `${target}.corrupt-${Date.now()}`).catch(() => undefined);
+    await rename(target, `${target}.corrupt-${Date.now()}-${randomUUID().slice(0, 8)}`).catch(() => undefined);
   }
   /** Optional per-edition state. Unreadable or unparseable files never block opening. */
   private async sidecar(bookId: string, suffix: string): Promise<unknown> {
