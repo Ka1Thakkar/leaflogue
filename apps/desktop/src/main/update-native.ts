@@ -3,7 +3,7 @@ import { constants, existsSync } from "node:fs";
 import { access, lstat, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import type { UpdateManifest } from "./update-manifest";
+import { compareVersions, type UpdateManifest } from "./update-manifest";
 
 function run(command: string, args: string[]): Promise<{ stdout: string }> {
   return new Promise((resolve, reject) => {
@@ -85,14 +85,17 @@ rm -rf "$backup"
 rm -rf "$work"
 `;
 
-/** Puts the kept previous bundle back after this app exits, then opens it. */
+/**
+ * Puts the kept previous bundle back after this app exits, then opens it. The
+ * update record stays: the previous version reads it on start to check the
+ * library (checkNativeUpdateStartup) and then removes it.
+ */
 export const MAC_ROLLBACK_HELPER = `#!/bin/sh
 set -eu
 parent="$1"
 target="$2"
 backup="$3"
-record="$4"
-shift 4
+shift 3
 count=0
 while kill -0 "$parent" 2>/dev/null; do
   count=$((count + 1))
@@ -106,7 +109,6 @@ if ! mv "$backup" "$target"; then
   mv "$backup.failed" "$target"
   exit 1
 fi
-rm -f "$record"
 /usr/bin/open "$target" --args "$@" || true
 rm -rf "$backup.failed"
 `;
@@ -284,6 +286,7 @@ export interface PendingNativeUpdate {
 const PENDING_RECORD = "native-update.json";
 const HEALTH_MARKER = "native-update.healthy";
 const ROLLBACK_HELPER = "native-update-rollback.sh";
+const ROLLBACK_NOTICE = "native-update-notice.json";
 /** Two starts that never became healthy are enough; the third goes back. */
 export const MAX_UNHEALTHY_LAUNCHES = 2;
 
@@ -312,11 +315,33 @@ export interface UpdateHealthEnvironment {
   readonly files?: UpdateHealthFiles;
 }
 
+/** Mirrors LibraryRollbackRecovery from @leaflogue/storage. */
+export type LibraryRollbackOutcome =
+  | { readonly outcome: "not-needed" }
+  | { readonly outcome: "restored"; readonly setAsidePath: string }
+  | { readonly outcome: "kept-newer" };
+
 export interface UpdateStartupEnvironment extends UpdateHealthEnvironment {
   readonly pid: number;
   readonly args: readonly string[];
   readonly quit: () => void;
   readonly launchHelper?: (command: string, args: string[]) => Promise<unknown>;
+  /**
+   * Runs before the library opens when this older version is running again
+   * after an update was undone. The newer version may already have migrated
+   * the library; this puts back the copy saved just before that migration
+   * when one written after `snapshotNotBefore` exists. If it throws, the record
+   * is kept and the next start tries again.
+   */
+  readonly recoverLibrary?: (snapshotNotBefore: number) => LibraryRollbackOutcome | Promise<LibraryRollbackOutcome>;
+}
+
+/** Shown once on the next window after an update was undone. */
+export interface NativeUpdateRollbackNotice {
+  readonly from: string;
+  readonly to: string;
+  readonly library: LibraryRollbackOutcome["outcome"];
+  readonly setAsidePath?: string;
 }
 
 function bundleOf(executable: string): string {
@@ -349,6 +374,8 @@ async function readPending(files: UpdateHealthFiles, directory: string): Promise
  * - "none": no update is waiting on this app.
  * - "pending": this version has not reported healthy yet; this start is counted.
  * - "cleaned": the update either finished earlier or never took; leftovers removed.
+ *   When this is the older version running again, the library is checked first
+ *   (recoverLibrary) and a one-time notice is left for the window.
  * - "rolling-back": too many unhealthy starts; the previous version is being
  *   restored and this app has been asked to quit.
  */
@@ -361,7 +388,16 @@ export async function checkNativeUpdateStartup(environment: UpdateStartupEnviron
   const markerPath = join(environment.directory, HEALTH_MARKER);
   if (record.version !== environment.version) {
     // The swap never happened or was already undone. This app runs from the
-    // installed location, so a kept copy is no longer needed.
+    // installed location, so a kept copy is no longer needed. A newer version
+    // installed by hand since then is not a rollback.
+    if (environment.recoverLibrary && compareVersions(environment.version, record.version) < 0) {
+      const library = await environment.recoverLibrary(record.installedAt);
+      const notice: NativeUpdateRollbackNotice = {
+        from: record.version, to: environment.version, library: library.outcome,
+        ...(library.outcome === "restored" ? { setAsidePath: library.setAsidePath } : {}),
+      };
+      await files.writeFile(join(environment.directory, ROLLBACK_NOTICE), JSON.stringify(notice), 0o600);
+    }
     await files.remove(record.backup);
     await files.remove(recordPath);
     await files.remove(markerPath);
@@ -384,7 +420,7 @@ export async function checkNativeUpdateStartup(environment: UpdateStartupEnviron
   const helper = join(environment.directory, ROLLBACK_HELPER);
   await files.writeFile(helper, MAC_ROLLBACK_HELPER, 0o700);
   const launch = environment.launchHelper ?? launchUpdateHelper;
-  await launch("/bin/sh", [helper, String(environment.pid), record.target, record.backup, recordPath, ...environment.args]);
+  await launch("/bin/sh", [helper, String(environment.pid), record.target, record.backup, ...environment.args]);
   environment.quit();
   return "rolling-back";
 }
@@ -403,4 +439,47 @@ export async function markNativeUpdateHealthy(environment: UpdateHealthEnvironme
   await files.remove(join(environment.directory, PENDING_RECORD));
   await files.remove(record.backup);
   return true;
+}
+
+/** The notice left by an undone update, if any. Remove it with clearNativeUpdateNotice once shown. */
+export async function readNativeUpdateNotice(environment: Pick<UpdateHealthEnvironment, "platform" | "directory" | "files">): Promise<NativeUpdateRollbackNotice | undefined> {
+  if (environment.platform !== "darwin") return undefined;
+  const files = environment.files ?? realFiles;
+  let raw: string;
+  try { raw = await files.readFile(join(environment.directory, ROLLBACK_NOTICE)); }
+  catch { return undefined; }
+  try {
+    const value = JSON.parse(raw) as Partial<NativeUpdateRollbackNotice>;
+    if (typeof value.from === "string" && typeof value.to === "string" &&
+        (value.library === "not-needed" || value.library === "restored" || value.library === "kept-newer") &&
+        (value.setAsidePath === undefined || typeof value.setAsidePath === "string")) {
+      return { from: value.from, to: value.to, library: value.library, ...(value.setAsidePath ? { setAsidePath: value.setAsidePath } : {}) };
+    }
+  } catch { /* fall through */ }
+  await files.remove(join(environment.directory, ROLLBACK_NOTICE));
+  return undefined;
+}
+
+export async function clearNativeUpdateNotice(environment: Pick<UpdateHealthEnvironment, "directory" | "files">): Promise<void> {
+  await (environment.files ?? realFiles).remove(join(environment.directory, ROLLBACK_NOTICE));
+}
+
+/** Plain wording for the one-time dialog after an undone update. */
+export function nativeUpdateNoticeText(notice: NativeUpdateRollbackNotice): { readonly message: string; readonly detail: string } {
+  const message = `Leaflogue ${notice.from} didn't start properly, so Leaflogue went back to version ${notice.to}.`;
+  if (notice.library === "restored") {
+    return {
+      message,
+      detail: `Leaflogue ${notice.from} had already updated your library, which this version can't open, so Leaflogue put back the copy it saved just before the update. ` +
+        `Anything changed after the update isn't in this copy. Nothing was deleted: the updated library is kept at ${notice.setAsidePath ?? "Leaflogue's data folder"}.`,
+    };
+  }
+  if (notice.library === "kept-newer") {
+    return {
+      message,
+      detail: `Leaflogue ${notice.from} had already updated your library, and no copy from before the update was found, so this version can't open it. ` +
+        `Your library was not changed. Install Leaflogue ${notice.from} or later to open it again.`,
+    };
+  }
+  return { message, detail: "Your library was not affected." };
 }

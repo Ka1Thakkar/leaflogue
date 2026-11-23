@@ -116,7 +116,11 @@ A network or verification failure leaves the installed version in place.
 On Mac, move the app from its disk image into Applications before updating.
 The Mac app keeps your previous version until the new one has opened your
 library. If the new version doesn't start, or closes before it gets that far,
-Leaflogue puts the previous version back and opens it. On Windows, the
+Leaflogue puts the previous version back, opens it, and tells you what
+happened. If the new version had already updated your library, the previous
+version goes back to the copy Leaflogue saved just before the update. The
+updated library isn't deleted: it stays in Leaflogue's data folder, and the
+message tells you where. On Windows, the
 installer replaces the app in place; if a new version won't start, download and
 install the previous release from GitHub Releases.
 Portable Windows ZIP and Linux tarball copies use manual replacement from

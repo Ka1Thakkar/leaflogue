@@ -194,7 +194,7 @@ import {
   type ReadonlyDatabase,
 } from "@leaflogue/importers";
 import { collectBooxExports, collectKOReaderSidecars } from "./reader-folders";
-import { LocalLibrary, recoverInterruptedFileReplacement, replaceFileWithRollback, validateLibraryBackup } from "@leaflogue/storage";
+import { LocalLibrary, recoverInterruptedFileReplacement, recoverLibraryAfterRollback, replaceFileWithRollback, validateLibraryBackup } from "@leaflogue/storage";
 import { CURRENT_SETUP_VERSION, ConvexSyncTransport, acceptAiProviderTerms, assertCompatibleConvexDeployment, canonicalConfigPath, checkConvex, checkPostgres, createPostgresClient, ensureConvexLibrary, explainPassageDisclosure, explainPassageRequest, generateAiText, type CompanionInput, companionInScope, companionNeedsScopeCheck, companionOutOfScope, companionRequest, companionScopeRequest, parseCompanionAnswer, validateCompanionInput, importThemeFile, loadUpdatePreferences, writeUpdatePreferences, loadDashboardLayouts, writeDashboardLayout, writeCustomWidget, deleteCustomWidget, importCustomWidgetFiles, writeCustomWidgetExport, initializePostgres, loadAiRuntimeProvider, parseExplanation, loadAppearanceConfig, loadRemoteConfig, prepareConvexLibrary, resolveAppearanceFiles, setupCompletedVersion, summarizeAiConfig, summarizeRemoteConfig, writeAiConfig, writeAppearanceConfig, writeRemoteConfig, writeSetupCompletion, writeThemeExport } from "@leaflogue/remote";
 import { readingStatusHistoryPage, registerTrustedHandler, validateAiSettings, validateCommitImport, validateConflictResolution, validateDailyRequest, validateExternalUrl, validateHighlightQuery, validateNoteOrigin, validateSetBookCompletionDate, validateSetBookReadingStatus, validateSyncConflictResolution, validateSyncRunOptions, validateThreadCreate, validateThreadDelete, validateThreadMembership, validateThreadUpdate } from "./ipc-security";
 import { applicationMenuTemplate } from "./application-menu";
@@ -207,7 +207,7 @@ import { createSyncStatusTracker } from "./sync-status";
 import { rendererContentPolicyForRequest, validateDevelopmentRendererUrl } from "./content-policy";
 import { TRUSTED_UPDATE_KEYS } from "./update-keys";
 import { DesktopUpdater } from "./update-service";
-import { checkNativeUpdateStartup, installNativeUpdate, markNativeUpdateHealthy, nativeUpdateUnavailable } from "./update-native";
+import { checkNativeUpdateStartup, clearNativeUpdateNotice, installNativeUpdate, markNativeUpdateHealthy, nativeUpdateNoticeText, nativeUpdateUnavailable, readNativeUpdateNotice } from "./update-native";
 import { scheduleAutomaticUpdateChecks } from "./update-scheduler";
 import { writeMarkdownExport } from "./markdown-export";
 import { mountRoots, watchConnectedReaders, type DetectedReader } from "./connected-readers";
@@ -333,6 +333,16 @@ function updateHealthEnvironment() {
   return { platform: process.platform, directory: desktopPaths.stateDirectory, version: app.getVersion(), executable: process.execPath };
 }
 
+/** Once, after a Mac update was undone: say so, and what happened to the library. */
+async function showNativeUpdateNotice(): Promise<void> {
+  const environment = updateHealthEnvironment();
+  const notice = await readNativeUpdateNotice(environment);
+  if (!notice || !mainWindow) return;
+  const { message, detail } = nativeUpdateNoticeText(notice);
+  await dialog.showMessageBox(mainWindow, { type: notice.library === "not-needed" ? "info" : "warning", title: "Leaflogue update undone", message, detail, buttons: ["OK"] });
+  await clearNativeUpdateNotice(environment);
+}
+
 function createWindow(): void {
   const appearance = describeAppearance();
   const backgroundColor = applyNativeAppearance(appearance, nativeTheme);
@@ -364,7 +374,10 @@ function createWindow(): void {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event) => event.preventDefault());
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
+    if (app.isPackaged) void showNativeUpdateNotice().catch(() => undefined);
+  });
   mainWindow.once("closed", () => { mainWindow = undefined; });
   // A Mac update keeps the previous app until this point: the window loaded
   // and the library opened. Only then is the previous copy let go.
@@ -466,7 +479,14 @@ void app.whenReady().then(async () => {
   // Before the library opens: a Mac update that never started healthily goes
   // back to the previous version instead of trying again (update-native.ts).
   if (app.isPackaged) {
-    const update = await checkNativeUpdateStartup({ ...updateHealthEnvironment(), pid: process.pid, args: process.argv.slice(1), quit: () => app.quit() }).catch(() => "none");
+    const update = await checkNativeUpdateStartup({
+      ...updateHealthEnvironment(), pid: process.pid, args: process.argv.slice(1), quit: () => app.quit(),
+      // The newer version may have migrated the library before it failed.
+      recoverLibrary: (snapshotNotBefore) => {
+        recoverInterruptedRestore(desktopPaths.libraryFile);
+        return recoverLibraryAfterRollback(desktopPaths.libraryFile, { snapshotNotBefore });
+      },
+    }).catch(() => "none");
     if (update === "rolling-back") return;
   }
 

@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkNativeUpdateStartup, launchUpdateHelper, markNativeUpdateHealthy, MAC_ROLLBACK_HELPER, MAX_UNHEALTHY_LAUNCHES, WINDOWS_UPDATE_HELPER, MAC_UPDATE_HELPER, nativeUpdateUnavailable, type UpdateHealthFiles } from "./update-native";
+import { DatabaseSync } from "node:sqlite";
+import { LocalLibrary, latestSchemaVersion, recoverLibraryAfterRollback } from "@leaflogue/storage";
+import { checkNativeUpdateStartup, clearNativeUpdateNotice, launchUpdateHelper, markNativeUpdateHealthy, MAC_ROLLBACK_HELPER, MAX_UNHEALTHY_LAUNCHES, WINDOWS_UPDATE_HELPER, MAC_UPDATE_HELPER, nativeUpdateNoticeText, nativeUpdateUnavailable, readNativeUpdateNotice, type UpdateHealthFiles } from "./update-native";
 
 // Hosted Windows runners can spend several seconds starting PowerShell. Wait
 // for the actual readiness marker and include helper output on failure.
@@ -176,11 +178,13 @@ describe.skipIf(process.platform === "win32")("Mac update keeps the previous app
     execFileSync("/bin/sh", [f.script(MAC_UPDATE_HELPER, true), "99999999", f.staged, f.target, f.backup, f.work, f.marker]);
     const record = join(f.path, "state", "native-update.json");
     writeFileSync(record, "{}");
-    execFileSync("/bin/sh", [f.script(MAC_ROLLBACK_HELPER, true), "99999999", f.target, f.backup, record, "--flag"]);
+    execFileSync("/bin/sh", [f.script(MAC_ROLLBACK_HELPER, true), "99999999", f.target, f.backup, "--flag"]);
     expect(f.version()).toBe("old");
     expect(existsSync(f.backup)).toBe(false);
     expect(existsSync(`${f.backup}.failed`)).toBe(false);
-    expect(existsSync(record)).toBe(false);
+    // The restored version reads the record to check the library, then removes it.
+    expect(existsSync(record)).toBe(true);
+    expect(readFileSync(f.opened, "utf8").trim().split("\n").at(-1)).toBe(`${f.target} --args --flag`);
   });
 });
 
@@ -219,7 +223,7 @@ describe("startup health of a Mac update", () => {
     const { result, launchHelper, quit } = start(api);
     expect(await result).toBe("rolling-back");
     expect(files.get("/state/native-update-rollback.sh")).toBe(MAC_ROLLBACK_HELPER);
-    expect(launchHelper).toHaveBeenCalledWith("/bin/sh", ["/state/native-update-rollback.sh", "42", target, backup, "/state/native-update.json", "--x"]);
+    expect(launchHelper).toHaveBeenCalledWith("/bin/sh", ["/state/native-update-rollback.sh", "42", target, backup, "--x"]);
     expect(quit).toHaveBeenCalledOnce();
   });
 
@@ -245,6 +249,44 @@ describe("startup health of a Mac update", () => {
     expect(files.has("/state/native-update.json")).toBe(false);
   });
 
+  it("checks the library before the previous version opens it again, and leaves a notice", async () => {
+    const { files, api } = memory({ "/state/native-update.json": pending(3) }, []);
+    const recoverLibrary = vi.fn().mockReturnValue({ outcome: "restored", setAsidePath: "/data/library.newer-schema-21.5.sqlite" });
+    expect(await start(api, { version: "0.1.0", recoverLibrary }).result).toBe("cleaned");
+    expect(recoverLibrary).toHaveBeenCalledWith(1);
+    expect(files.has("/state/native-update.json")).toBe(false);
+    const notice = await readNativeUpdateNotice({ platform: "darwin", directory, files: api });
+    expect(notice).toEqual({ from: "0.2.0", to: "0.1.0", library: "restored", setAsidePath: "/data/library.newer-schema-21.5.sqlite" });
+    expect(nativeUpdateNoticeText(notice!).detail).toContain("/data/library.newer-schema-21.5.sqlite");
+    await clearNativeUpdateNotice({ directory, files: api });
+    expect(await readNativeUpdateNotice({ platform: "darwin", directory, files: api })).toBeUndefined();
+  });
+
+  it("says the library was not affected when the newer version never migrated it", async () => {
+    const { api } = memory({ "/state/native-update.json": pending(3) }, []);
+    const recoverLibrary = vi.fn().mockReturnValue({ outcome: "not-needed" });
+    await start(api, { version: "0.1.0", recoverLibrary }).result;
+    const notice = await readNativeUpdateNotice({ platform: "darwin", directory, files: api });
+    expect(notice).toEqual({ from: "0.2.0", to: "0.1.0", library: "not-needed" });
+    expect(nativeUpdateNoticeText(notice!).detail).toBe("Your library was not affected.");
+  });
+
+  it("keeps the record to try again when the library check fails", async () => {
+    const { files, api } = memory({ "/state/native-update.json": pending(3) }, []);
+    const recoverLibrary = vi.fn().mockImplementation(() => { throw new Error("disk full"); });
+    await expect(start(api, { version: "0.1.0", recoverLibrary }).result).rejects.toThrow("disk full");
+    expect(files.has("/state/native-update.json")).toBe(true);
+    expect(files.has("/state/native-update-notice.json")).toBe(false);
+  });
+
+  it("does not treat a newer version installed by hand as a rollback", async () => {
+    const { files, api } = memory({ "/state/native-update.json": pending(1) }, []);
+    const recoverLibrary = vi.fn();
+    expect(await start(api, { version: "0.3.0", recoverLibrary }).result).toBe("cleaned");
+    expect(recoverLibrary).not.toHaveBeenCalled();
+    expect(files.has("/state/native-update-notice.json")).toBe(false);
+  });
+
   it("leaves records alone for other copies, development runs and Windows", async () => {
     const { files, folders, api } = memory({ "/state/native-update.json": pending(5) });
     expect(await start(api, { executable: "/Users/me/leaflogue/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron" }).result).toBe("none");
@@ -260,5 +302,61 @@ describe("startup health of a Mac update", () => {
     expect(await result).toBe("none");
     expect(launchHelper).not.toHaveBeenCalled();
     expect(files.has("/state/native-update.json")).toBe(false);
+  });
+});
+
+/** Real files in a temporary folder and the real storage recovery; no app is launched. */
+describe.skipIf(process.platform === "win32")("previous version running again after an update migrated the library", () => {
+  function setup() {
+    const root = folder();
+    const state = join(root, "state"), data = join(root, "data");
+    mkdirSync(state); mkdirSync(data);
+    const target = join(root, "Applications", "Leaflogue.app");
+    const backup = join(root, "Applications", ".leaflogue-update-1.app.previous");
+    const library = join(data, "library.sqlite");
+    const environment = { platform: "darwin" as const, directory: state, version: "0.1.0", executable: join(target, "Contents", "MacOS", "Leaflogue"), pid: 42, args: [], quit: vi.fn(), launchHelper: vi.fn(),
+      recoverLibrary: (snapshotNotBefore: number) => recoverLibraryAfterRollback(library, { snapshotNotBefore }) };
+    const record = (installedAt: number) => writeFileSync(join(state, "native-update.json"), JSON.stringify({ version: "0.2.0", target, backup, installedAt, launches: 3 }));
+    return { state, data, library, environment, record };
+  }
+  function titles(path: string) {
+    const database = new DatabaseSync(path, { readOnly: true });
+    try { return database.prepare("SELECT title FROM books ORDER BY title").all().map((row) => row.title); } finally { database.close(); }
+  }
+
+  it("puts back the pre-update copy and keeps the updated library beside it", async () => {
+    const { data, library, environment, record } = setup();
+    const before = new LocalLibrary(library);
+    before.createBook({ title: "Before the update", authors: [] });
+    before.close();
+    const installedAt = Date.now() - 1000;
+    record(installedAt);
+    // What the newer version does: save a copy, migrate, then keep working.
+    const live = new DatabaseSync(library);
+    live.prepare("VACUUM INTO ?").run(join(data, `library.before-upgrade.schema-${latestSchemaVersion}.sqlite`));
+    live.exec(`INSERT INTO books (id, title, authors_json, created_at, updated_at) VALUES ('20000000-0000-4000-8000-000000000000', 'After the update', '[]', 2, 2);
+      CREATE INDEX books_from_the_future ON books(title); PRAGMA user_version = ${latestSchemaVersion + 1};`);
+    live.close();
+    expect(() => new LocalLibrary(library)).toThrow(/newer than this Leaflogue build/);
+
+    expect(await checkNativeUpdateStartup(environment)).toBe("cleaned");
+    const reopened = new LocalLibrary(library);
+    expect(reopened.listBooks().map((book) => book.title)).toEqual(["Before the update"]);
+    expect(reopened.getSyncState().snapshotRequired).toBe(true);
+    reopened.close();
+    const notice = await readNativeUpdateNotice({ platform: "darwin", directory: environment.directory });
+    expect(notice?.library).toBe("restored");
+    expect(titles(notice!.setAsidePath!)).toEqual(["After the update", "Before the update"]);
+  });
+
+  it("leaves a library the newer version never migrated alone", async () => {
+    const { library, environment, record } = setup();
+    const current = new LocalLibrary(library);
+    current.createBook({ title: "Untouched", authors: [] });
+    current.close();
+    record(Date.now() - 1000);
+    expect(await checkNativeUpdateStartup(environment)).toBe("cleaned");
+    expect(titles(library)).toEqual(["Untouched"]);
+    expect((await readNativeUpdateNotice({ platform: "darwin", directory: environment.directory }))?.library).toBe("not-needed");
   });
 });
