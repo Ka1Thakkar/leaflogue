@@ -3,9 +3,21 @@ title: Back up and restore
 description: Save your whole library to one file and restore it later.
 ---
 
-A backup is one file holding your library database: books, passages, notes,
-organisation, and reading history. Make one before big changes, and keep
-copies somewhere other than this computer.
+A backup is one file holding your library. Make one before big changes, and
+keep copies somewhere other than this computer.
+
+## What a backup includes
+
+| Included | Not included |
+| --- | --- |
+| Books and their details | The book files themselves (EPUBs and PDFs) |
+| Passages and notes, including book notes | Links to book files and to your Calibre library |
+| Tags, collections, and threads | Reading positions and bookmarks |
+| Reading status and history, which your statistics are built from | Reader display settings, such as text size, font, and margins |
+| | App settings and saved keys |
+
+Settings shows the same list beside **Create backup**, and again when a backup
+is saved or restored.
 
 ## Make a backup
 
@@ -41,15 +53,17 @@ the restored library with your database from the start instead of picking up
 where it left off.
 
 
-## EPUB files and reading positions
+## Book files, reading positions, and reader settings
 
-In 0.1.1, the reader links EPUBs in their original location.
-SQLite backups and library exports include saved library highlights and notes,
-but do not include EPUB files, local file links, Calibre connections, or reading
-positions. Back up your original EPUBs or Calibre library separately.
+The reader opens your EPUBs and PDFs where they already are, so backups and
+exports keep your highlights and notes but not the files. Back up your book
+files or Calibre library separately.
 
-Local reader state lives beside the active library in
-`<library.sqlite>.epubs/` and `<library.sqlite>.calibre.json`. To preserve it,
-copy those sidecars separately while Leaflogue is closed. Restoring a SQLite
-backup does not restore or roll back them. On another computer, the original
-file paths may differ; link the files again as needed.
+Backups also leave out file and Calibre links, reading positions, bookmarks,
+and reader display settings. Restoring a backup doesn't change them: they stay
+as they were on this computer. On another computer, link your books again and
+set the reader up the way you like it.
+
+To keep links, positions, and bookmarks too, copy
+`<library.sqlite>.epubs/` and `<library.sqlite>.calibre.json` from beside your
+library while Leaflogue is closed.

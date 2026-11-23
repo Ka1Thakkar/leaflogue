@@ -33,6 +33,33 @@
 .detailsBody dt { margin-top: 12px; font: 600 var(--text-xs)/1.2 var(--font-condensed); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ui-dim); }
 .detailsBody dl > dt:first-of-type { margin-top: 0; }
 .detailsBody dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+/* A problem that leaves the page usable: what happened, and another try. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--ui-line);
+  border-left: 3px solid var(--stamp);
+  border-radius: var(--ui-radius);
+  background: var(--ruled);
+  font-size: var(--text-sm);
+}
+.detailsBody .notice { margin-top: 12px; }
+/* An invitation, not an error: a book with no book notes yet. */
+.bookNotesEmpty {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px dashed var(--ui-line);
+  border-radius: var(--ui-radius);
+  color: var(--ui-dim);
+  font-size: var(--text-sm);
+}
+.bookNotesEmpty p { margin: 0; max-width: 62ch; }
 
 @container workspace (max-width: 1100px) {
   .hero { grid-template-columns: 120px minmax(0, 1fr); }

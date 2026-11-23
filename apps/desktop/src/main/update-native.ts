@@ -1,6 +1,6 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { constants, existsSync } from "node:fs";
-import { access, lstat, open, readFile, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { UpdateManifest } from "./update-manifest";
@@ -11,7 +11,16 @@ function run(command: string, args: string[]): Promise<{ stdout: string }> {
   });
 }
 
-/** Arguments are passed as argv, never interpolated into shell source. */
+/**
+ * Arguments are passed as argv, never interpolated into shell source.
+ *
+ * The previous bundle is kept as "$backup" until the new app reports a healthy
+ * start by creating "$marker" (see markNativeUpdateHealthy). If the new app
+ * stops without doing so, the previous bundle is put back and opened. If it is
+ * still running but not yet healthy when the wait ends, the copy is left for
+ * the app's own launch check (checkNativeUpdateStartup). An empty "$marker"
+ * keeps the old behaviour: delete the previous bundle once open succeeds.
+ */
 export const MAC_UPDATE_HELPER = `#!/bin/sh
 set -eu
 parent="$1"
@@ -19,7 +28,15 @@ staged="$2"
 target="$3"
 backup="$4"
 work="$5"
-shift 5
+marker="$6"
+shift 6
+# Whether the new app's main process has gone. An unreadable process list
+# counts as still running, so doubt never triggers a restore.
+app_stopped() {
+  processes=$(/bin/ps -axo comm= 2>/dev/null) || return 1
+  if printf '%s\\n' "$processes" | /usr/bin/grep -F -x -q -- "$target/Contents/MacOS/Leaflogue"; then return 1; fi
+  return 0
+}
 count=0
 while kill -0 "$parent" 2>/dev/null; do
   count=$((count + 1))
@@ -39,8 +56,59 @@ if ! /usr/bin/open "$target" --args "$@"; then
   /usr/bin/open "$target" --args "$@"
   exit 1
 fi
+if [ -n "$marker" ]; then
+  grace=25
+  limit=600
+  waited=0
+  while [ ! -e "$marker" ] && [ -d "$backup" ]; do
+    waited=$((waited + 1))
+    if [ "$waited" -gt "$grace" ] && app_stopped; then
+      # The new app quit or crashed before it reported a healthy start.
+      rm -rf "$backup.failed"
+      mv "$target" "$backup.failed" || exit 1
+      if ! mv "$backup" "$target"; then
+        mv "$backup.failed" "$target"
+        exit 1
+      fi
+      /usr/bin/open "$target" --args "$@" || true
+      rm -rf "$backup.failed"
+      rm -rf "$work"
+      exit 1
+    fi
+    # Still running, not yet healthy: its next launch decides.
+    if [ "$waited" -gt "$limit" ]; then exit 0; fi
+    sleep 0.2
+  done
+  rm -f "$marker"
+fi
 rm -rf "$backup"
 rm -rf "$work"
+`;
+
+/** Puts the kept previous bundle back after this app exits, then opens it. */
+export const MAC_ROLLBACK_HELPER = `#!/bin/sh
+set -eu
+parent="$1"
+target="$2"
+backup="$3"
+record="$4"
+shift 4
+count=0
+while kill -0 "$parent" 2>/dev/null; do
+  count=$((count + 1))
+  if [ "$count" -gt 300 ]; then exit 1; fi
+  sleep 0.2
+done
+if [ ! -d "$backup" ] || [ -L "$backup" ]; then exit 1; fi
+rm -rf "$backup.failed"
+mv "$target" "$backup.failed" || exit 1
+if ! mv "$backup" "$target"; then
+  mv "$backup.failed" "$target"
+  exit 1
+fi
+rm -f "$record"
+/usr/bin/open "$target" --args "$@" || true
+rm -rf "$backup.failed"
 `;
 
 export const WINDOWS_UPDATE_HELPER = String.raw`param([string]$ConfigPath)
@@ -108,6 +176,12 @@ export interface NativeUpdateOptions {
   readonly quit: () => void;
   readonly args?: readonly string[];
   readonly pid?: number;
+  /**
+   * Where a Mac update records the kept previous bundle until the new version
+   * reports a healthy start. Without it the previous bundle is deleted as soon
+   * as the new one opens.
+   */
+  readonly healthDirectory?: string;
 }
 
 /** The native installation must be a writable app bundle or a per-user NSIS install. */
@@ -127,6 +201,10 @@ export async function installNativeUpdate(download: string, manifest: UpdateMani
   if (options.platform === "win32" && manifest.platform === "windows") {
     // NSIS waits for the old process, performs the per-user upgrade without a
     // wizard, and restarts. /D must be the final argument for NSIS parsing.
+    // The installer overwrites the installation in place by design, so there is
+    // no previous copy to keep for rollback as on macOS. A failed start is
+    // recovered by installing the previous release; library data stays safe
+    // through the pre-migration snapshot.
     const work = dirname(download);
     const helper = join(work, "install.ps1");
     const config = join(work, "install.json");
@@ -174,13 +252,155 @@ export async function installNativeUpdate(download: string, manifest: UpdateMani
   await run("/usr/bin/ditto", [staged, sibling]);
   const helper = join(work, "install.sh");
   await writeFile(helper, MAC_UPDATE_HELPER, { mode: 0o700, flag: "wx" });
+  const backup = `${sibling}.previous`;
+  const health = options.healthDirectory;
+  if (health) {
+    await mkdir(health, { recursive: true, mode: 0o700 });
+    await rm(join(health, HEALTH_MARKER), { force: true });
+    const record: PendingNativeUpdate = { version: manifest.version, target, backup, installedAt: Date.now(), launches: 0 };
+    await writeFile(join(health, PENDING_RECORD), JSON.stringify(record), { mode: 0o600 });
+  }
   try {
-    await launchUpdateHelper("/bin/sh", [helper, String(options.pid ?? process.pid), sibling, target, `${sibling}.previous`, work, ...(options.args ?? [])]);
+    await launchUpdateHelper("/bin/sh", [helper, String(options.pid ?? process.pid), sibling, target, backup, work, health ? join(health, HEALTH_MARKER) : "", ...(options.args ?? [])]);
   } catch (error) {
     // Only the random sibling copy is disposable; the running app is untouched.
-    const { rm } = await import("node:fs/promises");
     await rm(sibling, { recursive: true, force: true });
+    if (health) await rm(join(health, PENDING_RECORD), { force: true });
     throw error;
   }
   options.quit();
+}
+
+/** The previous Mac bundle kept until the new version starts healthily. */
+export interface PendingNativeUpdate {
+  readonly version: string;
+  readonly target: string;
+  readonly backup: string;
+  readonly installedAt: number;
+  /** Starts of this version that have not yet reported healthy. */
+  readonly launches: number;
+}
+
+const PENDING_RECORD = "native-update.json";
+const HEALTH_MARKER = "native-update.healthy";
+const ROLLBACK_HELPER = "native-update-rollback.sh";
+/** Two starts that never became healthy are enough; the third goes back. */
+export const MAX_UNHEALTHY_LAUNCHES = 2;
+
+export interface UpdateHealthFiles {
+  readFile(path: string): Promise<string>;
+  writeFile(path: string, data: string, mode: number): Promise<void>;
+  remove(path: string): Promise<void>;
+  isDirectory(path: string): Promise<boolean>;
+}
+
+const realFiles: UpdateHealthFiles = {
+  readFile: (path) => readFile(path, "utf8"),
+  writeFile: (path, data, mode) => writeFile(path, data, { mode }),
+  remove: (path) => rm(path, { recursive: true, force: true }),
+  isDirectory: async (path) => {
+    try { const info = await lstat(path); return info.isDirectory() && !info.isSymbolicLink(); }
+    catch { return false; }
+  },
+};
+
+export interface UpdateHealthEnvironment {
+  readonly platform: NodeJS.Platform;
+  readonly directory: string;
+  readonly version: string;
+  readonly executable: string;
+  readonly files?: UpdateHealthFiles;
+}
+
+export interface UpdateStartupEnvironment extends UpdateHealthEnvironment {
+  readonly pid: number;
+  readonly args: readonly string[];
+  readonly quit: () => void;
+  readonly launchHelper?: (command: string, args: string[]) => Promise<unknown>;
+}
+
+function bundleOf(executable: string): string {
+  return dirname(dirname(dirname(executable)));
+}
+
+async function readPending(files: UpdateHealthFiles, directory: string): Promise<PendingNativeUpdate | undefined> {
+  let raw: string;
+  try { raw = await files.readFile(join(directory, PENDING_RECORD)); }
+  catch { return undefined; }
+  try {
+    const value = JSON.parse(raw) as Partial<PendingNativeUpdate>;
+    if (typeof value.version === "string" && typeof value.target === "string" && typeof value.backup === "string" &&
+        typeof value.installedAt === "number" && typeof value.launches === "number" &&
+        // Only ever a hidden sibling of the installed app, as installNativeUpdate names it.
+        value.backup.startsWith(`${dirname(value.target)}/.`) && value.backup.endsWith(".app.previous") &&
+        !value.backup.slice(dirname(value.target).length + 1).includes("/") && !value.backup.includes("..")) {
+      return value as PendingNativeUpdate;
+    }
+  } catch { /* fall through: an unreadable record is discarded */ }
+  await files.remove(join(directory, PENDING_RECORD));
+  return undefined;
+}
+
+/**
+ * Runs once at startup, before the library opens. Only an installed Mac app
+ * that matches the recorded update takes part; development runs and other
+ * copies leave the record alone.
+ *
+ * - "none": no update is waiting on this app.
+ * - "pending": this version has not reported healthy yet; this start is counted.
+ * - "cleaned": the update either finished earlier or never took; leftovers removed.
+ * - "rolling-back": too many unhealthy starts; the previous version is being
+ *   restored and this app has been asked to quit.
+ */
+export async function checkNativeUpdateStartup(environment: UpdateStartupEnvironment): Promise<"none" | "pending" | "cleaned" | "rolling-back"> {
+  if (environment.platform !== "darwin") return "none";
+  const files = environment.files ?? realFiles;
+  const record = await readPending(files, environment.directory);
+  if (!record || record.target !== bundleOf(environment.executable)) return "none";
+  const recordPath = join(environment.directory, PENDING_RECORD);
+  const markerPath = join(environment.directory, HEALTH_MARKER);
+  if (record.version !== environment.version) {
+    // The swap never happened or was already undone. This app runs from the
+    // installed location, so a kept copy is no longer needed.
+    await files.remove(record.backup);
+    await files.remove(recordPath);
+    await files.remove(markerPath);
+    return "cleaned";
+  }
+  if (await files.readFile(markerPath).then(() => true, () => false)) {
+    await files.remove(record.backup);
+    await files.remove(recordPath);
+    return "cleaned";
+  }
+  if (!await files.isDirectory(record.backup)) {
+    await files.remove(recordPath);
+    return "none";
+  }
+  const launches = record.launches + 1;
+  if (launches <= MAX_UNHEALTHY_LAUNCHES) {
+    await files.writeFile(recordPath, JSON.stringify({ ...record, launches }), 0o600);
+    return "pending";
+  }
+  const helper = join(environment.directory, ROLLBACK_HELPER);
+  await files.writeFile(helper, MAC_ROLLBACK_HELPER, 0o700);
+  const launch = environment.launchHelper ?? launchUpdateHelper;
+  await launch("/bin/sh", [helper, String(environment.pid), record.target, record.backup, recordPath, ...environment.args]);
+  environment.quit();
+  return "rolling-back";
+}
+
+/**
+ * Called once the window has loaded and the library opened. Tells a waiting
+ * update helper that this version started healthily, then drops the kept
+ * previous bundle.
+ */
+export async function markNativeUpdateHealthy(environment: UpdateHealthEnvironment): Promise<boolean> {
+  if (environment.platform !== "darwin") return false;
+  const files = environment.files ?? realFiles;
+  const record = await readPending(files, environment.directory);
+  if (!record || record.target !== bundleOf(environment.executable) || record.version !== environment.version) return false;
+  await files.writeFile(join(environment.directory, HEALTH_MARKER), String(Date.now()), 0o600);
+  await files.remove(join(environment.directory, PENDING_RECORD));
+  await files.remove(record.backup);
+  return true;
 }

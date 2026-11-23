@@ -342,6 +342,12 @@ function AppearancePanel({ configFile }: { readonly configFile?: string }) {
   );
 }
 
+// Checked against the backup code: a backup is a copy of the library database.
+// Reader state lives beside it (<library>.epubs/, <library>.calibre.json), and
+// reader display settings and app settings live outside the database.
+const BACKUP_KEEPS = "your books, passages, notes, tags, collections, threads, and reading history";
+const BACKUP_LEAVES_OUT = "book files, links to files and Calibre, reading positions, bookmarks, and reader settings";
+
 function BackupPanel({ onLibraryReplaced }: { readonly onLibraryReplaced: () => void }) {
   const [confirm, confirmDialog] = useConfirm();
   const [pending, setPending] = useState(false);
@@ -352,22 +358,28 @@ function BackupPanel({ onLibraryReplaced }: { readonly onLibraryReplaced: () => 
       <ArchiveRestore size={20} aria-hidden="true" />
       <div>
         <h2>Backups</h2>
-                <div className={styles.buttons}>
+        <dl className={styles.backupScope} aria-label="What a backup holds">
+          <dt>Included</dt>
+          <dd>Books, passages, notes, tags, collections, threads, and reading history, which your statistics are built from.</dd>
+          <dt>Not included</dt>
+          <dd>The book files themselves, links to book files and your Calibre library, reading positions, bookmarks, reader display settings, and app settings or saved keys. Keep your book files safe separately.</dd>
+        </dl>
+        <div className={styles.buttons}>
           <button {...settingAnchor("backup-create")} className="ll-button-secondary" disabled={pending} onClick={async () => {
             setPending(true); setMessage(""); setError("");
             try {
               const result = await window.leaflogue.backups.create();
-              if (result) setMessage(`Backup saved as ${result.fileName}.`);
+              if (result) setMessage(`Backup saved as ${result.fileName}. It has ${BACKUP_KEEPS}, but not ${BACKUP_LEAVES_OUT}.`);
             } catch { setError("Leaflogue could not create that backup."); }
             finally { setPending(false); }
           }}><Save size={16} aria-hidden="true" />Create backup</button>
           <button {...settingAnchor("backup-restore")} className="ll-button-secondary" disabled={pending} onClick={async () => {
-            if (!await confirm({ title: "Restore this backup?", message: "This replaces your local library with the selected backup. Leaflogue validates it first and keeps the current library if validation fails.", confirmLabel: "Choose backup", destructive: true })) return;
+            if (!await confirm({ title: "Restore this backup?", message: "This replaces your local library with the selected backup. Leaflogue validates it first and keeps the current library if validation fails. Book files, file and Calibre links, reading positions, bookmarks, and reader settings aren't in backups, so they stay as they are on this computer.", confirmLabel: "Choose backup", destructive: true })) return;
             setPending(true); setMessage(""); setError("");
             try {
               const result = await window.leaflogue.backups.restore();
               if (result) {
-                setMessage(`Restored ${countOf(result.booksRestored, "book")} from ${result.fileName}.`);
+                setMessage(`Restored ${countOf(result.booksRestored, "book")} from ${result.fileName}. ${BACKUP_LEAVES_OUT[0]!.toLocaleUpperCase()}${BACKUP_LEAVES_OUT.slice(1)} aren't in backups, so they stay as they were on this computer.`);
                 onLibraryReplaced();
               }
             } catch { setError("That backup could not be restored. Your current library was kept."); }

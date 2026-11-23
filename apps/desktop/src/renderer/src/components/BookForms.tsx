@@ -6,6 +6,34 @@ import styles from "./knowledge.module.css";
 import { useAction } from "./useAction";
 import { ComboBox } from "@leaflogue/ui";
 
+type DetailField = "title" | "authors" | "isbn";
+/** Who last wrote a field: the reader, or the catalogue edition they picked. */
+type DetailDraft = Readonly<Record<DetailField, { readonly value: string; readonly typed: boolean }>>;
+const EMPTY_DRAFT: DetailDraft = { title: { value: "", typed: false }, authors: { value: "", typed: false }, isbn: { value: "", typed: false } };
+
+function editionValues(item: CatalogBook): Record<DetailField, string> {
+  return { title: item.title, authors: item.authors.join("\n"), isbn: item.isbn13 ?? "" };
+}
+
+/**
+ * Picking an edition fills only what the reader hasn't written: empty fields,
+ * and fields that still hold the previously picked edition's value. Anything
+ * typed stays, so comparing editions never throws work away.
+ */
+export function applyEdition(draft: DetailDraft, item: CatalogBook): DetailDraft {
+  const values = editionValues(item);
+  const next = { ...draft };
+  for (const field of Object.keys(values) as DetailField[]) {
+    if (draft[field].typed && draft[field].value.trim()) continue;
+    next[field] = { value: values[field], typed: false };
+  }
+  return next;
+}
+
+function listOf(words: readonly string[]): string {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
 export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
   const { pending, error, run } = useAction();
   const [query, setQuery] = useState("");
@@ -13,6 +41,8 @@ export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; r
   const [searchError, setSearchError] = useState("");
   const [results, setResults] = useState<CatalogSearch>();
   const [selected, setSelected] = useState<CatalogBook>();
+  const [draft, setDraft] = useState<DetailDraft>(EMPTY_DRAFT);
+  const edit = (field: DetailField, value: string) => setDraft((current) => ({ ...current, [field]: { value, typed: true } }));
   const [created, setCreated] = useState<Book>();
   const request = useRef(0);
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -42,7 +72,9 @@ export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; r
   }
   function choose(item: CatalogBook) {
     setSelected(item);
+    setDraft((current) => applyEdition(current, item));
   }
+  const kept = selected ? (Object.keys(EMPTY_DRAFT) as DetailField[]).filter((field) => draft[field].typed && draft[field].value.trim() && draft[field].value !== editionValues(selected)[field]) : [];
   return <>
     {window.leaflogue.catalog && <form className={styles.form} aria-label="Search book catalogue" onSubmit={(event) => {
       event.preventDefault();
@@ -69,7 +101,7 @@ export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; r
         </ul>
       </div>}
     </form>}
-    <form key={selected ? `${selected.provider}:${selected.providerId}` : "manual"} className={styles.form} aria-label="Book details" onSubmit={async (event) => {
+    <form className={styles.form} aria-label="Book details" onSubmit={async (event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const title = String(form.get("title") ?? "");
@@ -94,9 +126,10 @@ export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; r
     }}>
       <fieldset disabled={pending} className={styles.fields}>
         <legend>{selected ? "Review book details" : "Or enter book details manually"}</legend>
-        <label className="ll-label">Title<input autoFocus={!window.leaflogue.catalog} required name="title" className="ll-field" maxLength={1000} defaultValue={selected?.title ?? ""} /></label>
-        <label className="ll-label">Authors<textarea name="authors" className="ll-field" rows={2} defaultValue={selected?.authors.join("\n") ?? ""} /><span className="ll-muted">Separate authors with a new line or semicolon.</span></label>
-        <label className="ll-label">ISBN<input className="ll-field" name="isbn" defaultValue={selected?.isbn13 ?? ""} /></label>
+        <label className="ll-label">Title<input autoFocus={!window.leaflogue.catalog} required name="title" className="ll-field" maxLength={1000} value={draft.title.value} onChange={(event) => edit("title", event.target.value)} /></label>
+        <label className="ll-label">Authors<textarea name="authors" className="ll-field" rows={2} value={draft.authors.value} onChange={(event) => edit("authors", event.target.value)} /><span className="ll-muted">Separate authors with a new line or semicolon.</span></label>
+        <label className="ll-label">ISBN<input className="ll-field" name="isbn" value={draft.isbn.value} onChange={(event) => edit("isbn", event.target.value)} /></label>
+        {kept.length > 0 && <p className="ll-muted" role="status">Kept the {listOf(kept.map((field) => field === "isbn" ? "ISBN" : field))} you typed. To use this edition's instead, clear the field and choose the edition again.</p>}
       </fieldset>
       {created && error && <p role="status">The book already exists in your library. Retry saves its remaining details.</p>}
       <InlineError>{error}</InlineError>

@@ -114,6 +114,11 @@ installation still requires your choice. Beta builds check the signed beta feed.
 A network or verification failure leaves the installed version in place.
 
 On Mac, move the app from its disk image into Applications before updating.
+The Mac app keeps your previous version until the new one has opened your
+library. If the new version doesn't start, or closes before it gets that far,
+Leaflogue puts the previous version back and opens it. On Windows, the
+installer replaces the app in place; if a new version won't start, download and
+install the previous release from GitHub Releases.
 Portable Windows ZIP and Linux tarball copies use manual replacement from
 [GitHub Releases](https://github.com/Ka1Thakkar/leaflogue/releases).
 
