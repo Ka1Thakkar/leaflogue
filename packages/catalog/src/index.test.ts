@@ -74,6 +74,56 @@ describe("book lookup", () => {
     expect(openLibraryDocument({ key: "/works/OL1W", title: "Lonely", cover_i: -1 })).not.toHaveProperty("coverUrl");
   });
 
+  it("stops reading an oversized chunked response instead of holding it whole", async () => {
+    const CHUNK = 64 * 1024;
+    const streams: { pulled: number; cancelled: boolean }[] = [];
+    // 8 MiB of chunks with no declared length, as chunked encoding sends them.
+    const fetch = vi.fn(async () => {
+      const state = { pulled: 0, cancelled: false };
+      streams.push(state);
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (state.pulled >= 8 * 1024 * 1024) return controller.close();
+          state.pulled += CHUNK;
+          controller.enqueue(new Uint8Array(CHUNK).fill(0x20));
+        },
+        cancel() { state.cancelled = true; },
+      }, { highWaterMark: 0 });
+      return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await expect(searchCatalog("glass orchard", { fetch, sleep: noWait })).rejects.toThrow("Book lookup is unavailable");
+    expect(streams).toHaveLength(2);
+    for (const stream of streams) {
+      expect(stream.cancelled).toBe(true);
+      expect(stream.pulled).toBeLessThanOrEqual(2_000_000 + 2 * CHUNK);
+    }
+  });
+
+  it("refuses a declared oversized body before reading it, and counts bytes rather than characters", async () => {
+    let read = false;
+    const declared = () => new Response(new ReadableStream({ pull() { read = true; } }, { highWaterMark: 0 }), { headers: { "content-length": "5000000" } });
+    await expect(searchCatalog("glass orchard", { fetch: vi.fn(async () => declared()), sleep: noWait })).rejects.toThrow("Book lookup is unavailable");
+    expect(read).toBe(false);
+
+    // About 1.2 million characters but 2.4 million bytes.
+    const wide = () => json({ items: [], padding: "é".repeat(1_200_000) });
+    await expect(searchCatalog("glass orchard", { fetch: vi.fn(async () => wide()), sleep: noWait })).rejects.toThrow("Book lookup is unavailable");
+  });
+
+  it("decodes text split across chunks", async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({ totalItems: 1, items: [{ ...volume, volumeInfo: { ...volume.volumeInfo, title: "Café Orchard" } }] }));
+    const split = bytes.indexOf(0xc3) + 1;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, split));
+        controller.enqueue(bytes.slice(split));
+        controller.close();
+      },
+    });
+    const result = await searchCatalog("cafe orchard", { fetch: vi.fn(async () => new Response(body)), sleep: noWait });
+    expect(result.items[0]!.title).toBe("Café Orchard");
+  });
+
   it("reports both providers being down as unavailable", async () => {
     const fetch = vi.fn().mockResolvedValue(json({}, 500));
     await expect(searchCatalog("glass orchard", { fetch, sleep: noWait })).rejects.toThrow("Book lookup is unavailable");

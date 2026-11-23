@@ -995,6 +995,13 @@ export const migrations: readonly Migration[] = [
       colour TEXT NOT NULL CHECK (colour IN ('yellow','green','blue','pink','purple'))
     );`,
   },
+  {
+    version: 20,
+    // listHighlights checks provenance per row with
+    // EXISTS (SELECT 1 FROM source_annotations WHERE highlight_id = ...).
+    // Without this index every check scans the whole import table.
+    sql: `CREATE INDEX source_annotations_highlight ON source_annotations(highlight_id);`,
+  },
 ];
 
 export const latestSchemaVersion = migrations.at(-1)?.version ?? 0;

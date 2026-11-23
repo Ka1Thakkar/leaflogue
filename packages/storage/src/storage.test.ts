@@ -76,6 +76,26 @@ describe("SQLite migrations", () => {
     }
   });
 
+  it("looks up a highlight's import provenance through an index instead of scanning source annotations", () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      applyMigrations(database);
+      // Same correlated provenance check listHighlights uses for every row.
+      const plan = database.prepare(`EXPLAIN QUERY PLAN
+        SELECT highlights.id FROM highlights
+        WHERE EXISTS (SELECT 1 FROM source_annotations WHERE source_annotations.highlight_id = highlights.id)`)
+        .all()
+        .map((row) => String(row.detail));
+      const lookups = plan.filter((detail) => detail.includes("source_annotations"));
+      expect(lookups.length).toBeGreaterThan(0);
+      expect(lookups.every((detail) => detail.startsWith("SEARCH"))).toBe(true);
+      expect(lookups.join("\n")).toContain("source_annotations_highlight (highlight_id=?)");
+      expect(plan.join("\n")).not.toMatch(/SCAN source_annotations/u);
+    } finally {
+      database.close();
+    }
+  });
+
   it("creates a manual passage and its first note in one transaction", () => {
     const library = new LocalLibrary(":memory:");
     try {

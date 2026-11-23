@@ -38,6 +38,20 @@ function dayRange(day: string): { start: number; end: number } {
   return { start, end: start + DAY_MS };
 }
 
+/**
+ * The span `dateFrom`..`dateBefore` (epoch milliseconds, the end excluded),
+ * as a client sends it for a day in its own time zone. Either end may be
+ * left open. Older clients send `date` instead, a UTC calendar day.
+ */
+function exactRange(from: number | undefined, before: number | undefined, day: string | undefined) {
+  if (from === undefined && before === undefined) return day ? dayRange(day) : undefined;
+  if (day) throw invalid("Give either a date or a date range, not both");
+  if ((from !== undefined && !Number.isSafeInteger(from)) || (before !== undefined && !Number.isSafeInteger(before))) {
+    throw invalid("Date range must be whole milliseconds");
+  }
+  return { start: from, end: before };
+}
+
 function membershipMap(rows: { book_id: string; other: string }[]): Map<string, string[]> {
   const result = new Map<string, string[]>();
   for (const row of rows) result.set(row.book_id, [...(result.get(row.book_id) ?? []), row.other]);
@@ -179,6 +193,8 @@ export interface HighlightQuery {
   readonly notes?: "with" | "without";
   readonly source?: "typed" | "imported";
   readonly date?: string;
+  readonly dateFrom?: number;
+  readonly dateBefore?: number;
   readonly dateKind?: "added" | "imported";
   readonly sort?: "newest" | "oldest" | "updated" | "relevance";
   readonly paginationOpts: { readonly numItems: number; readonly cursor: string | null };
@@ -192,7 +208,7 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if ((args.bookId && !isUuid(args.bookId)) || (args.tagId && !isUuid(args.tagId))) {
     return { page: [], isDone: true, continueCursor: String(offset) };
   }
-  const range = args.date ? dayRange(args.date) : undefined;
+  const range = exactRange(args.dateFrom, args.dateBefore, args.date);
   const values: unknown[] = [libraryId];
   const value = (item: unknown) => `$${values.push(item)}`;
   const where = ["h.library_id = $1", "h.deleted_at IS NULL", "h.archived = false"];
@@ -201,7 +217,10 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if (search) {
     term = value(search);
     const pattern = value(`%${search.replace(/[\\%_]/gu, (character) => `\\${character}`)}%`);
-    where.push(`(to_tsvector('simple', h.text) @@ plainto_tsquery('simple', ${term}) OR h.text ILIKE ${pattern})`);
+    // A passage matches on its own text or on the text of one of its notes.
+    where.push(`(to_tsvector('simple', h.text) @@ plainto_tsquery('simple', ${term}) OR h.text ILIKE ${pattern} OR EXISTS (
+      SELECT 1 FROM leaflogue.notes AS n WHERE n.library_id = h.library_id AND n.highlight_id = h.id AND n.deleted_at IS NULL
+      AND (to_tsvector('simple', n.markdown) @@ plainto_tsquery('simple', ${term}) OR n.markdown ILIKE ${pattern})))`);
   }
   if (args.tagId) {
     where.push(`EXISTS (SELECT 1 FROM leaflogue.highlight_tags AS t WHERE t.library_id = h.library_id AND t.highlight_id = h.id AND t.tag_id = ${value(args.tagId)})`);
@@ -212,7 +231,8 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if (args.source) where.push(args.source === "imported" ? IMPORTED : `NOT ${IMPORTED}`);
   if (range) {
     const column = (args.dateKind ?? "added") === "imported" ? "link.updated_at" : "h.created_at";
-    where.push(`${column} >= to_timestamp(${value(range.start / 1000)}) AND ${column} < to_timestamp(${value(range.end / 1000)})`);
+    if (range.start !== undefined) where.push(`${column} >= to_timestamp(${value(range.start / 1000)})`);
+    if (range.end !== undefined) where.push(`${column} < to_timestamp(${value(range.end / 1000)})`);
   }
   const sort = search ? (args.sort ?? "relevance") : args.sort === "relevance" ? "oldest" : (args.sort ?? "oldest");
   const order = sort === "relevance" && search
