@@ -37,7 +37,13 @@ const wholeBooks = new WeakMap<EpubDocument, DocumentFragment>();
  */
 function annotationDocument(book: EpubDocument | undefined, frame: HTMLIFrameElement | null): ReaderRoot | undefined {
   if (!book) return undefined;
-  if (book.format === "pdf") return frame?.contentDocument ?? undefined;
+  if (book.format === "pdf") {
+    // Matching can run before the layout pass labels paragraphs; labelling is idempotent.
+    const doc = frame?.contentDocument ?? undefined;
+    const pages = doc?.getElementById("reader-pages");
+    if (pages) tagParagraphs(pages);
+    return doc;
+  }
   let copy = wholeBooks.get(book);
   if (!copy) {
     // Template contents are inert: nothing in them renders, runs or loads.

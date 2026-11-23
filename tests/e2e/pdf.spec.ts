@@ -101,10 +101,13 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await page.evaluate(async (id) => window.leaflogue.epub!.attach(id), saved.bookId);
     await session.close(); session = await launch(profile); page = session.page;
     await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId); await page.getByRole("button", { name: "Read", exact: true }).click();
+    // Both quotes are found in the EPUB; only the open chapter is painted, and the two sit in different chapters.
     await expect.poll(async () => page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
       const inner = (frame as HTMLIFrameElement).contentWindow as Window & typeof globalThis;
       return inner.CSS.highlights.get("leaflogue-saved")?.size ?? 0;
-    })).toBe(2);
+    })).toBe(1);
+    await page.frameLocator('iframe[title="EPUB pages"]').locator("body").click({ button: "right" });
+    await expect(page.getByRole("dialog", { name: "Reader options", exact: true }).getByText("Highlights in this book (2)")).toBeVisible();
     await session.close();
   } finally { await removeProfile(profile); }
 });
