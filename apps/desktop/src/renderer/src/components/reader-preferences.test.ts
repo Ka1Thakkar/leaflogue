@@ -88,6 +88,21 @@ describe("reader typography", () => {
     for (const property of ["text-align", "line-height", "text-indent", "margin-bottom"]) expect(prose.style.getPropertyPriority(property)).toBe("important");
     expect(prose.style.getPropertyValue("line-height")).toBe("3");
   });
+  it("sets a chapter swapped in later from its publisher sizes, not the sizes already enlarged around it", async () => {
+    const doc = await page('<article><p id="first">One</p></article>');
+    const base = doc.createElement("style"); base.textContent = "body{font-size:18px}"; doc.head.append(base);
+    const pages = doc.getElementById("reader-pages")!;
+    applyReaderTypography(doc, { ...DEFAULT_READER_PREFERENCES, size: 24, weight: 100 });
+    expect(doc.getElementById("first")!.style.getPropertyValue("font-size")).toBe("24px");
+    pages.innerHTML = '<article><p id="next">Two</p><p id="small" style="font-size: 9px">Three</p></article>';
+    applyReaderTypography(doc, { ...DEFAULT_READER_PREFERENCES, size: 24, weight: 100 });
+    expect(doc.getElementById("next")!.style.getPropertyValue("font-size")).toBe("24px");
+    expect(doc.getElementById("next")!.style.getPropertyValue("font-weight")).toBe("500");
+    expect(doc.getElementById("small")!.style.getPropertyValue("font-size")).toBe("12px");
+    // The surrounding page keeps its own settings afterwards.
+    expect(pages.style.getPropertyValue("font-size")).toBe("24px");
+    expect(doc.body.style.getPropertyValue("font-size")).toBe("24px");
+  });
   it("writes nothing to paragraphs when the typography has not changed", async () => {
     const doc = await page("<p>One</p><p>Two</p>");
     applyReaderTypography(doc, { ...DEFAULT_READER_PREFERENCES });

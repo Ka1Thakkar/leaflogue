@@ -110,14 +110,31 @@ const INLINE_OVERRIDES = {
 } as const;
 const userSet = (p: ReaderTypography, key: keyof typeof INLINE_OVERRIDES) => key === "alignment" ? p.alignment !== "publisher" : key === "line" ? p.line > 0 : p[key] >= 0;
 /**
- * Size/weight overrides preserve publisher hierarchy and relative emphasis.
- * Only values that changed since the last call are written, so a repeated
- * call costs nothing per element.
+ * Read publisher values for elements the reader has not seen yet. A chapter
+ * inserted later would otherwise inherit the reader's own size, weight and
+ * alignment from its ancestors, so those are set aside while it is measured.
  */
-export function applyReaderTypography(doc: Document, p: ReaderTypography) {
-  let values = originals.get(doc);
-  if (!values) {
-    values = Array.from(doc.querySelectorAll<HTMLElement>("#reader-pages, #reader-pages *")).map((element) => {
+function readOriginals(doc: Document, elements: HTMLElement[], tracked: readonly Original[]): Original[] {
+  if (!elements.length) return [];
+  const restore: (() => void)[] = [];
+  const sheet = (doc.getElementById("reader-typography") as HTMLStyleElement | null)?.sheet;
+  if (sheet && !sheet.disabled) { sheet.disabled = true; restore.push(() => { sheet.disabled = false; }); }
+  const fresh = new Set(elements);
+  const ancestors = new Set<HTMLElement>();
+  for (const element of elements) for (let parent = element.parentElement; parent && !fresh.has(parent); parent = parent.parentElement) ancestors.add(parent);
+  const reset = (element: HTMLElement, property: string, value: string | undefined) => {
+    const previous = element.style.getPropertyValue(property); const priority = element.style.getPropertyPriority(property);
+    if (!previous && value === undefined) return;
+    if (value === undefined) element.style.removeProperty(property); else element.style.setProperty(property, value);
+    restore.push(() => { if (previous) element.style.setProperty(property, previous, priority); else element.style.removeProperty(property); });
+  };
+  for (const original of tracked) if (ancestors.has(original.element)) {
+    reset(original.element, "font-size", `${original.size}px`);
+    reset(original.element, "font-weight", String(original.weight));
+  }
+  if (ancestors.has(doc.body)) reset(doc.body, "font-size", undefined);
+  try {
+    return elements.map((element) => {
       const css = doc.defaultView!.getComputedStyle(element);
       if (element.matches("p,li,blockquote") && (["center", "right", "end"].includes(css.textAlign) || css.whiteSpace.startsWith("pre") || element.closest("figcaption,pre"))) element.dataset.publisherSpecial = "true";
       const prose = element.matches("#reader-pages :is(p,li,blockquote)") && !element.dataset.publisherSpecial;
@@ -127,9 +144,10 @@ export function applyReaderTypography(doc: Document, p: ReaderTypography) {
         if (value) inline.set(property, [value, element.style.getPropertyPriority(property)]);
       }
       return { element, prose, inline, inlineWeight: element.style.getPropertyValue("font-weight"), priority: element.style.getPropertyPriority("font-weight"), size: parseFloat(css.fontSize) || 18, weight: parseInt(css.fontWeight) || 400 };
-    }); originals.set(doc, values);
-  }
-  const previous = applied.get(doc);
+    });
+  } finally { for (const undo of restore.reverse()) undo(); }
+}
+function setTypography(values: readonly Original[], p: ReaderTypography, previous: ReaderTypography | undefined) {
   const sizeChanged = previous?.size !== p.size; const weightChanged = previous?.weight !== p.weight;
   const overrides = (Object.keys(INLINE_OVERRIDES) as (keyof typeof INLINE_OVERRIDES)[]).filter((key) => !previous || userSet(previous, key) !== userSet(p, key));
   for (const { element, size, weight, inlineWeight, priority, inline } of values) {
@@ -146,6 +164,21 @@ export function applyReaderTypography(doc: Document, p: ReaderTypography) {
       if (original?.[1] === "important") element.style.setProperty(property, original[0], userSet(p, key) ? "" : "important");
     }
   }
+}
+/**
+ * Size/weight overrides preserve publisher hierarchy and relative emphasis.
+ * Only values that changed since the last call are written, so a repeated
+ * call costs nothing per element. Chapters swapped in since the last call are
+ * set in full; chapters swapped out are forgotten.
+ */
+export function applyReaderTypography(doc: Document, p: ReaderTypography) {
+  const tracked = (originals.get(doc) ?? []).filter((original) => original.element.isConnected);
+  const known = new Set(tracked.map((original) => original.element));
+  const added = readOriginals(doc, Array.from(doc.querySelectorAll<HTMLElement>("#reader-pages, #reader-pages *")).filter((element) => !known.has(element)), tracked);
+  originals.set(doc, [...tracked, ...added]);
+  const previous = applied.get(doc);
+  setTypography(tracked, p, previous);
+  setTypography(added, p, undefined);
   let style = doc.getElementById("reader-typography");
   if (!style) { style = doc.createElement("style"); style.id = "reader-typography"; doc.head.append(style); }
   // Do not flatten title/caption/verse alignment or typographic emphasis.

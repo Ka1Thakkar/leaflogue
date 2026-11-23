@@ -16,6 +16,18 @@ const book: EpubDocument = {
   bookmarks: [{ chapter: 1, paragraph: 0 }],
 };
 const highlight = { id: highlightId, bookId, text: "A quiet second paragraph.", notes: [], revision: 1 } as unknown as Highlight;
+let highlights: Highlight[] = [highlight];
+// Three chapters of 3, 2 and 4 equally long paragraphs; the page stubs below make each paragraph one page.
+const sentence = (chapter: number, paragraph: number) => `Chapter ${chapter + 1} paragraph ${paragraph + 1} reads evenly.`;
+const long: EpubDocument = {
+  sha256,
+  chapters: [3, 2, 4].map((size, index) => {
+    const items = Array.from({ length: size }, (_, paragraph) => sentence(index, paragraph));
+    return { id: `l${index}.xhtml`, title: `Part ${index + 1}`, text: items.join("\n\n"), paragraphs: items, html: items.map((text, paragraph) => `<p data-paragraph="${paragraph}">${text}</p>`).join("") };
+  }),
+  position: { chapter: 0, paragraph: 0 },
+  bookmarks: [{ chapter: 2, paragraph: 2 }],
+};
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 let root: Root; let container: HTMLDivElement;
@@ -23,6 +35,7 @@ let epub: Record<string, ReturnType<typeof vi.fn>>;
 
 beforeEach(() => {
   localStorage.clear();
+  highlights = [highlight];
   epub = {
     open: vi.fn().mockResolvedValue(book), savePosition: vi.fn().mockResolvedValue(undefined), saveBookmarks: vi.fn(), saveAnchor: vi.fn(),
     attach: vi.fn(), readPdf: vi.fn(), unlink: vi.fn().mockResolvedValue(undefined), relocate: vi.fn(),
@@ -30,7 +43,7 @@ beforeEach(() => {
   Object.defineProperty(window, "leaflogue", { configurable: true, value: {
     epub,
     appearance: { describe: vi.fn().mockResolvedValue(undefined), onChanged: vi.fn().mockReturnValue(() => undefined) },
-    library: { getBookContents: vi.fn().mockImplementation(() => Promise.resolve({ book: { id: bookId, title: "Quiet Book", archived: false }, highlights: [highlight] })) },
+    library: { getBookContents: vi.fn().mockImplementation(() => Promise.resolve({ book: { id: bookId, title: "Quiet Book", archived: false }, highlights })) },
     sync: { onStatus: vi.fn().mockReturnValue(() => undefined) },
   } });
   container = document.createElement("div"); document.body.append(container);
@@ -57,7 +70,7 @@ async function renderReader() {
   const viewport = container.querySelector<HTMLElement>('[aria-label="Book pages"]')!;
   Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 800 });
   const inner = container.querySelector("iframe")!.contentWindow as unknown as Record<string, unknown>;
-  inner.Highlight = class { priority = 0; constructor(...ranges: unknown[]) { void ranges; } };
+  inner.Highlight = class { priority = 0; ranges: unknown[]; constructor(...ranges: unknown[]) { this.ranges = ranges; } };
   Object.defineProperty(inner, "CSS", { configurable: true, value: { highlights: new Map() } });
   const scroll = frameDocument().getElementById("reader-scroll")!;
   Object.defineProperty(scroll, "clientWidth", { configurable: true, value: 760 });
@@ -65,6 +78,25 @@ async function renderReader() {
   await act(async () => { window.dispatchEvent(new Event("leaflogue:annotations-changed")); await tick(); await tick(); });
   return viewport;
 }
+/** A reader whose pages can be counted: every paragraph takes one 48px page. */
+async function renderPaged(next: EpubDocument) {
+  epub.open!.mockResolvedValue(next);
+  const viewport = await renderReader();
+  const pages = frameDocument().getElementById("reader-pages")!;
+  Object.defineProperty(pages, "scrollWidth", { configurable: true, get: () => Math.max(0, pages.querySelectorAll("[data-paragraph]").length * 48 - 48) });
+  // Lay out again now the page has a size, as a real resize would.
+  await act(async () => { container.querySelector("iframe")!.dispatchEvent(new Event("load")); await tick(); await tick(); });
+  return viewport;
+}
+const shownChapters = () => Array.from(frameDocument().querySelectorAll<HTMLElement>("article[data-chapter]"), (article) => Number(article.dataset.chapter));
+function progress() {
+  const [, page, count] = /Page (\d+) of (\d+)/u.exec(container.querySelector(".sr-only[role=status]")?.textContent ?? "") ?? [];
+  return { page: Number(page), count: Number(count) };
+}
+async function press(key: string) {
+  await act(async () => { frameDocument().body.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })); await tick(); });
+}
+const scrolled = () => frameDocument().getElementById("reader-scroll")!.scrollLeft;
 async function openOptions(viewport: HTMLElement) {
   await act(async () => { viewport.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })); await tick(); });
 }
@@ -97,15 +129,98 @@ describe("reader work per preference", () => {
     expect(calls).toContain("font-size");
     expect(calls.some((call) => call.startsWith("layout:"))).toBe(true);
   });
-  it("does not redo typography when reading moves into another chapter", async () => {
+  it("typesets only the chapter it moves into and keeps the page geometry", async () => {
     const viewport = await renderReader();
     const calls = watchTypography();
     await openOptions(viewport);
     await click(button(/Chapter 2Second chapter begins here/u));
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
     expect(epub.savePosition).toHaveBeenLastCalledWith(bookId, sha256, 1, 0, undefined);
-    // Neither typography nor the page layout is redone for an ordinary move between chapters.
-    expect(calls).toEqual([]);
+    // The chapter left behind is not touched again, and the page shape is not recomputed.
+    expect(calls.filter((call) => !call.startsWith("layout:"))).toEqual([]);
+    expect(calls.filter((call) => /^layout:(width|max-width|column-width|column-count)$/u.test(call))).toEqual([]);
+    expect(shownChapters()).toEqual([1]);
+    for (const paragraph of frameDocument().querySelectorAll<HTMLElement>("[data-paragraph]")) expect(paragraph.style.getPropertyValue("font-size")).toBe("18px");
+  });
+});
+
+describe("one chapter on the page at a time", () => {
+  it("keeps only the chapter being read in the reading document", async () => {
+    await renderPaged(long);
+    expect(shownChapters()).toEqual([0]);
+    expect(frameDocument().body.textContent).not.toContain(sentence(1, 0));
+    expect(Array.from(frameDocument().querySelectorAll<HTMLElement>("[data-paragraph]"), (node) => `${node.dataset.chapter}:${node.dataset.paragraph}`)).toEqual(["0:0", "0:1", "0:2"]);
+  });
+  it("turns into the next chapter at its last page and back onto the previous chapter's last page", async () => {
+    await renderPaged(long);
+    for (let index = 0; index < 3; index++) await press("ArrowRight");
+    expect(shownChapters()).toEqual([1]);
+    expect(scrolled()).toBe(0);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(epub.savePosition).toHaveBeenLastCalledWith(bookId, sha256, 1, 0, undefined);
+    await press("ArrowLeft");
+    expect(shownChapters()).toEqual([0]);
+    expect(scrolled()).toBe(96);
+    expect(progress().page).toBe(3);
+    // The wheel turns pages the same way.
+    await act(async () => { frameDocument().dispatchEvent(new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true })); await tick(); });
+    expect(shownChapters()).toEqual([1]);
+    await press("End");
+    expect(shownChapters()).toEqual([2]);
+    expect(scrolled()).toBe(144);
+    expect(progress()).toEqual({ page: 9, count: 9 });
+    await press("Home");
+    expect(shownChapters()).toEqual([0]);
+    expect(progress().page).toBe(1);
+  });
+  it("moves the book-wide page forward one page at a time while the total settles", async () => {
+    await renderPaged(long);
+    const seen = [progress()];
+    for (let index = 0; index < 8; index++) { await press("ArrowRight"); seen.push(progress()); }
+    expect(seen.map((item) => item.page)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const percent = seen.map((item) => item.page / item.count);
+    for (let index = 1; index < percent.length; index++) expect(percent[index]).toBeGreaterThanOrEqual(percent[index - 1]!);
+    expect(seen.at(-1)).toEqual({ page: 9, count: 9 });
+    // Pressing on at the end stays on the last page.
+    await press("ArrowRight");
+    expect(progress()).toEqual({ page: 9, count: 9 });
+  });
+  it("opens a saved position in a later chapter", async () => {
+    await renderPaged({ ...long, position: { chapter: 2, paragraph: 0 } });
+    expect(shownChapters()).toEqual([2]);
+    expect(progress().page).toBe(6);
+  });
+  it("jumps to a bookmark, a search result and the contents in chapters that are not on the page", async () => {
+    const viewport = await renderPaged(long);
+    await openOptions(viewport);
+    await click(button(new RegExp(`^Part 3${sentence(2, 2)}`, "u")));
+    expect(shownChapters()).toEqual([2]);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(epub.savePosition).toHaveBeenLastCalledWith(bookId, sha256, 2, 2, undefined);
+    await openOptions(viewport);
+    const search = document.querySelector<HTMLInputElement>('input[aria-label="Search this book"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "Chapter 2 paragraph 2");
+      search.dispatchEvent(new Event("input", { bubbles: true })); await tick();
+    });
+    await click(button(/^Part 2/u));
+    expect(shownChapters()).toEqual([1]);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(epub.savePosition).toHaveBeenLastCalledWith(bookId, sha256, 1, 1, 0);
+  });
+  it("lists and opens a highlight in a chapter that is not on the page, painting it once its chapter is shown", async () => {
+    highlights = [{ ...highlight, text: sentence(2, 3) } as Highlight];
+    const viewport = await renderPaged(long);
+    const painted = () => ((frameDocument().defaultView as unknown as { CSS: { highlights: Map<string, { ranges: Range[] }> } }).CSS.highlights.get("leaflogue-saved")?.ranges ?? []);
+    expect(painted()).toHaveLength(0);
+    await openOptions(viewport);
+    const list = document.querySelector('ol[aria-label="Highlights in this book"]');
+    expect(list?.textContent).toContain(sentence(2, 3));
+    await click(list!.querySelector("button"));
+    expect(shownChapters()).toEqual([2]);
+    expect(document.querySelector('[role="dialog"][aria-label="Saved highlight actions"]')).not.toBeNull();
+    await settle();
+    expect(painted().map((range) => range.toString())).toEqual([sentence(2, 3)]);
   });
 });
 

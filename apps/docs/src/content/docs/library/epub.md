@@ -58,7 +58,9 @@ Page-turn buttons are not part of this menu.
 
 Display choices are remembered on this device. Changing text size or panel
 width reflows the pages, so the page count can change while your place stays
-anchored to the text.
+anchored to the text. In a long book the total page count starts as an
+estimate and may shift by a few pages as you read; your current page always
+moves forward one page at a time. Each new chapter starts on a fresh page.
 
 ## Reading preferences in development
 

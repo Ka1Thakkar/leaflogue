@@ -9,7 +9,8 @@ import { CalibrePicker } from "./CalibrePicker";
 import { MarkdownText } from "./MarkdownText";
 import { useConfirm } from "./Confirm";
 import { applyReaderColors } from "./reader-colors";
-import { matchReaderHighlight, readerHighlightCandidates, type ReaderHighlightCandidate, normalizedQuote, readerSelection } from "./reader-annotations";
+import { matchReaderHighlight, matchReaderLocation, parseReaderLocation, readerHighlightCandidates, readerLocationRange, type ReaderHighlightCandidate, type ReaderLocation, type ReaderRoot, normalizedQuote, readerSelection } from "./reader-annotations";
+import { createPageEstimate, measureChapter, pagesBefore, resetPageEstimate, totalPages } from "./reader-pages";
 import { Icon, Select, SelectItem } from "@leaflogue/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BookId, HighlightId, EpubDocument, EpubFailureKind, BookContents, AppearanceConfiguration, Highlight as SavedHighlight } from "@leaflogue/contracts";
@@ -19,6 +20,33 @@ import styles from "./epub-reader.module.css";
 type Position = EpubDocument["position"];
 const escape = (value: string) => value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 const GAP = 48;
+/** One chapter as reading markup. Paragraph numbers are chapter-scoped, as saved positions and anchors expect. */
+const chapterMarkup = (book: EpubDocument, index: number) => {
+  const item = book.chapters[index]!;
+  return `<article data-chapter="${index}" data-path="${escape(item.id)}" aria-label="${escape(item.title)}">${item.html ?? item.text.split("\n\n").map((text, paragraph) => `<p data-paragraph="${paragraph}">${escape(text)}</p>`).join("")}</article>`;
+};
+const tagParagraphs = (root: ParentNode) => {
+  for (const node of root.querySelectorAll<HTMLElement>("[data-paragraph]")) node.dataset.chapter = node.closest<HTMLElement>("article[data-chapter]")!.dataset.chapter;
+};
+const wholeBooks = new WeakMap<EpubDocument, DocumentFragment>();
+/**
+ * Where highlights, anchors and reviewed locations are matched. EPUB pages hold
+ * one chapter, so matching uses an inert copy of the whole book: parsed the same
+ * way, but never laid out, styled, scripted or loaded from. PDF pages are all
+ * in the reading document already.
+ */
+function annotationDocument(book: EpubDocument | undefined, frame: HTMLIFrameElement | null): ReaderRoot | undefined {
+  if (!book) return undefined;
+  if (book.format === "pdf") return frame?.contentDocument ?? undefined;
+  let copy = wholeBooks.get(book);
+  if (!copy) {
+    // Template contents are inert: nothing in them renders, runs or loads.
+    const template = document.createElement("template");
+    template.innerHTML = book.chapters.map((_, index) => chapterMarkup(book, index)).join("");
+    copy = template.content; tagParagraphs(copy); wholeBooks.set(book, copy);
+  }
+  return copy;
+}
 
 /** Friendly wording for a book file that could not be opened; the technical message stays secondary. */
 const FAILURES: Record<EpubFailureKind, string> = {
@@ -57,7 +85,11 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   const countRef = useRef(1);
   const navigateRange = useRef<(range: Range) => void>(() => undefined);
   const handledTarget = useRef<number | undefined>(undefined);
-  const turn = useRef<(page: number) => void>(() => undefined);
+  /** Bring a chapter onto the page, then go to the range `find` locates in it. */
+  const goTo = useRef<(chapter: number, find: (doc: Document) => Range | undefined) => Range | undefined>(() => undefined);
+  const colourRef = useRef<() => void>(() => undefined);
+  // Bumped whenever another chapter is swapped into the page, so its highlights are painted.
+  const [windowVersion, setWindowVersion] = useState(0);
   const menu = useRef<(x: number, y: number) => void>(() => undefined);
   const [chapter, setChapter] = useState(0);
   const { preferences, update: updatePreferences, override, setOverride, savedBookSettings, forgetBookSettings, presets, savePreset, removePreset } = useReaderPreferences(bookId);
@@ -67,6 +99,8 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     size: preferences.size, weight: preferences.weight, alignment: preferences.alignment, line: preferences.line, paragraph: preferences.paragraph,
     indent: preferences.indent, letter: preferences.letter, word: preferences.word, hyphenation: preferences.hyphenation, horizontal: preferences.horizontal, vertical: preferences.vertical,
   }), [preferences.size, preferences.weight, preferences.alignment, preferences.line, preferences.paragraph, preferences.indent, preferences.letter, preferences.word, preferences.hyphenation, preferences.horizontal, preferences.vertical]);
+  const typographyRef = useRef(typography);
+  useEffect(() => { typographyRef.current = typography; }, [typography]);
   const [optionsTab, setOptionsTab] = useState<ReaderTab>("Book");
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => {
@@ -107,7 +141,9 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       return;
     }
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
-    applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : preferences.palette === "sepia" ? pdfTokens : undefined);
+    // Chapters swapped in later are coloured the same way.
+    colourRef.current = () => applyReaderColors(doc, readerDisplay.dark, readerDisplay.theme ? definition?.[readerDisplay.dark ? "dark" : "light"] : preferences.palette === "sepia" ? pdfTokens : undefined);
+    colourRef.current();
     if (preferences.surround === "app") doc.body.style.setProperty("background-color", getComputedStyle(document.documentElement).getPropertyValue("--ui-bg"), "important");
     doc.getElementById("reader-scroll")?.style.setProperty("background-color", readerPaper, "important");
   }, [loaded, appearance, readerDisplay, book?.format, readerPaper, preferences.palette, preferences.surround, pdfTokens]);
@@ -154,12 +190,27 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const stop = window.leaflogue.sync.onStatus((status) => { if (status.state !== "syncing") refresh(); });
     return () => { active = false; window.removeEventListener("leaflogue:annotations-changed", refresh); window.removeEventListener("focus", refresh); stop(); };
   }, [bookId]);
+  // Highlights are placed against the whole book, so counts and the highlights
+  // list do not depend on which chapter is on the page.
+  const [placed, setPlaced] = useState<readonly { highlight: SavedHighlight; location: ReaderLocation }[]>([]);
+  useEffect(() => {
+    const highlights = contents?.highlights ?? [];
+    const doc = loaded && highlights.length ? annotationDocument(book, frame.current) : undefined;
+    const next = book && doc ? highlights.flatMap((highlight) => {
+      const location = matchReaderLocation(doc, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation });
+      return location ? [{ highlight, location }] : [];
+    }) : [];
+    setPlaced(next);
+    setMatchStatus({ matched: next.length, unmatched: highlights.length - next.length });
+    setShownHighlights(next.map((match) => match.highlight));
+  }, [book, contents, loaded, localAnchors]);
   useEffect(() => {
     const doc = frame.current?.contentDocument;
     if (!book || !doc || !loaded) return;
     const inner = doc.defaultView as Window & typeof globalThis;
     if (!inner?.CSS?.highlights || !inner.Highlight) return;
-    const matches = (contents?.highlights ?? []).map((highlight) => ({ highlight, range: matchReaderHighlight(doc, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation }) })).filter((match): match is { highlight: SavedHighlight; range: Range } => Boolean(match.range));
+    // Only chapters on the page have live ranges to paint.
+    const matches = placed.flatMap(({ highlight, location }) => { const range = readerLocationRange(doc, location); return range ? [{ highlight, range }] : []; });
     paintedRanges.current = matches;
     const ranges = matches.map((match) => match.range);
     inner.CSS.highlights.set("leaflogue-saved", new inner.Highlight(...ranges));
@@ -168,10 +219,8 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       coloured.priority = 1; inner.CSS.highlights.set(`leaflogue-colour-${colour}`, coloured);
     }
     refreshNoteMarkers.current();
-    setMatchStatus({ matched: ranges.length, unmatched: (contents?.highlights.length ?? 0) - ranges.length });
-    setShownHighlights(matches.map((match) => match.highlight));
     return () => { paintedRanges.current = []; inner.CSS.highlights.delete("leaflogue-saved"); for (const colour of HIGHLIGHT_COLOURS) inner.CSS.highlights.delete(`leaflogue-colour-${colour}`); };
-  }, [book, contents, loaded, annotationVersion, localAnchors, highlightColours]);
+  }, [book, placed, loaded, annotationVersion, windowVersion, highlightColours]);
   const options = useRef<HTMLDivElement>(null);
   const jump = useRef<(chapter: number) => void>(() => undefined);
   useEffect(() => { if (optionsOpen) options.current?.focus(); }, [optionsOpen]);
@@ -218,10 +267,9 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     return () => { active = false; };
   }, [bookId]);
   const visit = (position: Position, length = 0) => {
-    const doc = frame.current?.contentDocument;
-    const range = doc && readerTextRange(doc, position, length);
+    const range = goTo.current(position.chapter, (doc) => readerTextRange(doc, position, length));
     if (!range) { setError("This location could not be opened in this edition."); return; }
-    setOptionsOpen(false); navigateRange.current(range); save.current(position); setChapter(position.chapter); frame.current?.focus();
+    setOptionsOpen(false); save.current(position); frame.current?.focus();
   };
   const updateBookmarks = async (next: readonly Position[]) => {
     if (!book || savingBookmark) return;
@@ -242,7 +290,10 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   const source = useMemo(() => {
     if (!book) return "";
     const publisherStyles = [...new Set(book.chapters.map((item) => item.styles ?? ""))].join("\n").replace(/<\/style/giu, "<\\/style");
-    const chapters = book.chapters.map((item, index) => `<article data-chapter="${index}" data-path="${escape(item.id)}" aria-label="${escape(item.title)}">${item.html ?? item.text.split("\n\n").map((text, paragraph) => `<p data-paragraph="${paragraph}">${escape(text)}</p>`).join("")}</article>`).join("");
+    // EPUB chapters are swapped in one at a time by the layout below; laying out
+    // a whole book at once costs hundreds of megabytes for a long novel.
+    // PDF pages are small, absolutely placed and shown one at a time already.
+    const chapters = book.format === "pdf" ? book.chapters.map((_, index) => chapterMarkup(book, index)).join("") : "";
     return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'"><style>${publisherStyles}</style><style>
       html,body{box-sizing:border-box!important;width:100%!important;height:100%!important;margin:0!important;overflow:hidden!important}
       body{padding:clamp(20px,4vw,48px)!important;background:#fff;color:#222;font:18px/1.65 Georgia,serif}
@@ -263,9 +314,16 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const view = doc?.getElementById("reader-scroll");
     const content = doc?.getElementById("reader-pages");
     if (!opened || !book || !doc || !view || !content) return;
-    let spreadPitch = 1;
+    const pdf = book.format === "pdf";
+    let active = true;
+    let spreadPitch = 1; let columnWidth = 0; let columnCount = 1;
+    // EPUB: only chapter `rendered` is in the document; `local` is its page.
+    // PDF: every page stays in the document and only one is displayed.
+    let rendered = -1; let local = 0;
+    const estimate = createPageEstimate(book.chapters.map((item) => item.text.length));
+    let layoutKey = "";
     const nodes = () => Array.from(content.querySelectorAll<HTMLElement>("[data-paragraph]"));
-    for (const node of nodes()) node.dataset.chapter = node.closest<HTMLElement>("article[data-chapter]")!.dataset.chapter;
+    if (pdf) tagParagraphs(content);
     const textNodes = (element: Element) => {
       const walker = doc.createTreeWalker(element, NodeFilter.SHOW_TEXT); const result: Text[] = [];
       let node: Node | null; while ((node = walker.nextNode())) result.push(node as Text);
@@ -310,9 +368,42 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       }
       view.scrollLeft = 0; view.scrollTop = 0; updateNoteMarkers();
     };
+    /** Swap chapter `index` into the page, typeset and coloured like the rest. */
+    const render = (index: number) => {
+      if (pdf || index === rendered || !book.chapters[index]) return;
+      content.innerHTML = chapterMarkup(book, index); tagParagraphs(content);
+      rendered = index; local = 0; view.scrollLeft = 0;
+      applyReaderTypography(doc, typographyRef.current); colourRef.current();
+      setChapter(index); setWindowVersion((value) => value + 1);
+      // Publisher fonts first used by this chapter can change its pages once loaded.
+      if (doc.fonts?.status === "loading") void doc.fonts.ready.then(() => { if (active && rendered === index) layout(); });
+    };
+    const pageCount = () => Math.max(1, Math.ceil((content.scrollWidth + GAP) / spreadPitch));
+    /** Pages per character from the page shape alone, until a chapter has been measured. */
+    const geometricRate = () => {
+      const { size, line } = typographyRef.current;
+      const lines = Math.max(1, Math.floor((view.clientHeight || 600) / (size * (line || 1.65))));
+      const perLine = Math.max(1, Math.floor((columnWidth || 600) / (size * 0.5)));
+      return 1 / Math.max(1, lines * perLine * columnCount * 0.85);
+    };
+    const measure = () => { const pages = pageCount(); measureChapter(estimate, rendered, pages, geometricRate()); return pages; };
+    const publish = () => {
+      const index = pagesBefore(estimate, rendered) + local; const total = Math.max(index + 1, totalPages(estimate));
+      pageRef.current = index; countRef.current = total; setPage(index); setCount(total);
+    };
+    /** Show page `value` of chapter `index`; Infinity is its last page. */
+    const place = (index: number, value: number) => {
+      render(index);
+      const pages = measure();
+      local = Math.max(0, Math.min(pages - 1, value));
+      view.scrollLeft = local * spreadPitch;
+      publish(); updateNoteMarkers();
+    };
+    const pageAt = (left: number) => Math.floor((left - content.getBoundingClientRect().left + 1) / spreadPitch);
     const layout = () => {
-      if (book.format === "pdf") { const index = anchor.current.chapter; countRef.current = book.chapters.length; setCount(book.chapters.length); pageRef.current = index; setPage(index); setChapter(index); pdfLayout(index); return; }
-      if (!viewport.current?.clientWidth || !view.clientWidth) return;
+      if (pdf) { const index = anchor.current.chapter; countRef.current = book.chapters.length; setCount(book.chapters.length); pageRef.current = index; setPage(index); setChapter(index); pdfLayout(index); return; }
+      render(Math.max(0, Math.min(book.chapters.length - 1, anchor.current.chapter)));
+      if (rendered < 0 || !viewport.current?.clientWidth || !view.clientWidth) return;
       // Lock the CSS column width to the same whole-pixel pitch used for turns.
       // Auto-expanded fractional columns otherwise accumulate drift hundreds of pages in.
       view.style.removeProperty("width");
@@ -321,80 +412,103 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       const columns = shape.columns !== "one" && available >= (shape.columns === "two" ? 640 : 1000) ? 2 : 1;
       view.style.setProperty("max-width", `${shape.width * columns}ch`, "important");
       const measured = Math.floor(view.getBoundingClientRect().width);
-      const columnWidth = Math.floor((measured - GAP * (columns - 1)) / columns);
+      columnWidth = Math.floor((measured - GAP * (columns - 1)) / columns); columnCount = columns;
       const width = columns * columnWidth + GAP * (columns - 1);
       view.style.setProperty("width", `${width}px`, "important");
       content.style.setProperty("width", `${width}px`, "important");
       content.style.setProperty("column-width", `${columnWidth}px`, "important");
       content.style.setProperty("column-count", String(columns), "important");
-      const pitch = columns * (columnWidth + GAP);
-      spreadPitch = pitch;
-      const total = Math.max(1, Math.ceil((content.scrollWidth + GAP) / pitch));
-      countRef.current = total; setCount(total);
+      spreadPitch = columns * (columnWidth + GAP);
+      // Page counts only hold for the text settings and page shape they were measured with.
+      const shapeKey = JSON.stringify([typographyRef.current, columns, columnWidth, view.clientHeight]);
+      if (shapeKey !== layoutKey) { layoutKey = shapeKey; resetPageEstimate(estimate); }
       const target = content.querySelector<HTMLElement>(`[data-chapter="${anchor.current.chapter}"][data-paragraph="${anchor.current.paragraph}"]`);
-      const left = target ? character(target, anchor.current.offset ?? 0).left : content.getBoundingClientRect().left;
-      const index = Math.max(0, Math.min(total - 1, Math.floor((left - content.getBoundingClientRect().left + 1) / pitch)));
-      pageRef.current = index; setPage(index); view.scrollLeft = index * pitch; updateNoteMarkers();
+      place(rendered, target ? pageAt(character(target, anchor.current.offset ?? 0).left) : 0);
     };
-    const showPage = (value: number) => {
+    const reset = () => {
       selectionLocked.current = false; setActiveHighlight(undefined); selectedRange.current = undefined; setSelected(undefined); setAddingNote(false); setNote("");
       doc.getSelection()?.removeAllRanges();
       window.dispatchEvent(new CustomEvent("leaflogue:reader-selection", { detail: null }));
       (doc.defaultView as Window & typeof globalThis).CSS?.highlights?.delete("leaflogue-target");
-      const index = Math.max(0, Math.min(countRef.current - 1, value));
-      pageRef.current = index; setPage(index);
-      if (book.format === "pdf") { setChapter(index); pdfLayout(index); save.current({ chapter: index, paragraph: 0 }); return; }
-      view.scrollLeft = index * spreadPitch; updateNoteMarkers();
+    };
+    /** Remember the first character on the page as the reading position. */
+    const remember = () => {
       const bounds = view.getBoundingClientRect();
       const first = nodes().find((node) => Array.from(node.getClientRects()).some((rect) => rect.right > bounds.left + 1 && rect.left < bounds.right - 1));
-      if (!first) return;
+      if (!first) {
+        // A page of pictures: keep the position in this chapter so a relayout stays here.
+        // Only a chapter with text has a paragraph 0 the saved position can name.
+        if (anchor.current.chapter === rendered) return;
+        const item = book.chapters[rendered]!;
+        if ((item.paragraphs ?? item.text.split("\n\n")).length) save.current({ chapter: rendered, paragraph: 0 });
+        else anchor.current = { chapter: rendered, paragraph: 0 };
+        return;
+      }
       let low = 0; let high = first.textContent?.length ?? 0;
       while (low < high) { const mid = Math.floor((low + high) / 2); if (character(first, mid).right <= bounds.left + 1) low = mid + 1; else high = mid; }
-      const next = { chapter: Number(first.dataset.chapter), paragraph: Number(first.dataset.paragraph), ...(low ? { offset: low } : {}) };
-      setChapter(next.chapter); save.current(next);
+      save.current({ chapter: Number(first.dataset.chapter), paragraph: Number(first.dataset.paragraph), ...(low ? { offset: low } : {}) });
     };
-    turn.current = showPage;
+    const showPdf = (value: number) => {
+      reset();
+      const index = Math.max(0, Math.min(countRef.current - 1, value));
+      pageRef.current = index; setPage(index); setChapter(index); pdfLayout(index); save.current({ chapter: index, paragraph: 0 });
+    };
+    const showPage = (index: number, value: number) => { reset(); place(index, value); remember(); };
+    /** Turn within the chapter, or into the next or previous one at its edges. */
+    const turnBy = (delta: number) => {
+      if (pdf) { showPdf(pageRef.current + delta); return; }
+      const next = local + delta; const pages = pageCount();
+      if (next >= pages && rendered < book.chapters.length - 1) showPage(rendered + 1, 0);
+      else if (next < 0 && rendered > 0) showPage(rendered - 1, Infinity);
+      else showPage(rendered, next);
+    };
     navigateRange.current = (range) => {
-      if (book.format === "pdf") {
+      const inner = doc.defaultView as Window & typeof globalThis;
+      if (pdf) {
         const node = range.startContainer.nodeType === 1 ? range.startContainer as Element : range.startContainer.parentElement;
-        const chapter = Number(node?.closest("article[data-chapter]")?.getAttribute("data-chapter"));
-        showPage(chapter); const inner = doc.defaultView as Window & typeof globalThis; inner.CSS.highlights.set("leaflogue-target", new inner.Highlight(range)); return;
+        showPdf(Number(node?.closest("article[data-chapter]")?.getAttribute("data-chapter"))); inner.CSS.highlights.set("leaflogue-target", new inner.Highlight(range)); return;
       }
       const start = range.cloneRange(); start.collapse(true);
-      const rect = start.getBoundingClientRect();
-      const index = Math.floor((rect.left - content.getBoundingClientRect().left + 1) / spreadPitch);
-      showPage(index);
-      const inner = doc.defaultView as Window & typeof globalThis;
+      showPage(rendered, pageAt(start.getBoundingClientRect().left));
       inner.CSS.highlights.set("leaflogue-target", new inner.Highlight(range));
+    };
+    goTo.current = (index, find) => {
+      const before = { chapter: rendered, page: local };
+      render(index);
+      const range = find(doc);
+      if (range) navigateRange.current(range);
+      else if (before.chapter >= 0) place(before.chapter, before.page);
+      return range;
     };
     layoutRef.current = layout;
     setAnnotationVersion((value) => value + 1);
     const observer = new ResizeObserver(layout); observer.observe(viewport.current!);
-    let active = true;
     void doc.fonts?.ready.then(() => { if (active) layout(); });
+    // Pictures decode after the chapter is placed and can add pages to it.
+    let settling: ReturnType<typeof setTimeout> | undefined;
+    const imageLoaded = () => { clearTimeout(settling); settling = setTimeout(() => { if (active) layout(); }, 50); };
+    if (!pdf) content.addEventListener("load", imageLoaded, true);
     const visible = () => Boolean(viewport.current?.clientWidth) && !viewport.current?.closest("[hidden]");
     menu.current = () => { selectionLocked.current = false; setActiveHighlight(undefined); selectedRange.current = undefined; setSelected(undefined); setAddingNote(false); setNote(""); doc.getSelection()?.removeAllRanges(); window.dispatchEvent(new CustomEvent("leaflogue:reader-selection", { detail: null })); setOptionsOpen(true); };
-    jump.current = (index) => {
-      if (book.format === "pdf") { showPage(index); return; }
-      const target = content.querySelector<HTMLElement>(`article[data-chapter="${index}"]`);
-      if (target) showPage(Math.floor((target.getBoundingClientRect().left - content.getBoundingClientRect().left + 1) / spreadPitch));
-    };
+    jump.current = (index) => { if (pdf) showPdf(index); else showPage(index, 0); };
     const key = (event: KeyboardEvent) => {
       if (!visible()) return;
       const action = readerKeyAction(event);
       if (!action) return;
       event.preventDefault();
       if (action === "menu") { const bounds = frame.current!.getBoundingClientRect(); menu.current(bounds.left + bounds.width / 2, bounds.top + 24); return; }
-      showPage(action === "first" ? 0 : action === "last" ? countRef.current - 1 : pageRef.current + (action === "next" ? 1 : -1));
+      if (action === "first") { if (pdf) showPdf(0); else showPage(0, 0); }
+      else if (action === "last") { if (pdf) showPdf(countRef.current - 1); else showPage(book.chapters.length - 1, Infinity); }
+      else turnBy(action === "next" ? 1 : -1);
     };
     window.addEventListener("keydown", key, true); doc.addEventListener("keydown", key, true);
     let accumulated = 0; let lastTurn = 0; let lastEvent = 0;
     const wheel = (event: WheelEvent) => {
-      if (!visible() || event.ctrlKey || event.metaKey || (book.format === "pdf" && geometry.current.pdfZoom !== "page")) return;
+      if (!visible() || event.ctrlKey || event.metaKey || (pdf && geometry.current.pdfZoom !== "page")) return;
       event.preventDefault(); const now = performance.now();
       if (now - lastEvent > 180) accumulated = 0; lastEvent = now;
       accumulated += (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view.clientHeight : 1);
-      if (Math.abs(accumulated) >= 40 && now - lastTurn > 350) { showPage(pageRef.current + (accumulated > 0 ? 1 : -1)); accumulated = 0; lastTurn = now; }
+      if (Math.abs(accumulated) >= 40 && now - lastTurn > 350) { turnBy(accumulated > 0 ? 1 : -1); accumulated = 0; lastTurn = now; }
     };
     const click = (event: MouseEvent) => {
       if (doc.getSelection()?.toString()) return;
@@ -410,15 +524,19 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       const link = target.closest<HTMLElement>("[data-reader-link]");
       if (link) {
         event.preventDefault(); const [path, id] = link.dataset.readerLink!.split("#");
-        const article = Array.from(content.querySelectorAll<HTMLElement>("article[data-path]")).find((item) => item.dataset.path === path);
+        const index = book.chapters.findIndex((item) => item.id === path);
+        if (index < 0) return;
+        if (pdf) { showPdf(index); return; }
+        render(index);
+        const article = content.querySelector<HTMLElement>(`article[data-chapter="${index}"]`);
         const destination = id ? Array.from(article?.querySelectorAll<HTMLElement>("[id]") ?? []).find((item) => item.id === id) : article;
-        if (destination) showPage(Math.floor((destination.getBoundingClientRect().left - content.getBoundingClientRect().left + 1) / spreadPitch));
+        showPage(index, destination ? pageAt(destination.getBoundingClientRect().left) : 0);
         return;
       }
       if (doc.getSelection()?.toString()) return;
       const bounds = view.getBoundingClientRect(); const x = event.clientX - bounds.left;
-      if (x >= 0 && x < bounds.width * 0.12) showPage(pageRef.current - 1);
-      else if (x > bounds.width * 0.88 && x <= bounds.width) showPage(pageRef.current + 1);
+      if (x >= 0 && x < bounds.width * 0.12) turnBy(-1);
+      else if (x > bounds.width * 0.88 && x <= bounds.width) turnBy(1);
     };
     const contextMenu = (event: MouseEvent) => {
       event.preventDefault(); const bounds = frame.current!.getBoundingClientRect(); menu.current(event.clientX + bounds.left, event.clientY + bounds.top);
@@ -445,7 +563,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     };
     doc.addEventListener("selectionchange", selectionChanged);
     doc.addEventListener("wheel", wheel, { passive: false }); doc.addEventListener("click", click); doc.addEventListener("mouseup", selection); doc.addEventListener("keyup", selection);
-    return () => { active = false; layoutRef.current = () => undefined; doc.removeEventListener("selectionchange", selectionChanged); doc.removeEventListener("contextmenu", contextMenu); observer.disconnect(); window.removeEventListener("keydown", key, true); doc.removeEventListener("keydown", key, true); doc.removeEventListener("wheel", wheel); doc.removeEventListener("click", click); doc.removeEventListener("mouseup", selection); doc.removeEventListener("keyup", selection); };
+    return () => { active = false; clearTimeout(settling); content.removeEventListener("load", imageLoaded, true); layoutRef.current = () => undefined; doc.removeEventListener("selectionchange", selectionChanged); doc.removeEventListener("contextmenu", contextMenu); observer.disconnect(); window.removeEventListener("keydown", key, true); doc.removeEventListener("keydown", key, true); doc.removeEventListener("wheel", wheel); doc.removeEventListener("click", click); doc.removeEventListener("mouseup", selection); doc.removeEventListener("keyup", selection); };
   }, [book, opened, loaded]);
 
   // Typography first, then layout: each runs only for the preferences it uses.
@@ -461,9 +579,11 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     if (!target || !active || !book || !contents || !loaded || !annotationVersion || !doc?.getElementById("reader-pages") || !viewport.current?.clientWidth || handledTarget.current === target.requestId) return;
     handledTarget.current = target.requestId;
     const highlight = contents.highlights.find((highlight) => highlight.id === target.highlightId);
-    const range = highlight ? matchReaderHighlight(doc, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation }) : undefined;
+    const whole = annotationDocument(book, frame.current);
+    const location = highlight && whole ? matchReaderLocation(whole, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation }) : undefined;
+    const range = location && goTo.current(location.chapter, (live) => readerLocationRange(live, location));
     if (!range) { setError(highlight ? "This highlight could not be uniquely matched to the attached EPUB. It may belong to a different edition." : "This highlight is no longer in your library."); return; }
-    setError(""); setOptionsOpen(false); navigateRange.current(range);
+    setError(""); setOptionsOpen(false);
     frame.current?.contentWindow?.focus();
   }, [target, active, book, contents, loaded, annotationVersion, localAnchors]);
 
@@ -478,7 +598,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     if (explain && !await confirm({ title: "Save and explain this selection?", message: "This saves the selected text as a library highlight, which can sync to your connected devices, then opens the Assistant. The Assistant uses your configured AI provider and its existing consent settings.", confirmLabel: "Save & explain" })) { selectionLocked.current = false; return; }
     setSavingHighlight(true); setError("");
     try {
-      const doc = frame.current?.contentDocument;
+      const doc = annotationDocument(book, frame.current);
       const existing = contents?.highlights.find((highlight) => normalizedQuote(highlight.text) === normalizedQuote(selected.text) && (
         highlight.sourceLocation === selected.sourceLocation || (doc && book && matchReaderHighlight(doc, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation }))
       ));
@@ -519,10 +639,12 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   }, [activeHighlight, optionsOpen]);
   /** Keyboard route to a saved highlight: show its page, then open its actions. */
   function openHighlight(id: HighlightId) {
-    const match = paintedRanges.current.find((item) => item.highlight.id === id);
+    const match = placed.find((item) => item.highlight.id === id);
     if (!match) return;
-    setOptionsOpen(false); navigateRange.current(match.range);
-    const rect = match.range.getBoundingClientRect(); const bounds = frame.current?.getBoundingClientRect();
+    setOptionsOpen(false);
+    const range = goTo.current(match.location.chapter, (doc) => readerLocationRange(doc, match.location));
+    if (!range) return;
+    const rect = range.getBoundingClientRect(); const bounds = frame.current?.getBoundingClientRect();
     setSelected(undefined); setNote("");
     setActiveHighlight({ id, keyboard: true, left: Math.max(8, Math.min((bounds?.left ?? 0) + rect.left, window.innerWidth - 344)), top: Math.max(8, Math.min((bounds?.top ?? 0) + rect.bottom + 8, window.innerHeight - 160)) });
   }
@@ -643,13 +765,13 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
             <summary>Review highlight locations</summary>
             <p className="ll-muted">Choose a passage and confirm where it belongs. Your imported text, source location and notes stay unchanged. Reviews stay on this device.</p>
             <ol className={styles.locationList}>{(contents?.highlights ?? []).map((highlight) => <li key={highlight.id}><button className="ll-button-secondary" onClick={() => {
-              const doc = frame.current?.contentDocument;
+              const doc = annotationDocument(book, frame.current);
               if (doc) setReview({ id: highlight.id, candidates: readerHighlightCandidates(doc, book, highlight.text) });
             }}><span>{highlight.text.slice(0, 140)}</span>{localAnchors[highlight.id] && <small>Location reviewed</small>}</button></li>)}</ol>
             {review && <div role="group" aria-label="Matching locations">
               <p role="status">{review.candidates.length === 100 ? "First 100 locations" : `${review.candidates.length} matching locations`}</p>
               {!review.candidates.length && <p className="ll-muted">No exact text match in this edition, allowing whitespace and quotation-mark differences. Your passage is kept in the library.</p>}
-              <ol className={styles.locationList}>{review.candidates.map((candidate) => <li key={candidate.location}><div><strong>{book.chapters[candidate.chapter]?.title}</strong><p>{candidate.excerpt}</p><button className="ll-button-secondary" onClick={() => { navigateRange.current(candidate.range); setOptionsOpen(false); }}>Preview location</button><button className="ll-button-secondary" disabled={savingAnchor} onClick={() => void saveReviewedLocation(review.id, candidate.location)}>Use this location</button></div></li>)}</ol>
+              <ol className={styles.locationList}>{review.candidates.map((candidate) => <li key={candidate.location}><div><strong>{book.chapters[candidate.chapter]?.title}</strong><p>{candidate.excerpt}</p><button className="ll-button-secondary" onClick={() => { const location = parseReaderLocation(candidate.location); if (location) goTo.current(location.chapter, (doc) => readerLocationRange(doc, location)); setOptionsOpen(false); }}>Preview location</button><button className="ll-button-secondary" disabled={savingAnchor} onClick={() => void saveReviewedLocation(review.id, candidate.location)}>Use this location</button></div></li>)}</ol>
               {localAnchors[review.id] && <button className="ll-button-secondary" disabled={savingAnchor} onClick={() => void saveReviewedLocation(review.id, null)}>Reset reviewed location</button>}
             </div>}
           </details>
