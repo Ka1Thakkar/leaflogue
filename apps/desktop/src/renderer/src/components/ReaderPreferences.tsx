@@ -3,9 +3,10 @@ import { DEFAULT_READER_PREFERENCES as defaults, type ReaderPreferences } from "
 import styles from "./epub-reader.module.css";
 export const READER_TABS = ["Book", "Text", "Layout", "Appearance", "Presets"] as const;
 export type ReaderTab = typeof READER_TABS[number];
-export function ReaderPreferenceControls({ tab, pdf, preferences: p, onChange, override, onOverride, presets, onSavePreset, onRemovePreset }: {
+export function ReaderPreferenceControls({ tab, pdf, preferences: p, onChange, override, onOverride, savedBookSettings = override, onForgetBookSettings, presets, onSavePreset, onRemovePreset }: {
   tab: ReaderTab; pdf: boolean; preferences: ReaderPreferences; onChange: (p: ReaderPreferences) => void;
   override: boolean; onOverride: (value: boolean) => void;
+  savedBookSettings?: boolean; onForgetBookSettings?: () => void;
   presets: { name: string; preferences: ReaderPreferences }[]; onSavePreset: (name: string) => void; onRemovePreset: (name: string) => void;
 }) {
   const [name, setName] = useState("");
@@ -48,7 +49,8 @@ export function ReaderPreferenceControls({ tab, pdf, preferences: p, onChange, o
     </>}
     {tab === "Presets" && <>
       {toggleOverride(override, onOverride)}
-      <p className="ll-muted">Preferences stay on this device. Without a book override, changes apply to other books too.</p>
+      <p className="ll-muted">Preferences stay on this device. Without separate preferences, changes apply to other books too. Turning separate preferences off keeps this book's settings, so turning them back on restores them.</p>
+      {savedBookSettings && onForgetBookSettings && <button className="ll-button-secondary" onClick={onForgetBookSettings}>Forget this book's settings</button>}
       <label className="ll-label">Preset name<input className="ll-input" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} /></label>
       <button className="ll-button" disabled={!name.trim()} onClick={() => { onSavePreset(name); setName(""); }}>Save current preset</button>
       {presets.map((preset) => <div className={styles.presetRow} key={preset.name}><button className="ll-button-secondary" onClick={() => onChange(preset.preferences)}>Apply {preset.name}</button><button className="ll-button-secondary" aria-label={`Delete preset ${preset.name}`} onClick={() => onRemovePreset(preset.name)}>Delete</button></div>)}

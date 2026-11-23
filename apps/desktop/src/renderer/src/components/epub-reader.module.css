@@ -81,3 +81,5 @@
 .options { width: min(100%, 36rem); padding: 18px; }
 .overlay { padding: 8px; }
 .preferenceToggle input { flex: none; }
+.failure { display: grid; gap: 10px; }
+.failure .pageActions { justify-content: flex-start; flex-wrap: wrap; }

@@ -45,7 +45,9 @@ current filename when you open the reader. Renames made through Calibre are
 followed automatically.
 
 If you move the library folder, open reader options with right-click or
-**Shift+F10**, choose **Manage Calibre link**, and select the new folder.
+**Shift+F10**, choose **Manage Calibre link**, and select the new folder. If the
+book can no longer open, the Reader tab offers **Reconnect from Calibre** for
+the same step.
 The library identifiers keep the link associated with the same library.
 A Calibre Content Server URL is not supported; choose a local folder.
 
@@ -57,8 +59,9 @@ without losing your reading position.
 
 ## Disconnect and back up
 
-**Unlink book file** removes only Leaflogue's local link and reading position.
-It keeps your Calibre EPUB, Leaflogue book, highlights, and notes.
+**Unlink book file** removes Leaflogue's local link to the file and to Calibre,
+along with your reading position, bookmarks and reviewed highlight locations
+for it. It keeps your Calibre EPUB, Leaflogue book, highlights, and notes.
 
 Calibre connections, file paths, and reading positions stay on this computer.
 They are not uploaded with library sync or included in SQLite backups or

@@ -1899,12 +1899,22 @@ export const EPUB_POSITION_CHANNEL = "epub:position";
 export const PDF_BYTES_CHANNEL = "reader:pdf-bytes";
 export const EPUB_ANCHOR_CHANNEL = "epub:anchor";
 export const EPUB_BOOKMARKS_CHANNEL = "epub:bookmarks";
+export const EPUB_RELOCATE_CHANNEL = "epub:relocate";
 export interface EpubBookmark { readonly chapter: number; readonly paragraph: number; readonly offset?: number }
+/** Why a linked book file could not be opened; carried as `[book-file:<kind>(+calibre)]` in the error message. */
+export type EpubFailureKind = "missing" | "changed" | "unreadable" | "invalid-link";
+export type EpubRelocation =
+  | { readonly status: "cancelled" }
+  /** The chosen file is another edition; call relocate again with confirmation to link it. */
+  | { readonly status: "different-edition" }
+  | { readonly status: "relinked"; readonly document: EpubDocument };
 
 export interface EpubDocument {
   readonly format?: "epub" | "pdf";
   readonly localAnchors?: Readonly<Record<string, string>>;
   readonly bookmarks?: readonly EpubBookmark[];
+  /** The file is reached through a Calibre library link. */
+  readonly calibre?: boolean;
   readonly sha256: string;
   readonly chapters: readonly { readonly id: string; readonly title: string; readonly text: string; readonly html?: string; readonly styles?: string; readonly paragraphs?: readonly string[] }[];
   readonly position: { readonly chapter: number; readonly paragraph: number; readonly offset?: number };
@@ -1927,6 +1937,8 @@ export interface LeaflogueBridge {
     saveAnchor(bookId: BookId, sha256: string, highlightId: HighlightId, location: string | null): Promise<Readonly<Record<string, string>>>;
     saveBookmarks(bookId: BookId, sha256: string, bookmarks: readonly EpubBookmark[]): Promise<readonly EpubBookmark[]>;
     savePosition(bookId: BookId, sha256: string, chapter: number, paragraph: number, offset?: number): Promise<void>;
+    /** Choose where a moved book file is now. Pass true to link the file chosen last when it was another edition. */
+    relocate?(bookId: BookId, acceptDifferentEdition?: boolean): Promise<EpubRelocation>;
   };
   readonly system: {
     getCapabilities(): Promise<SystemCapabilities>;
