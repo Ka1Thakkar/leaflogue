@@ -188,7 +188,7 @@ describe.skipIf(process.platform === "win32")("Mac update keeps the previous app
   });
 });
 
-describe("startup health of a Mac update", () => {
+describe.skipIf(process.platform === "win32")("startup health of a Mac update", () => {
   const directory = "/state";
   const target = "/Applications/Leaflogue.app";
   const backup = "/Applications/.leaflogue-update-1.app.previous";
