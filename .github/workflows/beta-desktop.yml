@@ -2,6 +2,11 @@ name: Refresh existing beta.6 build staging
 
 on:
   workflow_dispatch:
+    inputs:
+      promote_only:
+        type: boolean
+        default: false
+        description: Promote the verified staged beta.6 files without rebuilding
 
 env:
   LEAFLOGUE_E2E_BACKGROUND: "1"
@@ -15,6 +20,7 @@ concurrency:
 
 jobs:
   preflight:
+    if: inputs.promote_only != true
     name: Validate the exact beta source
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -36,6 +42,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   draft:
+    if: inputs.promote_only != true
     name: Create an unpublished beta candidate
     needs: preflight
     runs-on: ubuntu-24.04
@@ -55,6 +62,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   linux:
+    if: inputs.promote_only != true
     name: Linux x64 and ARM64 plus backend
     needs: draft
     runs-on: ubuntu-24.04
@@ -83,6 +91,7 @@ jobs:
           gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
 
   native:
+    if: inputs.promote_only != true
     name: ${{ matrix.platform }} beta (${{ matrix.architecture }})
     needs: draft
     runs-on: ${{ matrix.runner }}
@@ -131,7 +140,7 @@ jobs:
 
   sign:
     name: Sign the beta update feeds
-    if: success()
+    if: success() && inputs.promote_only != true
     needs: [draft, linux, native]
     runs-on: ubuntu-24.04
     environment: release
@@ -190,3 +199,19 @@ jobs:
           Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           EOF_NOTES
           gh release edit "$CANDIDATE_TAG" --notes-file "$notes"
+
+  promote-existing:
+    if: inputs.promote_only == true
+    name: Replace existing beta.6 downloads after independent verification
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/promote-beta6-refresh.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
