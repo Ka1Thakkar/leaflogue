@@ -15,7 +15,7 @@ for (const name of ['Validate the exact beta source', 'mac beta (arm64)', 'mac b
 const windowsRun = process.env.REFRESH_WINDOWS_RUN;
 if (!windowsRun) throw Error('Windows repair run is required');
 const windows = JSON.parse(gh('run','view',windowsRun,'--repo',repo,'--json','status,conclusion,headSha'));
-if (windows.status !== 'completed' || windows.conclusion !== 'success') throw Error('Windows repair and signing did not pass');
+if (windows.status !== 'completed' || windows.conclusion !== 'success' || !windows.headSha.startsWith('2e1f01c')) throw Error('Windows repair and signing did not pass on the expected source');
 const old = JSON.parse(gh('release','view',tag,'--repo',repo,'--json','body,assets'));
 mkdirSync('refresh-files');
 gh('release','download','beta-candidate-44087855277-1','--repo',repo,'--dir','refresh-files');

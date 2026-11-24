@@ -282,4 +282,3 @@ jobs:
           node apps/desktop/scripts/update-manifest.mjs --channel beta --platform windows --architecture x64 --directory update-files
           (cd update-files && sha256sum leaflogue-update-*.json leaflogue-update-*.json.sig > SHA256SUMS-updates.txt)
           gh release upload "$CANDIDATE_TAG" update-files/leaflogue-update-*.json update-files/leaflogue-update-*.json.sig update-files/SHA256SUMS-updates.txt --clobber
-
