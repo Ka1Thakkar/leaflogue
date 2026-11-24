@@ -19,7 +19,7 @@ Windows installers, as documented in [beta validation](beta-desktop-validation.m
 
 ## 0.1.1 — integrated reader
 
-The experimental **0.1.1-beta.4** ships the local paged EPUB reader, read-only
+The experimental **0.1.1-beta.6** ships the local paged EPUB reader, read-only
 Calibre linking, confirmed highlights and notes, return-to-context navigation,
 reader display settings, and Reader/Assistant sidebar. The broader milestone
 below includes follow-up work; book-file sync and cross-device positions are
@@ -31,9 +31,8 @@ and optional AI actions, and return-to-context navigation. It also includes
 separate opt-in book-file sync, offline downloads, progress across devices,
 and conservative matching of imported highlights against an attached edition.
 
-Text and image-only PDF reading is implemented in the next-beta development
-batch, using one linked file per book and shared text annotations where a
-selectable text layer exists. Scans are readable without OCR or text matching.
+Text and image-only PDF reading ships in beta.6, using one linked file per book
+and shared text annotations where a selectable text layer exists. Scans are readable without OCR or text matching.
 
 ## Later evaluation
 
