@@ -5,3 +5,5 @@ export { MAX_KOREADER_SIDECARS, parseKOReaderSidecars, type KOReaderSidecar } fr
 export { extractPocketBookDatabase, isPocketBookDatabase } from "./pocketbook";
 export { parsePortableJson } from "./portable";
 export { looksLikeTolinoNotes, parseTolinoNotes } from "./tolino";
+
+export { parseGoodreadsCsv } from "./goodreads";
