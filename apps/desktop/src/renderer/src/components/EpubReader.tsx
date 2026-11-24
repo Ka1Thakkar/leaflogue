@@ -144,6 +144,8 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       const surround = preferences.surround === "app" ? getComputedStyle(document.documentElement).getPropertyValue("--ui-bg") : readerPaper;
       doc.documentElement.style.setProperty("background", surround, "important");
       doc.body.style.setProperty("background", surround, "important");
+      // Pages not yet painted show the reader's paper, never a white sheet.
+      doc.documentElement.style.setProperty("--pdf-paper", readerPaper);
       return;
     }
     const definition = appearance?.themes.find((theme) => theme.id === appearance.themeId);
@@ -311,7 +313,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
       ::highlight(leaflogue-saved){background:#ffe098;color:#292017}
       img{max-width:100%!important;max-height:100%!important;object-fit:contain}table{max-width:100%}pre{white-space:pre-wrap}
       [data-reader-link]{cursor:pointer}p{orphans:2;widows:2}
-      ${book.format === "pdf" ? `body{padding:12px!important;background:transparent!important}#reader-scroll{max-width:none!important;padding:0!important}#reader-pages{column-width:auto!important;column-count:auto!important;column-gap:0!important;overflow:hidden}#reader-pages>article{display:none;position:absolute;inset:0;padding:0!important;overflow:hidden}#reader-pages .pdf-sheet{position:absolute!important;max-width:none!important;transform-origin:0 0;background:#fff}.pdf-sheet .pdf-page-image{position:absolute;inset:0;width:100%!important;height:100%!important;max-height:none!important;pointer-events:none;object-fit:fill;z-index:0}.pdf-sheet [data-paragraph]{z-index:1;color:transparent!important;cursor:text;user-select:text}.pdf-sheet [data-paragraph]::selection{background:#6699ff88}` : ""}
+      ${book.format === "pdf" ? `body{padding:12px!important;background:transparent!important}#reader-scroll{max-width:none!important;padding:0!important}#reader-pages{column-width:auto!important;column-count:auto!important;column-gap:0!important;overflow:hidden}#reader-pages>article{display:none;position:absolute;inset:0;padding:0!important;overflow:hidden}#reader-pages .pdf-sheet{position:absolute!important;max-width:none!important;transform-origin:0 0;background:var(--pdf-paper,#fff)}.pdf-sheet .pdf-page-image:not([data-rendered]){visibility:hidden}.pdf-sheet .pdf-page-image{position:absolute;inset:0;width:100%!important;height:100%!important;max-height:none!important;pointer-events:none;object-fit:fill;z-index:0}.pdf-sheet [data-paragraph]{z-index:1;color:transparent!important;cursor:text;user-select:text}.pdf-sheet [data-paragraph]::selection{background:#6699ff88}` : ""}
       </style></head><body data-edition="${escape(book.sha256)}"><main id="reader-scroll"><div id="reader-pages">${chapters}</div></main></body></html>`;
   }, [book]);
 

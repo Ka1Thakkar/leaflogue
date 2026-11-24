@@ -132,7 +132,10 @@ test("reads image-only PDFs without OCR messages or fabricated highlights", asyn
       const canvas = image.ownerDocument.createElement("canvas"); canvas.width = canvas.height = 1;
       canvas.getContext("2d")!.drawImage(image as HTMLImageElement, 0, 0);
       return Array.from(canvas.getContext("2d")!.getImageData(0, 0, 1, 1).data);
-    })).toEqual([255, 255, 255, 255]);
+    })).toEqual([0, 0, 0, 255]);
+    // The next page is painted ahead, so turning to it never shows a blank sheet.
+    await expect(reader.locator('article[data-chapter="1"] .pdf-page-image')).toHaveAttribute("data-rendered", "true");
+    await expect(reader.locator('article[data-chapter="1"] .pdf-sheet')).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(reader.locator("[data-paragraph]")).toHaveCount(0);
     await expect(page.getByText(/OCR|Image-only page/)).toHaveCount(0);
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } }); await page.keyboard.press("PageDown");
@@ -142,7 +145,7 @@ test("reads image-only PDFs without OCR messages or fabricated highlights", asyn
 });
 
 
-test("preserves the original page when text overlaps artwork", async () => {
+test("keeps text over artwork in place and tones the whole page to the reader's paper", async () => {
   const profile = createProfile();
   try {
     const file = join(profile.files, "overlap.pdf"); await writeFile(file, readerPdf(false, undefined, "overlap"));
@@ -158,7 +161,7 @@ test("preserves the original page when text overlaps artwork", async () => {
       const canvas = image.ownerDocument.createElement("canvas"); canvas.width = canvas.height = 1;
       canvas.getContext("2d")!.drawImage(image as HTMLImageElement, 0, 0);
       return Array.from(canvas.getContext("2d")!.getImageData(0, 0, 1, 1).data);
-    })).toEqual([255, 255, 255, 255]);
+    })).toEqual([0, 0, 0, 255]);
     await session.close();
   } finally { await removeProfile(profile); }
 });
