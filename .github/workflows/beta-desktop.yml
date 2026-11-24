@@ -3,6 +3,13 @@ name: Refresh existing beta.6 build staging
 on:
   workflow_dispatch:
     inputs:
+      windows_only:
+        type: boolean
+        default: false
+        description: Rebuild Windows with the background renderer scheduling fix
+      windows_run:
+        type: string
+        description: Successful Windows repair and signing run to verify during promotion
       promote_only:
         type: boolean
         default: false
@@ -20,7 +27,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: inputs.promote_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true
     name: Validate the exact beta source
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -42,7 +49,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   draft:
-    if: inputs.promote_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true
     name: Create an unpublished beta candidate
     needs: preflight
     runs-on: ubuntu-24.04
@@ -62,7 +69,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   linux:
-    if: inputs.promote_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true
     name: Linux x64 and ARM64 plus backend
     needs: draft
     runs-on: ubuntu-24.04
@@ -91,7 +98,7 @@ jobs:
           gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
 
   native:
-    if: inputs.promote_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true
     name: ${{ matrix.platform }} beta (${{ matrix.architecture }})
     needs: draft
     runs-on: ${{ matrix.runner }}
@@ -140,7 +147,7 @@ jobs:
 
   sign:
     name: Sign the beta update feeds
-    if: success() && inputs.promote_only != true
+    if: success() && inputs.promote_only != true && inputs.windows_only != true
     needs: [draft, linux, native]
     runs-on: ubuntu-24.04
     environment: release
@@ -214,4 +221,65 @@ jobs:
           node-version-file: .nvmrc
       - run: node scripts/promote-beta6-refresh.mjs
         env:
+          REFRESH_WINDOWS_RUN: ${{ inputs.windows_run }}
           GH_TOKEN: ${{ github.token }}
+
+  windows-rebuild:
+    if: inputs.windows_only == true
+    name: Rebuild Windows with unthrottled background rendering
+    runs-on: windows-2025
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: ./.github/actions/build-native-beta
+        with:
+          platform: windows
+          architecture: x64
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          directory=apps/desktop/dist/beta-windows-x64
+          sums="$directory/SHA256SUMS-windows-x64.txt"
+          assets=("$sums")
+          while read -r checksum name; do assets+=("$directory/$name"); done < "$sums"
+          gh release upload beta-candidate-44087855277-1 "${assets[@]}" --clobber
+
+  sign-windows-retry:
+    name: Sign the beta update feeds
+    if: inputs.windows_only == true
+    needs: windows-rebuild
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Sign exact validated artifacts with the separate beta key
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE_TAG: beta-candidate-44087855277-1
+          LEAFLOGUE_UPDATE_SIGNING_KEY: ${{ secrets.LEAFLOGUE_BETA_UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir update-files
+          gh release download "$CANDIDATE_TAG" --dir update-files \
+            --pattern '*.AppImage' --pattern '*-mac-*.zip' --pattern '*-windows-*.exe'
+          for architecture in x64 arm64; do
+            node apps/desktop/scripts/update-manifest.mjs --channel beta --platform linux --architecture "$architecture" --directory update-files
+            node apps/desktop/scripts/update-manifest.mjs --channel beta --platform mac --architecture "$architecture" --directory update-files
+          done
+          node apps/desktop/scripts/update-manifest.mjs --channel beta --platform windows --architecture x64 --directory update-files
+          (cd update-files && sha256sum leaflogue-update-*.json leaflogue-update-*.json.sig > SHA256SUMS-updates.txt)
+          gh release upload "$CANDIDATE_TAG" update-files/leaflogue-update-*.json update-files/leaflogue-update-*.json.sig update-files/SHA256SUMS-updates.txt --clobber
+
