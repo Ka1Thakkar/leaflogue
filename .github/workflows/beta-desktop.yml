@@ -1,7 +1,10 @@
-name: Cross-platform beta candidate
+name: Refresh existing beta.6 build staging
 
 on:
   workflow_dispatch:
+
+env:
+  LEAFLOGUE_E2E_BACKGROUND: "1"
 
 permissions:
   contents: read
@@ -47,10 +50,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag="beta-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" \
-            --title "Leaflogue cross-platform beta candidate ${GITHUB_SHA::12}" \
-            --notes "INCOMPLETE until every candidate job succeeds. Source: $GITHUB_SHA. Native Mac/Windows and Linux checks, human desktop/accessibility acceptance, signing review, and final beta version/tag approval are required before publication."
+          tag="beta-candidate-44087855277-1"
+          test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   linux:
@@ -65,6 +66,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/build-release-files
+      - name: Build self-hostable web archive
+        run: |
+          npm run build --workspace @leaflogue/web
+          mkdir -p release-files/web
+          (cd apps/web/dist && zip -qr ../../../release-files/web/Leaflogue-0.1.1-beta.6-web.zip .)
+          (cd release-files/web && sha256sum *.zip > SHA256SUMS-web.txt)
       - name: Retain validated Linux and backend downloads directly in the draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -124,7 +131,7 @@ jobs:
 
   sign:
     name: Sign the beta update feeds
-    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-beta.')
+    if: success()
     needs: [draft, linux, native]
     runs-on: ubuntu-24.04
     environment: release
@@ -154,7 +161,7 @@ jobs:
           done
           node apps/desktop/scripts/update-manifest.mjs --channel beta --platform windows --architecture x64 --directory update-files
           (cd update-files && sha256sum leaflogue-update-*.json leaflogue-update-*.json.sig > SHA256SUMS-updates.txt)
-          gh release upload "$CANDIDATE_TAG" update-files/leaflogue-update-*.json update-files/leaflogue-update-*.json.sig update-files/SHA256SUMS-updates.txt
+          gh release upload "$CANDIDATE_TAG" update-files/leaflogue-update-*.json update-files/leaflogue-update-*.json.sig update-files/SHA256SUMS-updates.txt --clobber
 
   complete:
     name: Mark the candidate ready for human validation
