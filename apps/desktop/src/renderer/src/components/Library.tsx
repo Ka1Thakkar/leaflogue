@@ -13,6 +13,8 @@ import { addBookRequests } from "../palette/actions";
 import { useCommands } from "../palette/commands";
 import styles from "./knowledge.module.css";
 import sheet from "./library.module.css";
+import { useContextWorkspace } from "./ContextPanel";
+import { ArticleForm } from "./ArticleForm";
 import { BookForm } from "./BookForms";
 import { CollectionManager, TagManager } from "./Organization";
 
@@ -36,6 +38,7 @@ function sortBooks(books: readonly Book[], sort: Sort): Book[] {
 }
 
 export function LibraryPage({ initialCollectionId, initialTagId }: { readonly initialCollectionId?: CollectionId; readonly initialTagId?: TagId } = {}) {
+  const context = useContextWorkspace();
   const [shelf, setShelf] = useState<"active" | "archived">("active");
   const [books, setBooks] = useState<readonly Book[]>();
   const [collections, setCollections] = useState<readonly Collection[]>([]);
@@ -255,6 +258,9 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
                 <Dialog label="Add book" title="Add a book" icon={Plus} triggerRef={addBookTrigger}>
                   {(close) => <BookForm onClose={close} onSaved={(book) => navigate(href.book(book.id))} />}
                 </Dialog>
+                {window.leaflogue.articles && <Dialog label="Add article" title="Capture a web article" secondary>
+                  {(close) => <ArticleForm onClose={close} onSaved={(book) => { navigate(href.book(book.id)); context?.showReader(book.id, book.title); }} />}
+                </Dialog>}
                 <Dialog label="Collections" title="Manage collections" icon={Folder} secondary triggerRef={collectionsTrigger}>
                   {(close) => <CollectionManager onClose={close} onChanged={refresh} />}
                 </Dialog>

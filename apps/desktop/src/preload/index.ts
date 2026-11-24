@@ -1,3 +1,4 @@
+import { ARTICLE_PREVIEW_CHANNEL, ARTICLE_SAVE_CHANNEL, ARTICLE_CANCEL_CHANNEL, type ArticlePreview } from "@leaflogue/contracts";
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL, type CalibreConnection, type CalibreFormat, type CalibreSearch } from "@leaflogue/contracts";
 import { CATALOG_SEARCH_CHANNEL, type CatalogSearch } from "@leaflogue/contracts";
 import { PDF_BYTES_CHANNEL, EPUB_ANCHOR_CHANNEL, EPUB_BOOKMARKS_CHANNEL, EPUB_ATTACH_CHANNEL, EPUB_OPEN_CHANNEL, EPUB_POSITION_CHANNEL, EPUB_RELOCATE_CHANNEL, type EpubDocument, type EpubRelocation } from "@leaflogue/contracts";
@@ -200,6 +201,11 @@ const bridge: LeaflogueBridge = Object.freeze({
     choose: () => ipcRenderer.invoke(CALIBRE_CHOOSE_CHANNEL) as Promise<CalibreConnection | undefined>,
     search: (id: BookId, query: string) => ipcRenderer.invoke(CALIBRE_SEARCH_CHANNEL, id, query) as Promise<CalibreSearch>,
     link: (id: BookId, uuid: string, format?: CalibreFormat) => ipcRenderer.invoke(CALIBRE_LINK_CHANNEL, id, uuid, format) as Promise<EpubDocument>,
+  }),
+  articles: Object.freeze({
+    preview: (url: string, operationId: string) => ipcRenderer.invoke(ARTICLE_PREVIEW_CHANNEL, url, operationId) as Promise<ArticlePreview>,
+    save: (token: string) => ipcRenderer.invoke(ARTICLE_SAVE_CHANNEL, token) as Promise<Book>,
+    cancel: (token: string) => ipcRenderer.invoke(ARTICLE_CANCEL_CHANNEL, token) as Promise<void>,
   }),
   epub: Object.freeze({
     unlink: (id: BookId) => ipcRenderer.invoke(EPUB_UNLINK_CHANNEL, id) as Promise<void>,

@@ -18,7 +18,7 @@ export function textPoint(doc: Document, element: Element, offset: number): [Nod
 /** Chapter-scoped paragraph coordinates, as saved in `epub:<edition>:chapter:paragraph:start:endParagraph:end`. */
 export interface ReaderLocation { readonly chapter: number; readonly paragraph: number; readonly start: number; readonly endParagraph: number; readonly end: number }
 export function parseReaderLocation(location: string | undefined, edition?: string): ReaderLocation | undefined {
-  if (!location?.startsWith("epub:")) return undefined;
+  if (!location || !/^(?:epub|article):/u.test(location)) return undefined;
   const [, hash, ...values] = location.split(":");
   const numbers = values.map(Number);
   if (numbers.length !== 5 || !numbers.every((value) => Number.isSafeInteger(value) && value >= 0) || (edition !== undefined && hash !== edition)) return undefined;
@@ -78,8 +78,8 @@ export function matchReaderHighlight(doc: ReaderRoot, book: EpubDocument, highli
 export function matchReaderLocation(doc: ReaderRoot, book: EpubDocument, highlight: SavedHighlight): ReaderLocation | undefined {
   const quote = normalizedQuote(highlight.text);
   if (!quote) return undefined;
-  if (highlight.sourceLocation?.startsWith("epub:")) {
-    const [, hash] = highlight.sourceLocation.split(":");
+  if (/^(?:epub|article):/u.test(highlight.sourceLocation ?? "")) {
+    const [, hash] = highlight.sourceLocation!.split(":");
     const location = parseReaderLocation(highlight.sourceLocation);
     if (!location) return undefined;
     if (hash === book.sha256) {
@@ -111,7 +111,7 @@ export function readerHighlightCandidates(doc: ReaderRoot, book: EpubDocument, t
         const paragraph = Number(first.element.dataset.paragraph); const endParagraph = Number(last.element.dataset.paragraph);
         const startOffset = rawStart - first.start; const endOffset = rawEnd - last.start;
         const range = rangeAt(doc, chapter, paragraph, startOffset, endParagraph, endOffset);
-        if (range) found.push({ range, chapter, location: `epub:${book.sha256}:${chapter}:${paragraph}:${startOffset}:${endParagraph}:${endOffset}`, excerpt: first.element.textContent?.slice(Math.max(0, startOffset - 60), startOffset + 180) ?? "" });
+        if (range) found.push({ range, chapter, location: `${book.format === "article" ? "article" : "epub"}:${book.sha256}:${chapter}:${paragraph}:${startOffset}:${endParagraph}:${endOffset}`, excerpt: first.element.textContent?.slice(Math.max(0, startOffset - 60), startOffset + 180) ?? "" });
         if (found.length >= limit) return found;
       }
       cursor = start + 1;
@@ -135,5 +135,5 @@ export function readerSelection(doc: Document, book: EpubDocument) {
   };
   const start = offset(first, range.startContainer, range.startOffset, 0);
   const end = offset(last, range.endContainer, range.endOffset, last.textContent?.length ?? 0);
-  return { text, range, sourceLocation: `epub:${book.sha256}:${first.dataset.chapter}:${first.dataset.paragraph}:${start}:${last.dataset.paragraph}:${end}` };
+  return { text, range, sourceLocation: `${book.format === "article" ? "article" : "epub"}:${book.sha256}:${first.dataset.chapter}:${first.dataset.paragraph}:${start}:${last.dataset.paragraph}:${end}` };
 }

@@ -588,7 +588,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const whole = annotationDocument(book, frame.current);
     const location = highlight && whole ? matchReaderLocation(whole, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation }) : undefined;
     const range = location && goTo.current(location.chapter, (live) => readerLocationRange(live, location));
-    if (!range) { setError(highlight ? "This highlight could not be uniquely matched to the attached EPUB. It may belong to a different edition." : "This highlight is no longer in your library."); return; }
+    if (!range) { setError(highlight ? "This highlight could not be uniquely matched to the linked source. It may belong to a different edition." : "This highlight is no longer in your library."); return; }
     setError(""); setOptionsOpen(false);
     frame.current?.contentWindow?.focus();
   }, [target, active, book, contents, loaded, annotationVersion, localAnchors]);
@@ -685,7 +685,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     catch (failure) { setError(describeOpenFailure(failure).detail || "The book file could not be linked."); } finally { setBusy(false); }
   }
   if (!window.leaflogue.epub) return null;
-  return <section className={styles.reader} aria-label={book?.format === "pdf" ? "Local PDF reader" : "Local EPUB reader"}>
+  return <section className={styles.reader} aria-label={book?.format === "article" ? "Local article reader" : book?.format === "pdf" ? "Local PDF reader" : "Local EPUB reader"}>
     {confirmDialog}
     {!book && openFailure && <div role="group" aria-label="Book file problem" className={styles.failure}>
       <InlineError>{openFailure.kind === "unknown" ? "This book file could not be opened." : FAILURES[openFailure.kind]}</InlineError>
@@ -698,11 +698,12 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     </div>}
     {!book && !openFailure && <><p className="ll-muted">{target ? "Link a book file to find this highlight in its original context." : "Link an EPUB or PDF to read it here."} The file stays in its original location.</p><button className="ll-button-secondary" disabled={busy} onClick={attach}>{busy ? "Checking for book file…" : "Attach book file"}</button>{window.leaflogue.calibre && <button className="ll-button-secondary" onClick={() => setCalibreOpen(true)}>Link from Calibre</button>}<p className="ll-muted">Book files are not included in library backups.</p></>}
     {error && <InlineError>{error}</InlineError>}
-    {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : "Read EPUB"}</button>}
+    {book?.source && <p className="ll-muted">Captured {new Date(book.source.capturedAt).toLocaleDateString()} from {new URL(book.source.url).hostname}. Full article text stays on this computer. <button className="ll-text-button" onClick={() => void window.leaflogue.system.openExternal(book.source!.url)}>Open source website</button></p>}
+    {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : book.format === "article" ? "Read article" : book.format === "pdf" ? "Read PDF" : "Read EPUB"}</button>}
     {calibreOpen && <div className={styles.overlay}><div role="dialog" aria-label="Calibre library" className={styles.options} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setCalibreOpen(false); } }}><CalibrePicker bookId={bookId} title={contents?.book.title ?? ""} onClose={() => setCalibreOpen(false)} onLinked={(next) => { anchor.current = next.position; setBook(next); setChapter(next.position.chapter); setCalibreOpen(false); setOptionsOpen(false); setOpened(true); setError(""); setOpenFailure(undefined); }} /></div></div>}
     {opened && book && <>
       <div className={styles.viewport} ref={viewport} style={{ background: preferences.surround === "app" ? "var(--ui-bg)" : readerPaper }} role="region" aria-label="Book pages" onContextMenu={(event) => { event.preventDefault(); menu.current(event.clientX, event.clientY); }}>
-        <iframe ref={frame} className={styles.frame} title={book.format === "pdf" ? "PDF pages" : "EPUB pages"} sandbox="allow-same-origin" srcDoc={source} onLoad={() => setLoaded((value) => value + 1)} />
+        <iframe ref={frame} className={styles.frame} title={book.format === "article" ? "Article pages" : book.format === "pdf" ? "PDF pages" : "EPUB pages"} sandbox="allow-same-origin" srcDoc={source} onLoad={() => setLoaded((value) => value + 1)} />
       </div>
       {!optionsOpen && !calibreOpen && active && noteMarkers.map((marker) => <button key={marker.id} className={styles.noteMarker} aria-label={marker.label} title={marker.label} style={{ left: marker.left, top: marker.top }} onClick={() => { setSelected(undefined); setActiveHighlight({ id: marker.id, left: Math.min(marker.left, window.innerWidth - 344), top: marker.top }); }}><Icon name="note-paper" size={15} aria-hidden="true" /></button>)}
       {activeHighlight && activePassage && !optionsOpen && <div ref={highlightActions} tabIndex={-1} data-reader-selection role="dialog" aria-label="Saved highlight actions" className={styles.selection} style={{ left: activeHighlight.left, top: Math.min(activeHighlight.top, window.innerHeight - (activeHighlight.note ? 280 : 160)) }} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActiveHighlight(undefined); } }}>

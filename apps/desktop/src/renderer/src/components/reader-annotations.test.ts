@@ -54,3 +54,11 @@ describe("reader annotation matching", () => {
     expect(readerLocationRange(doc, { chapter: 0, paragraph: 0, start: 0, endParagraph: 0, end: 5 })).toBeUndefined();
   });
 });
+
+it("reuses reader matching for versioned article anchors without changing EPUB anchors", () => {
+  const article: EpubDocument = { ...book, format: "article" };
+  const doc = documentWith('<p data-chapter="0" data-paragraph="0">A quiet beginning.</p>');
+  const candidate = readerHighlightCandidates(doc, article, "quiet")[0]!;
+  expect(candidate.location).toBe("article:edition-a:0:0:2:0:7");
+  expect(matchReaderHighlight(doc, article, highlight("quiet", candidate.location))?.toString()).toBe("quiet");
+});

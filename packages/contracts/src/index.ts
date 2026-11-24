@@ -1910,7 +1910,8 @@ export type EpubRelocation =
   | { readonly status: "relinked"; readonly document: EpubDocument };
 
 export interface EpubDocument {
-  readonly format?: "epub" | "pdf";
+  readonly format?: "epub" | "pdf" | "article";
+  readonly source?: { readonly url: string; readonly capturedAt: number };
   readonly localAnchors?: Readonly<Record<string, string>>;
   readonly bookmarks?: readonly EpubBookmark[];
   /** The file is reached through a Calibre library link. */
@@ -1920,7 +1921,21 @@ export interface EpubDocument {
   readonly position: { readonly chapter: number; readonly paragraph: number; readonly offset?: number };
 }
 
+export const ARTICLE_PREVIEW_CHANNEL = "article:preview";
+export const ARTICLE_SAVE_CHANNEL = "article:save";
+export const ARTICLE_CANCEL_CHANNEL = "article:cancel";
+export interface ArticlePreview {
+  readonly token: string; readonly url: string; readonly title: string; readonly author: string;
+  readonly excerpt: string; readonly paragraphs: number; readonly existing: boolean;
+}
+
 export interface LeaflogueBridge {
+  /** Desktop-only public web capture; full source text stays on this device. */
+  readonly articles?: {
+    preview(url: string, operationId: string): Promise<ArticlePreview>;
+    save(token: string): Promise<Book>;
+    cancel(operationId: string): Promise<void>;
+  };
   readonly calibre?: {
     describe(): Promise<CalibreConnection | undefined>;
     choose(): Promise<CalibreConnection | undefined>;

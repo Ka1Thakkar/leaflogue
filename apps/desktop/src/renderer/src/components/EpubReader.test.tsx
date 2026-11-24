@@ -321,3 +321,13 @@ describe("a linked book that cannot open", () => {
     expect(button("Attach book file")).toBeDefined();
   });
 });
+
+it("opens an article through the shared reader with source context and an article-specific accessible label", async () => {
+  epub.open!.mockResolvedValue({ ...book, format: "article", source: { url: "https://example.com/article", capturedAt: 123 } });
+  await act(async () => { root.render(<EpubReader bookId={bookId} embedded />); });
+  await settle();
+  expect(container.querySelector('[aria-label="Local article reader"]')).not.toBeNull();
+  expect(container.querySelector('iframe[title="Article pages"]')).not.toBeNull();
+  expect(container.textContent).toContain("Full article text stays on this computer");
+  expect(container.textContent).toContain("example.com");
+});

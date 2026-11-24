@@ -31,7 +31,8 @@
     "test:convex:live": "node --env-file=.env --env-file-if-exists=.env.local ./node_modules/vitest/vitest.mjs run tests/live/convex-sync.test.ts",
     "test:convex:packaged:live": "node --env-file=.env --env-file-if-exists=.env.local ./node_modules/playwright/cli.js test --config tests/live/playwright.config.ts",
     "test:docs": "npm run build --workspace @leaflogue/docs && playwright test --config tests/docs/playwright.config.ts",
-    "capture:marketing": "node scripts/capture-marketing.mjs"
+    "capture:marketing": "node scripts/capture-marketing.mjs",
+    "test:article-worker": "npm run build --workspace @leaflogue/desktop && node scripts/article-worker-smoke.mjs"
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",

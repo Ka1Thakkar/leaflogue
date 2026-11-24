@@ -11,6 +11,7 @@ export default defineConfig({
     ],
     build: {
       rollupOptions: {
+        input: { index: resolve(__dirname, "src/main/index.ts"), "article-worker": resolve(__dirname, "src/main/article-worker.ts") },
         output: {
           format: "es",
         },

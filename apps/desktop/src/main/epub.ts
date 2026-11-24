@@ -1,8 +1,10 @@
+import { readReaderSource } from "./reader-source";
+import { parseArticle } from "./article-document";
 import { parsePdf } from "./pdf";
 import { formatEpubChapter, type EpubFormatBudget } from "./epub-format";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat, writeFile, rm } from "node:fs/promises";
-import { isAbsolute, join, posix } from "node:path";
+import { mkdir, readFile, rename, stat, writeFile, rm } from "node:fs/promises";
+import { join, posix } from "node:path";
 import { fromBuffer, type Entry, type ZipFile } from "yauzl";
 import { SaxesParser } from "saxes";
 import type { CalibreReference, EpubBookmark, EpubDocument, EpubFailureKind } from "@leaflogue/contracts";
@@ -182,25 +184,7 @@ export async function readEpubFile(path: string): Promise<Buffer> {
   return (await readBookFile(path)).bytes;
 }
 
-/** The size and modification time come from the same handle the bytes were read through. */
-async function readBookFile(path: string): Promise<{ bytes: Buffer; size: number; mtimeMs: number }> {
-  if (!isAbsolute(path)) throw new Error("EPUB path must be absolute.");
-  const handle = await open(path, "r");
-  try {
-    const info = await handle.stat();
-    if (!info.isFile() || info.size > MAX_FILE) throw new Error("Choose an EPUB file under 50 MB.");
-    const stream = handle.createReadStream({ start: 0, end: MAX_FILE, autoClose: false });
-    const chunks: Buffer[] = [];
-    let size = 0;
-    for await (const chunk of stream) {
-      const bytes = chunk as Buffer;
-      size += bytes.length;
-      if (size > MAX_FILE) throw new Error("EPUB exceeds the 50 MB limit.");
-      chunks.push(bytes);
-    }
-    return { bytes: Buffer.concat(chunks), size: info.size, mtimeMs: info.mtimeMs };
-  } finally { await handle.close(); }
-}
+const readBookFile = (path: string) => readReaderSource(path, MAX_FILE);
 
 /**
  * Opening failures carry a stable marker through IPC, so the reader can offer
@@ -483,4 +467,8 @@ function validAnchor(document: EpubDocument, location: unknown): boolean {
   return paragraphs?.[first] !== undefined && paragraphs?.[last] !== undefined && start <= paragraphs[first]!.length && end <= paragraphs[last]!.length && (first < last || (first === last && start < end));
 }
 
-function parseBook(bytes: Buffer) { return bytes.subarray(0, 5).toString() === "%PDF-" ? parsePdf(bytes) : parseEpub(bytes); }
+async function parseBook(bytes: Buffer) {
+  if (bytes.subarray(0, 5).toString() === "%PDF-") return parsePdf(bytes);
+  if (bytes[0] === 123) return parseArticle(bytes);
+  return parseEpub(bytes);
+}

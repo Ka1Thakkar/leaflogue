@@ -1,3 +1,5 @@
+import { ARTICLE_PREVIEW_CHANNEL, ARTICLE_SAVE_CHANNEL, ARTICLE_CANCEL_CHANNEL } from "@leaflogue/contracts";
+import { ArticleCapture } from "./article-capture";
 import { normalizeHighlightColour } from "@leaflogue/contracts";
 import { CalibreLibrary } from "./calibre";
 import { CALIBRE_DESCRIBE_CHANNEL, CALIBRE_CHOOSE_CHANNEL, CALIBRE_SEARCH_CHANNEL, CALIBRE_LINK_CHANNEL, EPUB_UNLINK_CHANNEL } from "@leaflogue/contracts";
@@ -537,6 +539,23 @@ void app.whenReady().then(async () => {
     if (epubStoreInstance?.root !== root) epubStoreInstance = { root, store: new EpubStore(root, (reference) => calibre().resolve(reference)) };
     return epubStoreInstance.store;
   };
+  let articleService: ArticleCapture | undefined;
+  const articles = () => articleService ??= new ArticleCapture(`${desktopPaths.libraryFile}.articles`, () => {
+    if (!library) throw new Error("Local library unavailable.");
+    return library;
+  }, epubStore);
+  registerTrustedHandler(ipcMain, ARTICLE_PREVIEW_CHANNEL, () => app.isPackaged, (url: unknown, token: unknown) => {
+    if (typeof url !== "string" || typeof token !== "string") throw new Error("Invalid article request.");
+    return articles().preview(url, token);
+  });
+  registerTrustedHandler(ipcMain, ARTICLE_SAVE_CHANNEL, () => app.isPackaged, (token: unknown) => {
+    if (typeof token !== "string") throw new Error("Invalid article request.");
+    return articles().save(token);
+  });
+  registerTrustedHandler(ipcMain, ARTICLE_CANCEL_CHANNEL, () => app.isPackaged, (token: unknown) => {
+    if (typeof token !== "string") throw new Error("Invalid article request.");
+    articles().cancel(token);
+  });
   /** A located file that turned out to be another edition, awaiting the reader's confirmation. */
   const pendingRelocations = new Map<BookId, string>();
   const epubBook = (id: unknown) => {
@@ -570,7 +589,7 @@ void app.whenReady().then(async () => {
   registerTrustedHandler(ipcMain, EPUB_ATTACH_CHANNEL, () => app.isPackaged, async (id: unknown) => {
     const bookId = epubBook(id);
     const store = epubStore();
-    const chosen = await dialog.showOpenDialog({ title: "Attach a local EPUB, KEPUB or PDF", properties: ["openFile"], filters: [{ name: "EPUB, Kobo EPUB and PDF books", extensions: ["epub", "kepub", "pdf"] }] });
+    const chosen = await dialog.showOpenDialog({ title: "Attach a local EPUB, KEPUB or PDF", properties: ["openFile"], filters: [{ name: "Books and captured articles", extensions: ["epub", "kepub", "pdf", "json"] }] });
     if (chosen.canceled || !chosen.filePaths[0]) return undefined;
     const path = chosen.filePaths[0];
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
@@ -587,7 +606,7 @@ void app.whenReady().then(async () => {
       return store.relocate(bookId, path, true);
     }
     pendingRelocations.delete(bookId);
-    const chosen = await dialog.showOpenDialog({ title: "Locate this book's file", properties: ["openFile"], filters: [{ name: "EPUB, Kobo EPUB and PDF books", extensions: ["epub", "kepub", "pdf"] }] });
+    const chosen = await dialog.showOpenDialog({ title: "Locate this book's file", properties: ["openFile"], filters: [{ name: "Books and captured articles", extensions: ["epub", "kepub", "pdf", "json"] }] });
     if (chosen.canceled || !chosen.filePaths[0]) return { status: "cancelled" };
     const path = chosen.filePaths[0];
     if (statSync(path).size > 50 * 1024 * 1024) throw new Error("EPUB exceeds the 50 MB limit.");
