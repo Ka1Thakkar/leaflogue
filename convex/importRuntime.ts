@@ -32,7 +32,7 @@ const MAX_LOCATION_CHARACTERS = 2_000;
 
 const providerValidator = v.union(
   v.literal("kindle"), v.literal("kobo"), v.literal("koreader"), v.literal("pocketbook"),
-  v.literal("tolino"), v.literal("boox"), v.literal("portable"),
+  v.literal("tolino"), v.literal("boox"), v.literal("portable"), v.literal("goodreads"),
 );
 const importBookValidator = v.object({
   providerRecordId: v.string(),

@@ -6,7 +6,7 @@ import { newId, type LibraryClient } from "./client";
 type Imports = Pick<LeaflogueBridge["imports"], "chooseFile" | "commit">;
 
 const PROVIDER_NAMES: Record<ImportProvider, string> = {
-  kobo: "Kobo", kindle: "Kindle", koreader: "KOReader", pocketbook: "PocketBook", tolino: "Tolino", boox: "Boox", portable: "Portable",
+  kobo: "Kobo", kindle: "Kindle", koreader: "KOReader", pocketbook: "PocketBook", tolino: "Tolino", boox: "Boox", portable: "Portable", goodreads: "Goodreads",
 };
 
 /** The server takes at most 100 records a call; Convex also limits a call's size. */

@@ -1070,7 +1070,7 @@ export interface ImportPreview {
   readonly warnings: readonly ImportWarning[];
 }
 
-export type ImportProvider = "kindle" | "kobo" | "koreader" | "pocketbook" | "tolino" | "boox" | "portable";
+export type ImportProvider = "kindle" | "kobo" | "koreader" | "pocketbook" | "tolino" | "boox" | "portable" | "goodreads";
 
 export interface ImportSourceProfile {
   readonly id: string;

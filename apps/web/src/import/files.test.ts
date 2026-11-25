@@ -26,3 +26,11 @@ describe("reading an import in the browser", () => {
     await expect(readImportFiles([])).rejects.toThrow("Choose a file");
   });
 });
+
+it("reads Goodreads CSV in the browser through the shared parser", async () => {
+  const source = 'Book Id,Title,Author,Exclusive Shelf,My Review\r\n42,Synthetic book,A Reader,to-read,\r\n';
+  const result = await readImportFiles([new File([source], "goodreads.csv")]);
+  expect(result.provider).toBe("goodreads");
+  expect(result.preview.document.books[0]).toMatchObject({ title: "Synthetic book", status: "unread" });
+  expect(result.preview.document.annotations).toEqual([]);
+});

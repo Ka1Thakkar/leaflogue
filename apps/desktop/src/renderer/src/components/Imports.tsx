@@ -19,6 +19,7 @@ const SOURCES: readonly { readonly name: string; readonly file: string; readonly
   { name: "PocketBook or Vivlio", file: "books.db", where: "In system/config on the reader" },
   { name: "Tolino", file: "notes.txt", where: "At the top of the reader's drive" },
   { name: "Boox", file: "Exported highlights", where: "Export from NeoReader, then choose the .txt or its folder", folder: true, web: { file: "Exported highlights", where: "Export from NeoReader, then choose every .txt at once" } },
+  { name: "Goodreads", file: "Library export CSV", where: "My Books → Import and export → Export Library" },
   { name: "Leaflogue", file: "Library JSON", where: "An export from another Leaflogue library" },
 ];
 
@@ -32,13 +33,14 @@ export interface ImportRecord {
   readonly failed?: boolean;
 }
 
-const PROVIDERS: Record<PendingImport["provider"], { readonly file: string; readonly placeholder: string }> = {
+const PROVIDERS: Record<PendingImport["provider"], { readonly file: string; readonly placeholder: string; readonly actionLabel?: string }> = {
   kobo: { file: "Kobo database", placeholder: "My Kobo Clara" },
   kindle: { file: "Kindle My Clippings.txt", placeholder: "My Kindle" },
   koreader: { file: "KOReader highlights", placeholder: "KOReader on my Kobo" },
   pocketbook: { file: "PocketBook library", placeholder: "My PocketBook" },
   tolino: { file: "Tolino notes.txt", placeholder: "My Tolino" },
   boox: { file: "Boox highlights export", placeholder: "My Boox" },
+  goodreads: { file: "Goodreads CSV", placeholder: "My Goodreads library", actionLabel: "Import books and reviews" },
   portable: { file: "Portable JSON", placeholder: "Reading export" },
 };
 
@@ -165,7 +167,7 @@ export function ImportTool({ history, onImported }: {
   const rows = [...books].sort((a, b) => (perBook.get(b.providerRecordId)?.passages ?? 0) - (perBook.get(a.providerRecordId)?.passages ?? 0));
   return (
     <div className={sheet.page}>
-      <TitleRow title="Import" meta={desktop ? "Bring highlights and notes in from your e-reader. Files are read on this computer and never changed." : "Bring highlights and notes in from your e-reader. Files are read in this browser and never changed."} />
+      <TitleRow title="Import" meta={desktop ? "Bring books, highlights and notes in from your e-reader or Goodreads. Files are read on this computer and never changed." : "Bring books, highlights and notes in from your e-reader or Goodreads. Files are read in this browser and never changed."} />
       <form className={sheet.form} onSubmit={(event) => { event.preventDefault(); void commit(); }}>
         <fieldset disabled={busy} className={sheet.fieldset}>
           <legend className="sr-only">Import</legend>
@@ -275,7 +277,7 @@ export function ImportTool({ history, onImported }: {
                 <div className={sheet.footer}>
                   <span className="ui-sub">Edits you made here are always kept. Anything that changed in both places waits for you to review.</span>
                   <button type="button" className="ll-button-secondary" disabled={busy} onClick={() => { setPending(undefined); setError(""); }}>Cancel import</button>
-                  <button type="submit" className="ll-button" disabled={busy || sourceId === "review" || Boolean(reviewNeeded) || (!sourceId && !sourceName.trim())}>Import highlights and notes</button>
+                  <button type="submit" className="ll-button" disabled={busy || sourceId === "review" || Boolean(reviewNeeded) || (!sourceId && !sourceName.trim())}>{PROVIDERS[pending.provider].actionLabel ?? "Import highlights and notes"}</button>
                 </div>
               </Panel>
             </>

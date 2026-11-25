@@ -193,6 +193,7 @@ import {
   parseKOReaderSidecars,
   parsePortableJson,
   parseTolinoNotes,
+  parseGoodreadsCsv,
   type ReadonlyDatabase,
 } from "@leaflogue/importers";
 import { collectBooxExports, collectKOReaderSidecars } from "./reader-folders";
@@ -1435,7 +1436,7 @@ async function chooseImportFile(): Promise<PendingImport | undefined> {
     buttonLabel: "Review import",
     properties: Array.of(`open${"File"}`),
     filters: [
-      { name: "Reading annotations", extensions: ["sqlite", "db", "txt", "json", "lua"] },
+      { name: "Reading annotations", extensions: ["sqlite", "db", "txt", "json", "lua", "csv"] },
       { name: "All files", extensions: ["*"] },
     ],
   });
@@ -1543,6 +1544,7 @@ const IMPORT_PROVIDER_NAMES: Record<ImportProvider, string> = {
   tolino: "Tolino",
   boox: "Boox",
   portable: "Portable",
+  goodreads: "Goodreads",
 };
 
 function suggestedImportSourceName(provider: PendingImport["provider"], path: string): string {
@@ -1555,6 +1557,10 @@ function suggestedImportSourceName(provider: PendingImport["provider"], path: st
 
 async function inspectImportCopy(path: string, size: number, originalPath: string): Promise<{ provider: ImportProvider; preview: ImportPreview }> {
   const extension = extname(path).toLocaleLowerCase("en");
+  if (extension === ".csv") {
+    if (size > 16 * 1024 * 1024) throw new Error("Goodreads CSV exceeds 16 MiB");
+    return { provider: "goodreads", preview: parseGoodreadsCsv(readFileSync(path, "utf8")) };
+  }
   if (extension === ".txt") {
     if (size > 16 * 1024 * 1024) throw new Error("Text file exceeds 16 MiB");
     const source = readFileSync(path, "utf8");

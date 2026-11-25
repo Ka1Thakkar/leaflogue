@@ -1,6 +1,6 @@
 ---
 title: Import highlights
-description: Bring highlights and notes in from a Kobo, Kindle, KOReader, PocketBook, Tolino, or Boox reader, or from another Leaflogue library.
+description: Bring highlights and notes in from a Kobo, Kindle, KOReader, PocketBook, Tolino, or Boox reader, from Goodreads, or from another Leaflogue library.
 ---
 
 Leaflogue reads your reader's own highlights file. It only reads the file you
@@ -14,6 +14,7 @@ choose: it never writes to your e-reader, and nothing is uploaded anywhere.
 | PocketBook or Vivlio | `books.db` |
 | Tolino | `notes.txt` |
 | Boox | The `.txt` file NeoReader exports for a book |
+| Goodreads | The library export `.csv` from Goodreads |
 | Leaflogue | A JSON export (**Export your library**, then **JSON**) |
 
 In the [web app](/web/overview/), choose the file itself: a browser can't
@@ -21,6 +22,26 @@ open a folder or see a plugged-in reader. For KOReader, choose every
 `metadata.*.lua` file from your books' `.sdr` folders at once; for Boox,
 choose all the exported `.txt` files at once. The file is read in your
 browser, and only the books and passages in it are saved to your library.
+
+## Goodreads books and reviews
+
+On the Goodreads website, open **My Books → Import and export**, choose
+**Export Library**, wait for the download link, then save the original CSV.
+In Leaflogue, choose **Import → Choose file** and select that CSV. Review the
+book matches and source name before importing, as with an e-reader export.
+
+Titles, primary authors, valid ISBN-13 values and reviews are supported. A review
+becomes a book note without a quotation. Books without reviews can be imported too.
+For new books, **read**, **currently-reading** and **to-read** map to **Finished**,
+**Reading** and **Unread**. Existing linked books keep their local metadata/status.
+Use the same import source when importing an updated export: unchanged reviews
+are not duplicated, and conflicting edits go to import-conflict review.
+
+Ratings, private notes, additional authors, custom shelves and exported dates are
+not imported in this first version; the preview warns when those fields contain
+data. Reviews larger than the supported 24 KiB note limit are rejected explicitly,
+not shortened. No Goodreads login or account connection is needed in Leaflogue.
+StoryGraph CSVs are not supported yet.
 
 ## The easy way: plug in your reader
 
