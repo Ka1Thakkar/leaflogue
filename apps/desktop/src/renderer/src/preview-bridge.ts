@@ -167,6 +167,14 @@ export function installPreviewBridge(): void {
         }),
         openExternal: async (url: string) => window.confirm(`Open this link in your browser?\n${url}`),
       }),
+      ...(new URLSearchParams(window.location.search).has("capture") ? {
+        catalog: { search: async () => ({ items: [], source: "google-books" as const }) },
+        articles: {
+          preview: async (url: string) => ({ token: "preview", url, title: "A captured article", author: "A Writer", excerpt: "A short synthetic article for visual review.", paragraphs: 2, existing: false }),
+          save: async () => previewBook,
+          cancel: async () => undefined,
+        },
+      } : {}),
       library: Object.freeze({
         findDuplicates: async () => ({ books: [], passages: [] }),
         listBooks: async (options?: { includeArchived?: boolean }) => [previewBook, targetBook].filter((book) => !deletedBooks.has(book.id) && (options?.includeArchived || !book.archived)),
