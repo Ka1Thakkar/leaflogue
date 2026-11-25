@@ -7,8 +7,8 @@ import { createHash, createPublicKey, verify } from "node:crypto";
 const repo = "Ka1Thakkar/leaflogue";
 const tag = "v0.1.1-beta.6";
 const staging = "beta-candidate-44087855277-1";
-const source = process.env.REFRESH_BUILD_SOURCE;
-if (!/^[a-f0-9]{40}$/u.test(source ?? "")) throw Error("Exact staging source is required");
+const promotionSource = process.env.REFRESH_BUILD_SOURCE;
+if (!/^[a-f0-9]{40}$/u.test(promotionSource ?? "")) throw Error("Exact staging source is required");
 const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
 const json = (...args) => JSON.parse(gh(...args));
 const run = (id) => {
@@ -20,7 +20,11 @@ const run = (id) => {
 const buildRun = process.env.REFRESH_BUILD_RUN;
 const signingRun = process.env.REFRESH_SIGNING_RUN;
 const build = run(buildRun);
-if (build.headSha !== source) throw Error("Build source differs from this promotion source");
+const source = build.headSha;
+// A verifier-only correction need not rebuild validated payloads. Refuse any
+// change outside the promotion implementation and its workflow wiring.
+const changed = execFileSync("git", ["diff", "--name-only", source, promotionSource], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+if (changed.some((name) => !["scripts/promote-beta6-refresh.mjs", ".github/workflows/beta-desktop.yml"].includes(name))) throw Error("Promotion source differs from validated product/build source");
 for (const name of ["Validate the exact beta source", "mac beta (arm64)", "mac beta (x64)", "windows beta (x64)", "Linux x64 and ARM64 plus backend"]) {
   if (!build.jobs.some((job) => job.name === name && job.conclusion === "success")) throw Error(`Missing passed job: ${name}`);
 }
@@ -44,11 +48,14 @@ for (const name of names.filter((name) => name.startsWith("SHA256SUMS-"))) {
     if (!match || !names.includes(match[2]) || hash(match[2]) !== match[1]) throw Error(`Invalid checksum in ${name}`);
   }
 }
-const expectedLock = createHash("sha256").update(readFileSync("package-lock.json")).digest("hex");
-const expectedManifest = createHash("sha256").update(readFileSync("apps/desktop/package.json")).digest("hex");
+const inputHash = (path, windows) => createHash("sha256").update(windows
+  ? readFileSync(path, "utf8").replace(/\r?\n/gu, "\r\n") : readFileSync(path)).digest("hex");
 for (const name of names.filter((name) => name.endsWith(".build-inputs.json"))) {
   const input = JSON.parse(bytes(name));
-  if (input.version !== "0.1.1-beta.6" || input.lockfileSha256 !== expectedLock || input.desktopManifestSha256 !== expectedManifest ||
+  // Windows checkout records the exact CRLF bytes; all other platforms use LF.
+  const windows = input.platform === "windows";
+  if (input.version !== "0.1.1-beta.6" || input.lockfileSha256 !== inputHash("package-lock.json", windows) ||
+      input.desktopManifestSha256 !== inputHash("apps/desktop/package.json", windows) ||
       (input.platform !== undefined && input.commit !== source)) throw Error(`Unexpected build inputs: ${name}`);
 }
 const keySource = readFileSync("apps/desktop/src/main/update-keys.ts", "utf8");
