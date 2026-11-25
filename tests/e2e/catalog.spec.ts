@@ -15,8 +15,8 @@ test("searches Google Books through IPC and adds the selected edition with metad
       };
     });
     await page.getByRole("button", { name: "Set up later" }).click();
-    await page.getByRole("button", { name: "Add book", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "Add a book", exact: true });
+    await page.getByRole("button", { name: "Add to library", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Add to your library", exact: true });
     await dialog.getByRole("textbox", { name: "Search books online" }).fill("A quiet beginning");
     // Results arrive after the debounce without pressing Search or Enter.
     await dialog.getByRole("button", { name: /A quiet beginning A Reader/ }).click();

@@ -1,0 +1,54 @@
+import { copyFileSync, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { expect, test } from "@playwright/test";
+import { selectOption } from "../shared/select";
+import { createProfile, launch, removeProfile } from "./harness";
+import { chooseShelf, confirmDialog } from "../shared/library";
+
+test("one Add flow preserves both drafts and archived deletion keeps the original file", async () => {
+  const profile = createProfile();
+  try {
+    const session = await launch(profile); const page = session.page;
+    await page.getByRole("button", { name: "Set up later" }).click();
+    await expect(page.getByRole("button", { name: "Add article", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Add to library", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Add to your library" });
+    await dialog.getByLabel("Title", { exact: true }).fill("A kept draft");
+    const kind = dialog.getByRole("combobox", { name: "What are you adding?" });
+    await selectOption(kind, "article");
+    await dialog.getByLabel("Article URL").fill("https://example.com/a-draft");
+    await selectOption(kind, "book");
+    await expect(dialog.getByLabel("Title", { exact: true })).toHaveValue("A kept draft");
+    await selectOption(kind, "article");
+    await expect(dialog.getByLabel("Article URL")).toHaveValue("https://example.com/a-draft");
+    await selectOption(kind, "book");
+    await dialog.getByRole("button", { name: "Add book", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "A kept draft" })).toBeVisible();
+    const saved = await page.evaluate(async () => (await window.leaflogue.library.listBooks())[0]!);
+    const source = join(profile.files, "original.epub");
+    copyFileSync(resolve(__dirname, "../fixtures/local-reader.epub"), source);
+    await session.chooseFile(source);
+    await page.evaluate(id => window.leaflogue.reader!.attach(id), saved.id);
+    await page.getByLabel("More book actions").click();
+    await expect(page.getByRole("menuitem", { name: "Delete permanently" })).toHaveCount(0);
+    await page.getByRole("menuitem", { name: "Archive book" }).click();
+    await confirmDialog(page, /^Archive this book\?$/u, "Archive book");
+    await chooseShelf(page, "archived");
+    await page.getByRole("link", { name: "Open A kept draft", exact: true }).click();
+    await page.getByLabel("More book actions").click();
+    await page.getByRole("menuitem", { name: "Delete permanently" }).click();
+    const confirmation = page.getByRole("dialog", { name: "Delete from your library?" });
+    await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(await page.evaluate(async id => !!(await window.leaflogue.library.getBookContents(id)), saved.id)).toBe(true);
+    await page.getByLabel("More book actions").click();
+    await page.getByRole("menuitem", { name: "Delete permanently" }).click();
+    await confirmDialog(page, /^Delete from your library\?$/u, "Delete permanently");
+    await expect(page.getByRole("heading", { level: 1, name: "Your library" })).toBeVisible();
+    expect(await page.evaluate(() => window.leaflogue.library.listBooks({ includeArchived: true }))).toEqual([]);
+    expect(existsSync(source)).toBe(true);
+    await session.close();
+    const reopened = await launch(profile);
+    expect(await reopened.page.evaluate(() => window.leaflogue.library.listBooks({ includeArchived: true }))).toEqual([]);
+    await reopened.close();
+  } finally { await removeProfile(profile); }
+});

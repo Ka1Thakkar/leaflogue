@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("changes a passage colour in one click and keeps its date and hover bar after reload", async ({ page, browser }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Add book", exact: true }).click();
-  const book = page.getByRole("dialog", { name: "Add a book", exact: true });
+  await page.getByRole("button", { name: "Add to library", exact: true }).click();
+  const book = page.getByRole("dialog", { name: "Add to your library", exact: true });
   await book.getByLabel("Title", { exact: true }).fill("Colour acceptance fixture");
   await book.getByRole("button", { name: "Add book", exact: true }).click();
   await page.getByRole("button", { name: "Add highlight", exact: true }).click();

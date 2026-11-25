@@ -203,7 +203,7 @@ deferred database colour choices are requeued by SQLite migration 21.
 
 ## Web articles
 
-On desktop, choose **Add article** in the library and paste a public HTTPS URL.
+On desktop, choose **Add to library → Web article** and paste a public HTTPS URL.
 Choose **Preview article**, review the title, source and text, then **Save article**.
 The captured text opens in the same reader, with the same highlighting, notes,
 bookmarks and display settings. Only your explicit preview action retrieves a page.

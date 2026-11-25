@@ -6,7 +6,8 @@ import { KOBO_BOOK, KOBO_NOTE, KOBO_PASSAGES, writeKoboDatabase } from "./fixtur
 import { createProfile, networkActivity, removeProfile } from "./harness";
 import { answerNativeFileDialog, nativeDialogsAvailable } from "./native-file-dialog";
 import { completeLocalSetup, launchPackagedApp, stopPackagedProcess, type PackagedApp } from "./packaged-process";
-import { confirmDialog, openRail, passage } from "./steps";
+import { openRail, passage } from "./steps";
+import { confirmDialog } from "../shared/library";
 
 /**
  * The packaged app's file workflows through the real system file dialogs:
@@ -76,8 +77,8 @@ test("the packaged app imports, backs up, restores, and exports through system f
 
     await test.step("restore the backup over a changed library", async () => {
       await openRail(page, "Library");
-      await page.getByRole("button", { name: "Add book" }).click();
-      const form = page.getByRole("dialog", { name: "Add a book" });
+      await page.getByRole("button", { name: "Add to library" }).click();
+      const form = page.getByRole("dialog", { name: "Add to your library" });
       await form.getByLabel("Title").fill("Added after the backup");
       await form.getByRole("button", { name: "Add book" }).click();
       await expect(page.getByRole("heading", { level: 1, name: "Added after the backup" })).toBeVisible();

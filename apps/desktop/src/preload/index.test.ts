@@ -23,6 +23,7 @@ import {
   LIBRARY_LIST_READING_STATUS_CHANNEL,
   LIBRARY_MERGE_BOOKS_CHANNEL,
   LIBRARY_SET_BOOK_ARCHIVED_CHANNEL,
+  LIBRARY_DELETE_BOOK_CHANNEL,
   LIBRARY_SET_COMPLETION_DATE_CHANNEL,
   LIBRARY_SET_READING_STATUS_CHANNEL,
   LIBRARY_UPDATE_HIGHLIGHT_CHANNEL,
@@ -173,6 +174,8 @@ describe("preload IPC bridge", () => {
     await bridge.library.getHighlightSource(bookId, highlightId);
     await bridge.library.resetHighlightToSource({ id: highlightId, bookId, expectedRevision: 1, resetToken: "a".repeat(64) });
     await bridge.library.setBookArchived({ id: bookId, archived: true, expectedRevision: 1 });
+    await bridge.library.deleteBook({ id: bookId, expectedRevision: 2 });
+    expect(electron.invoke).toHaveBeenCalledWith(LIBRARY_DELETE_BOOK_CHANNEL, { id: bookId, expectedRevision: 2 });
     await bridge.library.listReadingStatusHistory(bookId);
     await bridge.library.setBookReadingStatus({ id: bookId, status: "reading", expectedRevision: 1 });
     await bridge.library.setBookCompletionDate({ id: bookId, completedOn: "2024-02-29", expectedRevision: 2 });
@@ -246,6 +249,7 @@ describe("preload IPC bridge", () => {
       [LIBRARY_HIGHLIGHT_SOURCE_CHANNEL, bookId, highlightId],
       [LIBRARY_RESET_HIGHLIGHT_CHANNEL, { id: highlightId, bookId, expectedRevision: 1, resetToken: "a".repeat(64) }],
       [LIBRARY_SET_BOOK_ARCHIVED_CHANNEL, { id: bookId, archived: true, expectedRevision: 1 }],
+      [LIBRARY_DELETE_BOOK_CHANNEL, { id: bookId, expectedRevision: 2 }],
       [LIBRARY_LIST_READING_STATUS_CHANNEL, bookId],
       [LIBRARY_SET_READING_STATUS_CHANNEL, { id: bookId, status: "reading", expectedRevision: 1 }],
       [LIBRARY_SET_COMPLETION_DATE_CHANNEL, { id: bookId, completedOn: "2024-02-29", expectedRevision: 2 }],

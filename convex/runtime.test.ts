@@ -193,3 +193,23 @@ async function provisionAndSeed(
     }
   });
 }
+
+it("authorizes archived deletion, checks revisions, and claims a book tombstone", async () => {
+  const t = convexTest(schema, convexModules);
+  await provisionAndSeed(t, ALICE);
+  const remove = makeFunctionReference<"mutation", { libraryId: string; id: string; expectedRevision: number }, null>("runtime:deleteBook");
+  const alice = t.withIdentity({ tokenIdentifier: ALICE });
+  await expect(t.mutation(remove, { libraryId: LIBRARY, id: TARGET_BOOK, expectedRevision: 1 })).rejects.toThrow();
+  await expect(alice.mutation(remove, { libraryId: LIBRARY, id: TARGET_BOOK, expectedRevision: 1 })).rejects.toThrow("archived");
+  await alice.mutation(functions.setBookArchived, { libraryId: LIBRARY, id: TARGET_BOOK, archived: true, expectedRevision: 1 });
+  await expect(alice.mutation(remove, { libraryId: LIBRARY, id: TARGET_BOOK, expectedRevision: 1 })).rejects.toThrow("unchanged");
+  await expect(alice.mutation(remove, { libraryId: OTHER_LIBRARY, id: TARGET_BOOK, expectedRevision: 2 })).rejects.toThrow();
+  await alice.mutation(remove, { libraryId: LIBRARY, id: TARGET_BOOK, expectedRevision: 2 });
+  await t.run(async (ctx) => {
+    const book = await ctx.db.query("books").withIndex("by_library_and_id", q => q.eq("libraryId", LIBRARY).eq("id", TARGET_BOOK)).unique();
+    expect(book).toMatchObject({ revision: 3, deletedAt: expect.any(Number) });
+    const claim = await ctx.db.query("syncedWriters").withIndex("by_library_entity", q => q.eq("libraryId", LIBRARY).eq("entityType", "book").eq("entityId", TARGET_BOOK)).unique();
+    expect(claim).toMatchObject({ operation: "tombstone" });
+  });
+  await expect(alice.mutation(functions.setBookArchived, { libraryId: LIBRARY, id: TARGET_BOOK, archived: false, expectedRevision: 3 })).rejects.toThrow();
+});

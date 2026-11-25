@@ -4,10 +4,11 @@ import { InlineError } from "./shared";
 import styles from "./knowledge.module.css";
 
 /** A capture adapter; saving/reopening uses the ordinary library page and reader. */
-export function ArticleForm({ onClose, onSaved }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
+export function ArticleForm({ onClose, onSaved, onBusyChange }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void; readonly onBusyChange?: (busy: boolean) => void }) {
   const [url, setUrl] = useState("");
   const [preview, setPreview] = useState<ArticlePreview>();
   const [busy, setBusy] = useState<"retrieve" | "save">();
+  useEffect(() => { onBusyChange?.(busy !== undefined); }, [busy, onBusyChange]);
   const [error, setError] = useState("");
   const operation = useRef<string | undefined>(undefined);
   const request = useRef(0);

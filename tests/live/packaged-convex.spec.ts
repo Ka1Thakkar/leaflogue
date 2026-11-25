@@ -120,8 +120,8 @@ test("two isolated packaged desktops exchange edits through Settings", async () 
     sessions.push(first);
     await test.step("create first desktop book and passage", async () => {
       await finishLocalSetup(first.page);
-      await first.page.getByRole("button", { name: "Add book" }).click();
-      const form = first.page.getByRole("dialog", { name: "Add a book" });
+      await first.page.getByRole("button", { name: "Add to library" }).click();
+      const form = first.page.getByRole("dialog", { name: "Add to your library" });
       await form.getByLabel("Title").fill(title);
       await form.getByRole("button", { name: "Add book" }).click();
       await first.page.getByRole("button", { name: "Add highlight" }).click();

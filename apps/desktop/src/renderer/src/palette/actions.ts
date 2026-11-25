@@ -34,10 +34,10 @@ export function startImport(request: ImportRequest): void {
   if (parseRoute(window.location.hash).name !== "import") navigate(href.import());
 }
 
-/** Asks the library page to open its Add book dialog. */
-export const addBookRequests = createChannel<null>();
+/** Asks the library page to open its Add dialog. */
+export const addToLibraryRequests = createChannel<null>();
 
-export function addBook(): void {
-  addBookRequests.send(null);
+export function addToLibrary(): void {
+  addToLibraryRequests.send(null);
   if (parseRoute(window.location.hash).name !== "library") navigate(href.library());
 }

@@ -153,7 +153,7 @@ export async function launch(profile: Profile): Promise<Session> {
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
   // Leaflogue confirms through in-app dialogs (answered with
-  // steps.confirmDialog). A native `window.confirm` would be a regression, and
+  // shared/library.confirmDialog). A native `window.confirm` would be a regression, and
   // Electron's message box for it cannot be driven from the test, so any call
   // is declined here and reported when the session closes.
   await page.evaluate(() => {

@@ -98,6 +98,9 @@ export const deleteAnnotationArgs = {
   expectedRevision: v.number(),
 };
 
+export const deleteBookArgs = { libraryId: v.string(), id: v.string(), expectedRevision: v.number() };
+export type DeleteBookArgs = { readonly libraryId: string; readonly id: string; readonly expectedRevision: number };
+
 export const setBookArchivedArgs = {
   libraryId: v.string(),
   id: v.string(),

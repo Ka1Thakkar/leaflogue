@@ -1,4 +1,4 @@
-import { normalizeHighlightColour } from "@leaflogue/contracts";
+import { normalizeHighlightColour, syncedParentBookId } from "@leaflogue/contracts";
 import { chmodSync, constants as fsConstants, copyFileSync, existsSync, linkSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
@@ -62,6 +62,7 @@ import type {
   SyncConflictId,
   SyncConflictPage,
   SetBookArchived,
+  DeleteBook,
   SetBookCompletionDate,
   SetBookReadingStatus,
   SetBookCollectionMembership,
@@ -746,6 +747,10 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   }
 
   #applyIncomingChange(change: SyncedChange): SyncedChangeOutcome {
+    const parentId = syncedParentBookId(change);
+    // A snapshot can contain old child claims after its book tombstone. They
+    // must not block a fresh replica or recreate writing under a deleted item.
+    if (parentId && this.#incomingEntity("book", parentId)?.deleted) return "superseded";
     const entityId = syncedEntityId(change);
     const current = this.#incomingEntity(change.entityType, entityId);
     const recordedWriter = this.#database.prepare(
@@ -835,14 +840,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   ): number {
     const entityId = syncedEntityId(change);
     if (change.operation === "tombstone") {
-      const revision = current ? current.revision + 1 : this.#nextIncomingTombstoneRevision("book", entityId, 1);
-      if (current) this.#database.prepare(
-        "UPDATE books SET deleted_at = ?, updated_at = ?, revision = ? WHERE id = ?",
-      ).run(now, now, revision, entityId);
-      this.#database.prepare("DELETE FROM collection_books WHERE book_id = ?").run(entityId);
-      this.#database.prepare("DELETE FROM book_tags WHERE book_id = ?").run(entityId);
-      this.#writeIncomingTombstone("book", entityId, entityId, revision, now);
-      return revision;
+      return this.#tombstoneBook(entityId, current?.revision, now);
     }
     const collectionIds = activeOrTombstonedContainerIds(this.#database, "collection", change.collectionIds);
     const tagIds = activeOrTombstonedContainerIds(this.#database, "tag", change.tagIds);
@@ -2837,6 +2835,28 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     });
   }
 
+  #tombstoneBook(id: string, currentRevision: number | undefined, now: number): number {
+    const revision = currentRevision !== undefined ? currentRevision + 1 : this.#nextIncomingTombstoneRevision("book", id, 1);
+    if (currentRevision !== undefined) this.#database.prepare(
+      "UPDATE books SET deleted_at = ?, updated_at = ?, revision = ? WHERE id = ?",
+    ).run(now, now, revision, id);
+    this.#database.prepare("DELETE FROM collection_books WHERE book_id = ?").run(id);
+    this.#database.prepare("DELETE FROM book_tags WHERE book_id = ?").run(id);
+    this.#writeIncomingTombstone("book", id, id, revision, now);
+    return revision;
+  }
+
+  deleteBook(input: DeleteBook): void {
+    if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1) throw new Error("Book revision is invalid");
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const book = this.#database.prepare("SELECT revision, archived FROM books WHERE id = ? AND deleted_at IS NULL").get(input.id) as { revision: number; archived: number } | undefined;
+      if (!book || book.archived !== 1 || book.revision !== input.expectedRevision) throw new Error("Only an unchanged archived item can be deleted");
+      this.#tombstoneBook(input.id, book.revision, Date.now());
+      this.#database.exec("COMMIT");
+    } catch (error) { this.#database.exec("ROLLBACK"); throw error; }
+  }
+
   setBookArchived(input: SetBookArchived): BookArchiveChange {
     if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1) {
       throw new Error("Book revision is invalid");
@@ -2844,7 +2864,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     const now = Date.now();
     const result = this.#database.prepare(
       `UPDATE books SET archived = ?, updated_at = ?, revision = revision + 1
-       WHERE id = ? AND revision = ? AND archived != ?
+       WHERE id = ? AND revision = ? AND archived != ? AND deleted_at IS NULL
        RETURNING id, archived, revision, updated_at`,
     ).get(input.archived ? 1 : 0, now, input.id, input.expectedRevision, input.archived ? 1 : 0) as
       | { id: string; archived: number; revision: number; updated_at: number }

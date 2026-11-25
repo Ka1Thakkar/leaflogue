@@ -54,7 +54,7 @@ test.describe("keyboard and screen-reader workflows", () => {
 
   test("closes a dialog with Escape and returns focus to its trigger", async ({ page }) => {
     await page.goto("/#/library");
-    const trigger = page.getByRole("button", { name: "Add book" });
+    const trigger = page.getByRole("button", { name: "Add to library" });
     await trigger.click();
     const dialog = page.locator("dialog[open]");
     await expect(dialog).toBeVisible();
