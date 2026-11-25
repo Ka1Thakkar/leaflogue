@@ -3,6 +3,16 @@ name: Refresh existing beta.6 build staging
 on:
   workflow_dispatch:
     inputs:
+      sign_only:
+        type: boolean
+        default: false
+        description: Sign the validated staging files through the existing beta tag
+      signing_run:
+        type: string
+        description: Successful protected signing run
+      signing_source:
+        type: string
+        description: Exact signing workflow commit
       windows_only:
         type: boolean
         default: false
@@ -30,7 +40,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: inputs.promote_only != true && inputs.windows_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true && inputs.sign_only != true
     name: Validate the exact beta source
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -52,7 +62,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   draft:
-    if: inputs.promote_only != true && inputs.windows_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true && inputs.sign_only != true
     name: Create an unpublished beta candidate
     needs: preflight
     runs-on: ubuntu-24.04
@@ -72,7 +82,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   linux:
-    if: inputs.promote_only != true && inputs.windows_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true && inputs.sign_only != true
     name: Linux x64 and ARM64 plus backend
     needs: draft
     runs-on: ubuntu-24.04
@@ -101,7 +111,7 @@ jobs:
           gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
 
   native:
-    if: inputs.promote_only != true && inputs.windows_only != true
+    if: inputs.promote_only != true && inputs.windows_only != true && inputs.sign_only != true
     name: ${{ matrix.platform }} beta (${{ matrix.architecture }})
     needs: draft
     runs-on: ${{ matrix.runner }}
@@ -150,7 +160,7 @@ jobs:
 
   sign:
     name: Sign the beta update feeds
-    if: success() && inputs.promote_only != true && inputs.windows_only != true
+    if: success() && inputs.promote_only != true && inputs.windows_only != true && inputs.sign_only != true
     needs: [draft, linux, native]
     runs-on: ubuntu-24.04
     environment: release
@@ -224,6 +234,8 @@ jobs:
           node-version-file: .nvmrc
       - run: node scripts/promote-beta6-refresh.mjs
         env:
+          REFRESH_SIGNING_RUN: ${{ inputs.signing_run }}
+          REFRESH_SIGNING_SOURCE: ${{ inputs.signing_source }}
           REFRESH_WINDOWS_RUN: ${{ inputs.windows_run }}
           REFRESH_EXPECTED_WINDOWS_SOURCE: ${{ inputs.windows_source }}
           GH_TOKEN: ${{ github.token }}
@@ -255,7 +267,7 @@ jobs:
 
   sign-windows-retry:
     name: Sign the beta update feeds
-    if: inputs.windows_only == true
+    if: ${{ !cancelled() && (inputs.sign_only == true || (inputs.windows_only == true && needs.windows-rebuild.result == 'success')) }}
     needs: windows-rebuild
     runs-on: ubuntu-24.04
     environment: release
