@@ -4,6 +4,8 @@ Experimental public beta for Linux x64/ARM64, Mac Apple Silicon/Intel and Window
 
 The version remains **0.1.1-beta.6**. Existing beta.6 users must reinstall a refreshed download because automatic updates require a newer version.
 
+- Add books and web articles through one **Add to library** flow, retaining drafts when switching types.
+- Permanently delete archived library items with confirmation; original files remain on disk and deletions propagate through sync.
 - Import Goodreads library CSVs: books, reading status and reviews as book notes, using the existing import reconciliation and conflict handling.
 - Capture public HTTPS web articles on desktop with preview and confirmation, then read, highlight and annotate the saved text in the shared reader.
 - Reader typography, spacing, layout, appearance and preset controls; reader preferences remain local to the device.
