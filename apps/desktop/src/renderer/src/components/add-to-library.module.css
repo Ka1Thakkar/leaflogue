@@ -1,0 +1,53 @@
+.capture {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.typeField {
+  width: min(100%, 220px);
+}
+.capture :global(.ll-label) {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.typeField :global([role="combobox"]) {
+  width: 100%;
+  min-height: 34px;
+  justify-content: space-between;
+}
+.entry:not([hidden]) {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.entry > form {
+  gap: 12px;
+}
+.entry > form + form {
+  border-top: 1px solid var(--ui-line);
+  padding-top: 20px;
+}
+.entry fieldset {
+  gap: 14px;
+}
+.entry legend {
+  margin-bottom: 12px;
+  padding: 0;
+  font-weight: 500;
+}
+.capture :global(.ll-field),
+.capture :global([role="combobox"]) {
+  font: 400 var(--text-md)/1.45 var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.capture :global(.ll-muted) {
+  margin: 0;
+  font: 400 var(--text-sm)/1.5 var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.entry > form[aria-label="Search book catalogue"] > button {
+  justify-self: start;
+}
