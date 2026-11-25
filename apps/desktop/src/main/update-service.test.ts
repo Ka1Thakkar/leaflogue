@@ -12,8 +12,8 @@ const NEW_APPIMAGE = Buffer.from("the new AppImage bytes");
 
 function release(version = "0.2.0", payload = NEW_APPIMAGE) {
   const manifestBytes = Buffer.from(`${JSON.stringify({
-    format: 1, product: "leaflogue", channel: "stable", version, architecture: "x64", releasedAt: "2026-10-01T00:00:00.000Z",
-    appImage: { name: `Leaflogue-${version}-x86_64.AppImage`, size: payload.byteLength, sha512: createHash("sha512").update(payload).digest("base64") },
+    format: 2, platform: "linux", product: "leaflogue", channel: "stable", version, architecture: "x64", releasedAt: "2026-10-01T00:00:00.000Z",
+    artifact: { name: `Leaflogue-${version}-x86_64.AppImage`, size: payload.byteLength, sha512: createHash("sha512").update(payload).digest("base64") },
   }, null, 2)}\n`);
   const signatureBytes = Buffer.from(JSON.stringify({
     format: 1, keyId: updateKeyId(keys.publicKey), signature: sign(null, manifestBytes, keys.privateKey).toString("base64"),

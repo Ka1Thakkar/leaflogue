@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { isPublicCoverAddress, pinnedAddressLookup, resolvePublicCoverAddress, responseFromIncoming } from "./public-cover-fetch";
+import { isPublicResourceAddress, pinnedAddressLookup, resolvePublicResourceAddress, responseFromIncoming } from "./public-resource-fetch";
 
 function incoming(status: number, body = ""): IncomingMessage {
   const stream = new PassThrough();
@@ -19,7 +19,7 @@ describe("public cover network boundary", () => {
     "8.8.8.8",
     "2606:4700:4700::1111",
   ])("accepts globally routable address %s", (address) => {
-    expect(isPublicCoverAddress(address)).toBe(true);
+    expect(isPublicResourceAddress(address)).toBe(true);
   });
 
   it.each([
@@ -51,7 +51,7 @@ describe("public cover network boundary", () => {
     "fe80::1",
     "ff02::1",
   ])("rejects non-public address %s", (address) => {
-    expect(isPublicCoverAddress(address)).toBe(false);
+    expect(isPublicResourceAddress(address)).toBe(false);
   });
 
   it("accepts a public hostname and pins its first validated answer", async () => {
@@ -59,7 +59,7 @@ describe("public cover network boundary", () => {
       { address: "203.1.1.10", family: 4 as const },
       { address: "2606:4700:4700::1111", family: 6 as const },
     ]);
-    await expect(resolvePublicCoverAddress("images.example", resolver)).resolves.toEqual({
+    await expect(resolvePublicResourceAddress("images.example", resolver)).resolves.toEqual({
       address: "203.1.1.10",
       family: 4,
     });
@@ -70,7 +70,7 @@ describe("public cover network boundary", () => {
       { address: "203.1.1.10", family: 4 as const },
       { address: "127.0.0.1", family: 4 as const },
     ]);
-    await expect(resolvePublicCoverAddress("mixed.example", resolver)).rejects.toThrow("public address");
+    await expect(resolvePublicResourceAddress("mixed.example", resolver)).rejects.toThrow("public address");
   });
 
   it("returns the pinned address in both Node lookup callback forms", () => {

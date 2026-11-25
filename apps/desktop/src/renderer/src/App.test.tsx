@@ -413,6 +413,24 @@ describe("settings", () => {
     expect(restore).not.toHaveBeenCalled();
   });
 
+  it("says what a backup includes and leaves out, beside the buttons and after saving or restoring", async () => {
+    const create = vi.fn().mockResolvedValue({ fileName: "Leaflogue-backup-2026-11-23.sqlite" });
+    const restore = vi.fn().mockResolvedValue({ fileName: "Leaflogue-backup-2026-11-01.sqlite", booksRestored: 2 });
+    override({ backups: { create, restore } });
+    await render("#/settings");
+    const scope = document.querySelector("dl[aria-label='What a backup holds']");
+    expect(scope?.textContent).toContain("Books, passages, notes, tags, collections, threads, and reading history");
+    for (const left of ["book files themselves", "Calibre", "reading positions", "bookmarks", "reader display settings"]) expect(scope?.textContent).toContain(left);
+    await click(button("Create backup"));
+    const status = () => document.querySelector("#settings-data [role='status']")?.textContent ?? "";
+    expect(status()).toContain("Backup saved as Leaflogue-backup-2026-11-23.sqlite. It has your books, passages, notes");
+    expect(status()).toContain("but not book files, links to files and Calibre, reading positions, bookmarks, and reader settings");
+    await click(button("Restore backup"));
+    expect(confirmation()?.textContent).toContain("reading positions, bookmarks, and reader settings aren't in backups");
+    await click(button("Choose backup", confirmation()));
+    expect(status()).toContain("Restored 2 books from Leaflogue-backup-2026-11-01.sqlite. Book files, links to files and Calibre, reading positions, bookmarks, and reader settings aren't in backups");
+  });
+
   it("checks for updates only when asked and asks before installing one", async () => {
     const check = vi.fn().mockResolvedValue({ state: "available", currentVersion: "0.1.0", version: "0.2.0", releasedAt: "2026-10-01T00:00:00.000Z", notesUrl: "https://github.com/Ka1Thakkar/leaflogue/releases/tag/v0.2.0" });
     const install = vi.fn();
@@ -2415,4 +2433,21 @@ it("shows live sync phases, counters, and completion in Settings", async () => {
   });
   expect(status?.textContent).toContain("12 sent, 180 received, 2 already current");
   expect(status?.querySelector("progress")).toBeNull();
+});
+
+it("never shows a late reply for the previous book on the next book's page", async () => {
+  const titles: Record<string, string> = { [firstBookId]: "Piranesi", [secondBookId]: "The Left Hand of Darkness" };
+  const book = (id: BookId, title = titles[id]!): Book => ({ id, title, authors: [], status: "unread", archived: false, createdAt: 1, updatedAt: 1, revision: 1, highlightCount: 0 });
+  let finishLate: ((value: unknown) => void) | undefined;
+  const getBookContents = vi.fn().mockImplementation(async (id: BookId) => ({ book: book(id), highlights: [], standaloneNotes: [] }));
+  override({ library: { getBookContents } });
+  await render(`#/library/${firstBookId}`);
+  expect(document.querySelector("h1")?.textContent).toBe("Piranesi");
+  // A change starts a refresh of the first book, which answers only after the reader has moved on.
+  getBookContents.mockImplementationOnce(() => new Promise((resolve) => { finishLate = resolve; }));
+  await act(async () => { window.dispatchEvent(new Event("leaflogue:annotations-changed")); await tick(); });
+  await visit(`#/library/${secondBookId}`);
+  expect(document.querySelector("h1")?.textContent).toBe("The Left Hand of Darkness");
+  await act(async () => { finishLate!({ book: book(firstBookId, "Piranesi (stale)"), highlights: [], standaloneNotes: [] }); await tick(); await tick(); });
+  expect(document.querySelector("h1")?.textContent).toBe("The Left Hand of Darkness");
 });

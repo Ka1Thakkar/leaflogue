@@ -59,9 +59,9 @@ export function prepareDesktopDirectories(value: DesktopPaths): void {
  * data, while publishing the device identity before the database makes a
  * process interruption safe to resume.
  */
-export async function migrateLegacyDesktopFiles(value: DesktopPaths): Promise<readonly string[]> {
+export async function migrateDesktopLibrary(value: DesktopPaths): Promise<readonly string[]> {
   if (normalize(value.legacyUserDataDirectory) === normalize(value.dataDirectory)) return [];
-  const copied = migrateLegacyConfiguration(value);
+  const copied: string[] = [];
   if (existsSync(value.libraryFile)) return copied;
 
   const source = legacyLibrarySource(value.legacyUserDataDirectory);
@@ -88,25 +88,6 @@ export async function migrateLegacyDesktopFiles(value: DesktopPaths): Promise<re
     if (installPreparedFileIfAbsent(stagedLibrary, value.libraryFile)) copied.push("library.sqlite");
   } finally {
     rmSync(stagedLibrary, { force: true });
-  }
-  return copied;
-}
-
-function migrateLegacyConfiguration(value: DesktopPaths): string[] {
-  const copied: string[] = [];
-  const legacyLocator = join(value.legacyUserDataDirectory, "remote-config-location.json");
-  const legacyConfig = join(value.legacyUserDataDirectory, "config.json");
-
-  // A valid locator is the effective active-config selection, so publish it
-  // first. If the process stops here, the next launch still selects the same
-  // external config; copying a legacy default alongside it is unnecessary.
-  if (validConfigLocator(legacyLocator) && copyProtectedFileIfAbsent(legacyLocator, value.configLocatorFile)) {
-    copied.push("remote-config-location.json");
-  }
-  // A legacy config that other users can read was already refused by the
-  // reader, so it is not carried forward (its secrets may be exposed).
-  if (!existsSync(value.configLocatorFile) && isOwnerOnlyFile(legacyConfig) && copyProtectedFileIfAbsent(legacyConfig, value.defaultConfigFile)) {
-    copied.push("config.json");
   }
   return copied;
 }
@@ -145,18 +126,6 @@ function xdgRoot(value: string | undefined, fallback: string): string {
   return candidate && isAbsolute(candidate) ? candidate : fallback;
 }
 
-function validConfigLocator(path: string): boolean {
-  if (!isOwnedRegularFile(path)) return false;
-  try {
-    const document = JSON.parse(readFileSync(path, "utf8")) as unknown;
-    if (typeof document !== "object" || document === null || !("path" in document)) return false;
-    const candidate = (document as { path: unknown }).path;
-    return typeof candidate === "string" && candidate.length <= 4_096 && !candidate.includes("\0") && isAbsolute(candidate);
-  } catch {
-    return false;
-  }
-}
-
 function copyProtectedFileIfAbsent(source: string, destination: string): boolean {
   if (!isOwnedRegularFile(source) || existsSync(destination) || normalize(source) === normalize(destination)) return false;
   mkdirSync(dirname(destination), { recursive: true, mode: 0o700 });
@@ -178,10 +147,6 @@ function installPreparedFileIfAbsent(source: string, destination: string): boole
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
   }
-}
-
-function isOwnerOnlyFile(path: string): boolean {
-  return isOwnedRegularFile(path) && (process.platform === "win32" || (lstatSync(path).mode & 0o077) === 0);
 }
 
 function isOwnedRegularFile(path: string): boolean {

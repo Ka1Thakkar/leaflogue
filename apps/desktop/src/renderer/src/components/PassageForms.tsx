@@ -184,6 +184,8 @@ export function NoteCard({ note, readOnly, onSaved }: { readonly note: Note; rea
                 return;
               }
               setDeleted(true);
+              // Like the forms above, a committed change announces itself once.
+              window.dispatchEvent(new Event("leaflogue:annotations-changed"));
               try {
                 await onSaved();
               } catch {

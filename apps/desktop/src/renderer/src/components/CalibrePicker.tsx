@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import type { BookId, CalibreBook, CalibreConnection, CalibreFormat, CalibreSearch, EpubDocument } from "@leaflogue/contracts";
+import type { BookId, CalibreBook, CalibreConnection, CalibreFormat, CalibreSearch, ReaderDocument } from "@leaflogue/contracts";
 import { InlineError } from "./shared";
 import styles from "./epub-reader.module.css";
 
-export function CalibrePicker({ bookId, title, onLinked, onClose }: { readonly bookId: BookId; readonly title: string; readonly onLinked: (document: EpubDocument) => void; readonly onClose: () => void }) {
+export function CalibrePicker({ bookId, title, onLinked, onClose }: { readonly bookId: BookId; readonly title: string; readonly onLinked: (document: ReaderDocument) => void; readonly onClose: () => void }) {
   const [connection, setConnection] = useState<CalibreConnection>();
   const [query, setQuery] = useState(title.slice(0, 200));
   const [results, setResults] = useState<CalibreSearch>();

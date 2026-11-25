@@ -1,5 +1,5 @@
 import { normalizeHighlightColour } from "@leaflogue/contracts";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, constants as fsConstants, copyFileSync, existsSync, linkSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
@@ -246,7 +246,6 @@ interface SourceAnnotationLink {
   readonly detached: number;
 }
 
-export type LocalSyncCursor = SyncCursor;
 
 /**
  * Local-only synchronization metadata. It deliberately contains no endpoint,
@@ -254,11 +253,10 @@ export type LocalSyncCursor = SyncCursor;
  */
 export interface LocalSyncState {
   readonly deviceId: string;
-  readonly remoteCursor?: LocalSyncCursor;
+  readonly remoteCursor?: SyncCursor;
   readonly snapshotRequired: boolean;
 }
 
-export type LocalSyncOutboxEntry = SyncOutboxEntry;
 
 export interface ApplyIncomingSyncChange {
   readonly change: SyncedChange;
@@ -359,35 +357,11 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     };
   }
 
-  /** Durably retain unsupported colours while ordinary data syncs to contract 23. */
-  prepareHighlightColourSync(contract: number): number {
-    if (!Number.isSafeInteger(contract) || contract < 23) return 0;
-    this.#database.exec("BEGIN IMMEDIATE");
-    try {
-      if (contract === 23) {
-        this.#database.exec(`INSERT INTO sync_deferred_colours(highlight_id, colour)
-          SELECT id, colour FROM highlights WHERE colour IS NOT NULL AND deleted = 0
-          ON CONFLICT(highlight_id) DO UPDATE SET colour = excluded.colour`);
-      } else {
-        // A new revision is essential: the older backend already acknowledged
-        // the colour-less projection under the earlier writer claim.
-        this.#database.prepare(`UPDATE highlights SET revision = revision + 1, updated_at = ?
-          WHERE id IN (SELECT highlight_id FROM sync_deferred_colours) AND deleted = 0`).run(Date.now());
-        // Moving this intent into the ordinary durable outbox is atomic.
-        this.#database.exec("DELETE FROM sync_deferred_colours");
-      }
-      this.#database.exec("DELETE FROM sync_deferred_colours WHERE highlight_id IN (SELECT id FROM highlights WHERE deleted = 1)");
-      const count = Number((this.#database.prepare("SELECT count(*) AS count FROM sync_deferred_colours").get() as { count: number }).count);
-      this.#database.exec("COMMIT");
-      return count;
-    } catch (error) { this.#database.exec("ROLLBACK"); throw error; }
-  }
-
   countPendingSyncChanges(): number {
     return Number((this.#database.prepare("SELECT count(*) AS count FROM sync_outbox WHERE acknowledged_at IS NULL").get() as { count: number }).count);
   }
 
-  listPendingSyncChanges(limit = 100): readonly LocalSyncOutboxEntry[] {
+  listPendingSyncChanges(limit = 100): readonly SyncOutboxEntry[] {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
       throw new Error("Sync outbox limit is invalid");
     }
@@ -603,7 +577,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   }
 
   acknowledgeSyncChanges(
-    submitted: readonly LocalSyncOutboxEntry[],
+    submitted: readonly SyncOutboxEntry[],
     acknowledgement: SyncAcknowledgement,
   ): void {
     assertSyncAcknowledgement(submitted, acknowledgement);
@@ -650,27 +624,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
    * inherit an obsolete cursor or resend another installation's outbox entries.
    */
   resetSyncStateAfterRestore(): void {
-    this.#database.exec("BEGIN IMMEDIATE");
-    try {
-      const result = this.#database.prepare(
-        `UPDATE sync_state
-         SET remote_generation = NULL, remote_sequence = 0, remote_checkpoint = NULL, snapshot_required = 1,
-             updated_at = ?
-         WHERE singleton = 1`,
-      ).run(Date.now());
-      if (Number(result.changes) !== 1) throw new Error("Local synchronization state is unavailable");
-      this.#database.prepare("DELETE FROM sync_outbox").run();
-      // Writer claims and absent-row tombstones belong to the old remote sync
-      // domain and must not suppress a replacement provider's snapshot. Keep
-      // conflicts: their bodies are reader data and remain reviewable even
-      // after rebinding.
-      this.#database.prepare("DELETE FROM sync_incoming_writers").run();
-      this.#database.prepare("DELETE FROM sync_tombstones").run();
-      this.#database.exec("COMMIT");
-    } catch (error) {
-      this.#database.exec("ROLLBACK");
-      throw error;
-    }
+    resetSyncStateForRestore(this.#database);
   }
 
   /**
@@ -3752,8 +3706,10 @@ const RETAINED_UPGRADE_SNAPSHOTS = 2;
  * Migrations only run forward and an older release refuses a newer library, so
  * without this copy the only way back to the previous release would be a
  * backup the reader remembered to make. It is an ordinary restorable backup of
- * the library exactly as that release left it. Failing to write it keeps the
- * library closed and unmigrated rather than upgrading without a way back.
+ * the library exactly as that release left it, and the copy
+ * recoverLibraryAfterRollback puts back when a Mac update is undone. Failing to
+ * write it keeps the library closed and unmigrated rather than upgrading
+ * without a way back.
  */
 function snapshotBeforeMigration(database: DatabaseSync, path: string): void {
   const current = Number(database.prepare("PRAGMA user_version").get()?.user_version ?? 0);
@@ -3777,6 +3733,95 @@ function snapshotBeforeMigration(database: DatabaseSync, path: string): void {
     .filter((entry) => Number.isSafeInteger(entry.schema) && entry.schema > 0)
     .sort((first, second) => second.schema - first.schema);
   for (const stale of retained.slice(RETAINED_UPGRADE_SNAPSHOTS)) rmSync(join(directory, stale.name), { force: true });
+}
+
+/** What happened to a library this app found newer than it supports after an update was undone. */
+export type LibraryRollbackRecovery =
+  | { readonly outcome: "not-needed" }
+  /** The newer library is kept beside it under `setAsidePath`; the pre-update copy is live again. */
+  | { readonly outcome: "restored"; readonly newerSchemaVersion: number; readonly setAsidePath: string }
+  /** No usable pre-update copy: the newer library is left exactly as it was. */
+  | { readonly outcome: "kept-newer"; readonly newerSchemaVersion: number };
+
+/**
+ * After a Mac update is undone, the previous release may find the library
+ * already migrated by the newer one, which it refuses to open
+ * (applyMigrations). The newer release wrote a pre-upgrade copy just before
+ * migrating; when that copy exists for exactly this release's schema and was
+ * written after the update was installed (`snapshotNotBefore`), it becomes the
+ * live library again.
+ *
+ * Nothing is deleted. The newer library stays as a hard link under a
+ * `.newer-schema-N.<time>.sqlite` name, with its write-ahead log folded in
+ * first so that file is complete on its own. The live path is swapped in one
+ * rename, so a crash leaves either the newer library or the restored copy in
+ * place, never neither. Like a backup restore, the restored copy starts sync
+ * afresh rather than resuming from a cursor the newer release may have moved.
+ */
+export function recoverLibraryAfterRollback(
+  path: string,
+  options: { readonly snapshotNotBefore: number; readonly now?: () => number },
+): LibraryRollbackRecovery {
+  if (!existsSync(path)) return { outcome: "not-needed" };
+  const info = lstatSync(path);
+  if (!info.isFile() || info.isSymbolicLink() || (typeof process.getuid === "function" && info.uid !== process.getuid())) {
+    return { outcome: "not-needed" };
+  }
+  const live = new DatabaseSync(path);
+  let newerSchemaVersion: number;
+  try {
+    newerSchemaVersion = Number(live.prepare("PRAGMA user_version").get()?.user_version ?? 0);
+    if (!Number.isSafeInteger(newerSchemaVersion) || newerSchemaVersion <= latestSchemaVersion) return { outcome: "not-needed" };
+    const checkpoint = live.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get() as { busy?: number } | undefined;
+    if (checkpoint?.busy) throw new Error("The Leaflogue library is still in use");
+  } finally {
+    live.close();
+  }
+
+  const directory = dirname(path);
+  const stem = basename(path).replace(/\.sqlite$/u, "");
+  const snapshot = join(directory, `${stem}.before-upgrade.schema-${latestSchemaVersion}.sqlite`);
+  if (!usableUpgradeSnapshot(snapshot, options.snapshotNotBefore)) return { outcome: "kept-newer", newerSchemaVersion };
+  // A log left beside the live path would be replayed into the restored copy.
+  const wal = `${path}-wal`;
+  if (existsSync(wal) && statSync(wal).size > 0) throw new Error("The Leaflogue library has unsaved changes in its log");
+
+  const staged = `${path}.rollback.${randomUUID()}.tmp`;
+  try {
+    copyFileSync(snapshot, staged, fsConstants.COPYFILE_EXCL);
+    chmodSync(staged, 0o600);
+    const copy = new DatabaseSync(staged, { enableForeignKeyConstraints: true });
+    try {
+      copy.exec("PRAGMA journal_mode = DELETE");
+      resetSyncStateForRestore(copy);
+    } finally {
+      copy.close();
+    }
+    const setAsidePath = join(directory, `${stem}.newer-schema-${newerSchemaVersion}.${(options.now ?? Date.now)()}.sqlite`);
+    linkSync(path, setAsidePath);
+    rmSync(wal, { force: true });
+    rmSync(`${path}-shm`, { force: true });
+    renameSync(staged, path);
+    return { outcome: "restored", newerSchemaVersion, setAsidePath };
+  } finally {
+    rmSync(staged, { force: true });
+  }
+}
+
+function usableUpgradeSnapshot(path: string, notBefore: number): boolean {
+  try {
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || info.mtimeMs < notBefore) return false;
+    validateLibraryBackup(path);
+    const database = new DatabaseSync(path, { readOnly: true });
+    try {
+      return Number(database.prepare("PRAGMA user_version").get()?.user_version) === latestSchemaVersion;
+    } finally {
+      database.close();
+    }
+  } catch {
+    return false;
+  }
 }
 
 export function validateLibraryBackup(path: string): void {
@@ -4258,6 +4303,31 @@ function activeOrTombstonedContainerIds(
     if (tombstone.get(entityType, id)) return false;
     throw new Error("Synced organization container no longer exists");
   });
+}
+
+/** See LocalLibrary.resetSyncStateAfterRestore; also used on a staged copy before it goes live. */
+function resetSyncStateForRestore(database: DatabaseSync): void {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const result = database.prepare(
+      `UPDATE sync_state
+       SET remote_generation = NULL, remote_sequence = 0, remote_checkpoint = NULL, snapshot_required = 1,
+           updated_at = ?
+       WHERE singleton = 1`,
+    ).run(Date.now());
+    if (Number(result.changes) !== 1) throw new Error("Local synchronization state is unavailable");
+    database.prepare("DELETE FROM sync_outbox").run();
+    // Writer claims and absent-row tombstones belong to the old remote sync
+    // domain and must not suppress a replacement provider's snapshot. Keep
+    // conflicts: their bodies are reader data and remain reviewable even
+    // after rebinding.
+    database.prepare("DELETE FROM sync_incoming_writers").run();
+    database.prepare("DELETE FROM sync_tombstones").run();
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 function ensureLocalSyncState(database: DatabaseSync, deviceId: string): void {

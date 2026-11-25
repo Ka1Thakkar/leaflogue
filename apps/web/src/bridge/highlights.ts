@@ -13,7 +13,6 @@ import { toHighlightEntry, type WirePassage } from "./wire";
 const BROWSE_PAGE = 50;
 const DEFAULT_LIMIT = 50;
 const KEPT_QUERIES = 8;
-const LOCAL_DAY_MS = { shortest: 23 * 60 * 60 * 1000, longest: 25 * 60 * 60 * 1000 };
 
 interface Stream {
   readonly items: HighlightListEntry[];
@@ -24,14 +23,10 @@ interface Stream {
 }
 
 interface Translated {
+  /** Arguments with exact date bounds (`dateFrom`/`dateBefore`). */
   readonly args: Record<string, unknown>;
   /** What the backend cannot filter exactly, checked here. */
   readonly keep: (passage: WirePassage) => boolean;
-}
-
-function calendarDate(timestamp: number): string {
-  const day = new Date(timestamp);
-  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
 }
 
 export function translateHighlightQuery(query: HighlightQuery): Translated {
@@ -40,21 +35,21 @@ export function translateHighlightQuery(query: HighlightQuery): Translated {
   const before = query.dateBefore ?? Number.POSITIVE_INFINITY;
   const dated = query.dateFrom !== undefined || query.dateBefore !== undefined;
   const imported = query.dateKind === "imported";
-  // The backend filters by one UTC calendar day. The interface asks for one
-  // local day, so the backend is given that day's date (the UTC day that
-  // overlaps it most) and the exact bounds are checked here. Passages from
-  // the hours the two days do not share are missed; other ranges are only
-  // checked here, which reads every passage.
-  const span = before - from;
-  const oneDay = Number.isFinite(span) && span >= LOCAL_DAY_MS.shortest && span <= LOCAL_DAY_MS.longest;
-  const args: Record<string, unknown> = {
+  // The backend filters by the exact span the interface asks for, such as
+  // one local day: [its local midnight, the next local midnight).
+  const base: Record<string, unknown> = {
     ...(query.bookId ? { bookId: query.bookId } : {}),
     ...(search ? { search } : {}),
     ...(query.tagId ? { tagId: query.tagId } : {}),
     ...(query.notes ? { notes: query.notes } : {}),
     ...(query.source ? { source: query.source === "manual" ? "typed" : "imported" } : {}),
-    ...(oneDay ? { date: calendarDate(from), dateKind: imported ? "imported" : "added" } : {}),
     ...(query.sort ? { sort: query.sort } : {}),
+  };
+  const args: Record<string, unknown> = {
+    ...base,
+    ...(query.dateFrom !== undefined ? { dateFrom: query.dateFrom } : {}),
+    ...(query.dateBefore !== undefined ? { dateBefore: query.dateBefore } : {}),
+    ...(dated ? { dateKind: imported ? "imported" : "added" } : {}),
   };
   const keep = (passage: WirePassage) => {
     if (!dated) return true;

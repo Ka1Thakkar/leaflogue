@@ -5,11 +5,7 @@ import { readBoundedConvexResponse, validateConvexDeploymentUrl } from "./convex
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const SUPPORTED_SCHEMA_VERSION = 17;
-const MIN_SUPPORTED_MUTATION_CONTRACT_VERSION = 22;
-const MAX_SUPPORTED_MUTATION_CONTRACT_VERSION = 24;
-/** The first contract that replays threads and passage thread membership. */
-export const CONVEX_THREAD_CONTRACT_VERSION = 23;
-export const CONVEX_COLOUR_CONTRACT_VERSION = 24;
+export const CONVEX_MUTATION_CONTRACT_VERSION = 24;
 
 interface ConvexDeploymentMetadata {
   readonly product: "leaflogue";
@@ -76,8 +72,8 @@ export async function checkConvex(
   }
   const versions = { schemaVersion: result.schemaVersion, mutationContractVersion: result.mutationContractVersion,
     backendUpdate: { installedContract: result.mutationContractVersion, installedSchema: result.schemaVersion,
-      requiredContract: MAX_SUPPORTED_MUTATION_CONTRACT_VERSION, requiredSchema: SUPPORTED_SCHEMA_VERSION,
-      updateDesktop: result.schemaVersion > SUPPORTED_SCHEMA_VERSION || result.mutationContractVersion > MAX_SUPPORTED_MUTATION_CONTRACT_VERSION } };
+      requiredContract: CONVEX_MUTATION_CONTRACT_VERSION, requiredSchema: SUPPORTED_SCHEMA_VERSION,
+      updateDesktop: result.schemaVersion > SUPPORTED_SCHEMA_VERSION || result.mutationContractVersion > CONVEX_MUTATION_CONTRACT_VERSION } };
   if (result.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
     return {
       reachable: true,
@@ -86,13 +82,12 @@ export async function checkConvex(
       problem: `This desktop supports Convex schema ${SUPPORTED_SCHEMA_VERSION}; the deployment reports schema ${result.schemaVersion}.${upgradeInstruction(options.releaseVersion)}`,
     };
   }
-  if (result.mutationContractVersion < MIN_SUPPORTED_MUTATION_CONTRACT_VERSION ||
-      result.mutationContractVersion > MAX_SUPPORTED_MUTATION_CONTRACT_VERSION) {
+  if (result.mutationContractVersion !== CONVEX_MUTATION_CONTRACT_VERSION) {
     return {
       reachable: true,
       initialized: false,
       ...versions,
-      problem: `This desktop supports Convex mutation contracts ${MIN_SUPPORTED_MUTATION_CONTRACT_VERSION}–${MAX_SUPPORTED_MUTATION_CONTRACT_VERSION}; the deployment reports contract ${result.mutationContractVersion}.${upgradeInstruction(options.releaseVersion)}`,
+      problem: `This desktop supports Convex mutation contract ${CONVEX_MUTATION_CONTRACT_VERSION}; the deployment reports contract ${result.mutationContractVersion}.${upgradeInstruction(options.releaseVersion)}`,
     };
   }
   return { reachable: true, initialized: true, schemaVersion: result.schemaVersion, mutationContractVersion: result.mutationContractVersion };
@@ -100,8 +95,8 @@ export async function checkConvex(
 
 /**
  * Refuse an incompatible deployment before any library provisioning or data
- * exchange, and report the accepted mutation contract so the transport can
- * hold back changes an older adjacent backend cannot express.
+ * exchange. Only the current protocol is supported; database migrations still
+ * run after this check.
  */
 export async function assertCompatibleConvexDeployment(
   deploymentUrl: string,

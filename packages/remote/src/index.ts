@@ -1,5 +1,4 @@
 export * from "./config";
-export * from "@leaflogue/ai";
 export * from "./convex";
 export * from "./convex-sync";
 export * from "./postgres";

@@ -96,10 +96,12 @@ export async function launch(profile: Profile): Promise<Session> {
   profile.launches += 1;
   const netLog = join(profile.root, `net-log-${profile.launches}.json`);
   const environment = isolatedProfileEnvironment(profile);
+  const background = process.env.LEAFLOGUE_E2E_BACKGROUND === "1";
+  if (background) environment.LEAFLOGUE_E2E_MAIN_URL = pathToFileURL(mainEntry).href;
   const app = await _electron.launch({
     executablePath: electronExecutable,
     args: [
-      mainEntry,
+      background ? join(repositoryRoot, "tests/e2e/background-main.mjs") : mainEntry,
       `--user-data-dir=${join(profile.root, "user-data")}`,
       `--log-net-log=${netLog}`,
       // Hosted Linux runners forbid the unprivileged namespaces Chromium's

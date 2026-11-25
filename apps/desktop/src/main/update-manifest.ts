@@ -14,7 +14,7 @@ export type UpdatePlatform = "linux" | "mac" | "windows";
 export type UpdateArchitecture = "x64" | "arm64";
 
 export interface UpdateManifest {
-  readonly format: 1 | 2;
+  readonly format: 2;
   readonly platform: UpdatePlatform;
   readonly product: "leaflogue";
   readonly channel: UpdateChannel;
@@ -98,13 +98,10 @@ export function parseUpdateSignature(bytes: Uint8Array): UpdateSignature {
 function parseManifest(bytes: Uint8Array): UpdateManifest {
   const value = parseJson(bytes, MAX_UPDATE_MANIFEST_BYTES, "Update manifest");
   if (!isRecord(value)) throw new UpdateVerificationError("Update manifest is invalid", "format");
-  const legacy = value.format === 1;
-  exactKeys(value, legacy
-    ? ["format", "product", "channel", "version", "architecture", "releasedAt", "appImage"]
-    : ["format", "product", "platform", "channel", "version", "architecture", "releasedAt", "artifact"], "Update manifest");
-  const platform = legacy ? "linux" : value.platform;
-  const artifact = legacy ? value.appImage : value.artifact;
-  if ((value.format !== 1 && value.format !== 2) || value.product !== "leaflogue" ||
+  exactKeys(value, ["format", "product", "platform", "channel", "version", "architecture", "releasedAt", "artifact"], "Update manifest");
+  const platform = value.platform;
+  const artifact = value.artifact;
+  if (value.format !== 2 || value.product !== "leaflogue" ||
       (value.channel !== "stable" && value.channel !== "beta") ||
       (platform !== "linux" && platform !== "mac" && platform !== "windows") ||
       typeof value.version !== "string" || !VERSION_PATTERN.test(value.version) ||

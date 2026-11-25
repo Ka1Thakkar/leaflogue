@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it } from "vitest";
 import { readerTextRange, searchReader } from "./reader-search";
-const book = { sha256: "edition", position: { chapter: 0, paragraph: 0 }, chapters: [{ id: "a", title: "One", text: "A [word] and WORD.\n\nword again" }, { id: "b", title: "Two", text: "Last word" }] };
+const book = { format: "epub" as const, sha256: "edition", position: { chapter: 0, paragraph: 0 }, chapters: [{ id: "a", title: "One", text: "A [word] and WORD.\n\nword again" }, { id: "b", title: "Two", text: "Last word" }] };
 describe("reader search", () => {
   it("finds literal matches across chapters with exact offsets and bounded results", () => {
     expect(searchReader(book, "word").map(({ chapter, paragraph, offset }) => [chapter, paragraph, offset])).toEqual([[0, 0, 3], [0, 0, 13], [0, 1, 0], [1, 0, 5]]);

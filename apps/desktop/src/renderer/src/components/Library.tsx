@@ -1,6 +1,6 @@
 
 import { Select, SelectItem } from "@leaflogue/ui";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ArrowDownWideNarrow, Folder, Library as LibraryIcon, Plus, Search, Tags } from "../components/icons";
 import type { Book, BookId, BookOrganization, Collection, CollectionId, LibraryBookStatistics, LibraryDuplicates, LibraryStatistics, ReadingStatus, Tag, TagId } from "@leaflogue/contracts";
 import { TitleRow } from "@leaflogue/ui";
@@ -13,11 +13,14 @@ import { addBookRequests } from "../palette/actions";
 import { useCommands } from "../palette/commands";
 import styles from "./knowledge.module.css";
 import sheet from "./library.module.css";
+import { useContextWorkspace } from "./ContextPanel";
+import { ArticleForm } from "./ArticleForm";
 import { BookForm } from "./BookForms";
 import { CollectionManager, TagManager } from "./Organization";
 
 type Sort = "series" | "recent" | "title" | "author" | "highlights";
 type StatusTab = "all" | ReadingStatus;
+const SHELF_PAGE_SIZE = 60;
 
 function sortBooks(books: readonly Book[], sort: Sort): Book[] {
   return [...books].sort((a, b) =>
@@ -36,6 +39,7 @@ function sortBooks(books: readonly Book[], sort: Sort): Book[] {
 }
 
 export function LibraryPage({ initialCollectionId, initialTagId }: { readonly initialCollectionId?: CollectionId; readonly initialTagId?: TagId } = {}) {
+  const context = useContextWorkspace();
   const [shelf, setShelf] = useState<"active" | "archived">("active");
   const [books, setBooks] = useState<readonly Book[]>();
   const [collections, setCollections] = useState<readonly Collection[]>([]);
@@ -97,17 +101,30 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
   const [filtersOpen, setFiltersOpen] = useState(Boolean(initialCollectionId || initialTagId));
   const panelId = useId();
   const activeFilters = [collection, tag, shelf === "archived"].filter(Boolean).length;
-  const matching = books?.filter((book) => {
+  const matching = useMemo(() => books?.filter((book) => {
     const organization = organizations.get(book.id);
     return `${book.title} ${book.authors.join(" ")}`.toLocaleLowerCase().includes(needle) &&
       (!collection || organization?.collectionIds.includes(collection)) &&
       (!tag || organization?.tagIds.includes(tag));
-  });
-  const filtered = matching && sortBooks(matching.filter((book) => statusTab === "all" || book.status === statusTab), sort);
+  }), [books, organizations, needle, collection, tag]);
+  const filtered = useMemo(() => matching && sortBooks(matching.filter((book) => statusTab === "all" || book.status === statusTab), sort), [matching, statusTab, sort]);
+  const pageKey = JSON.stringify([shelf, needle, collection, tag, statusTab, sort]);
+  const [paging, setPaging] = useState({ key: pageKey, page: 0 });
+  useEffect(() => { setPaging({ key: pageKey, page: 0 }); }, [pageKey]);
+  const lastPage = Math.max(0, Math.ceil((filtered?.length ?? 0) / SHELF_PAGE_SIZE) - 1);
+  const page = paging.key === pageKey ? Math.min(paging.page, lastPage) : 0;
+  const firstBook = useRef<HTMLAnchorElement>(null);
+  const focusPage = useRef(false);
+  const changePage = (next: number) => { focusPage.current = true; setPaging({ key: pageKey, page: next }); };
+  useEffect(() => {
+    if (focusPage.current) { focusPage.current = false; firstBook.current?.focus(); }
+  }, [page]);
+  const pageStart = page * SHELF_PAGE_SIZE;
+  const visibleBooks = filtered?.slice(pageStart, pageStart + SHELF_PAGE_SIZE);
   const statusCounts = (["reading", "finished", "unread", "paused"] as const)
     .map((status) => [status, matching?.filter((book) => book.status === status).length ?? 0] as const)
     .filter(([status, count]) => count > 0 || status === statusTab);
-  const perBook = new Map<BookId, LibraryBookStatistics>(statistics?.books.map((entry) => [entry.bookId, entry]) ?? []);
+  const perBook = useMemo(() => new Map<BookId, LibraryBookStatistics>(statistics?.books.map((entry) => [entry.bookId, entry]) ?? []), [statistics]);
   const summary = statistics && shelf === "active" && statistics.totals.highlights > 0 ? readingSummary(statistics) : undefined;
   const dashboard = useDashboard("library");
   const showDashboard = shelf === "active" && statistics !== undefined && statistics.totals.highlights > 0;
@@ -219,10 +236,10 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
         <>
           <p className="ll-muted sr-only" role="status">{countOf(filtered?.length ?? 0, "book")}</p>
           <div className={sheet.books}>
-            {filtered?.map((book) => {
+            {visibleBooks?.map((book, index) => {
               const counted = perBook.get(book.id);
               return (
-                <a className={`ui-panel ${sheet.book}`} href={href.book(book.id)} key={book.id} aria-label={`Open ${book.title}`}>
+                <a className={`ui-panel ${sheet.book}`} href={href.book(book.id)} key={book.id} ref={index === 0 ? firstBook : undefined} aria-label={`Open ${book.title}`}>
                   <Cover book={book} />
                   <div>
                     <h2>{book.title}</h2>
@@ -237,6 +254,13 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
               );
             })}
           </div>
+          {lastPage > 0 && (
+            <nav className={sheet.pagination} aria-label="Book pages">
+              <button type="button" className="ll-button-secondary" disabled={page === 0} onClick={() => changePage(page - 1)}>Previous books</button>
+              <p className="ll-muted" role="status">Books {pageStart + 1}–{Math.min(pageStart + SHELF_PAGE_SIZE, filtered?.length ?? 0)} of {filtered?.length} · Page {page + 1} of {lastPage + 1}</p>
+              <button type="button" className="ll-button-secondary" disabled={page === lastPage} onClick={() => changePage(page + 1)}>Next books</button>
+            </nav>
+          )}
         </>
       )}
     </>
@@ -255,6 +279,9 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
                 <Dialog label="Add book" title="Add a book" icon={Plus} triggerRef={addBookTrigger}>
                   {(close) => <BookForm onClose={close} onSaved={(book) => navigate(href.book(book.id))} />}
                 </Dialog>
+                {window.leaflogue.articles && <Dialog label="Add article" title="Capture a web article" secondary>
+                  {(close) => <ArticleForm onClose={close} onSaved={(book) => { navigate(href.book(book.id)); context?.showReader(book.id, book.title); }} />}
+                </Dialog>}
                 <Dialog label="Collections" title="Manage collections" icon={Folder} secondary triggerRef={collectionsTrigger}>
                   {(close) => <CollectionManager onClose={close} onChanged={refresh} />}
                 </Dialog>

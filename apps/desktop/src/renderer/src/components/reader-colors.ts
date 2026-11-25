@@ -51,14 +51,20 @@ export function readerColor(value: string, property: "color" | "background-color
 
 const originalColors = new WeakMap<Document, { element: HTMLElement; color: string; background: string; border: string }[]>();
 export function applyReaderColors(doc: Document, dark: boolean, tokens?: ThemeTokens) {
-  let originals = originalColors.get(doc);
-  if (!originals) {
-    originals = Array.from(doc.querySelectorAll<HTMLElement>("#reader-pages *")).map((element) => {
-      const style = doc.defaultView!.getComputedStyle(element);
-      return { element, color: style.color, background: style.backgroundColor, border: style.borderTopColor };
-    });
-    originalColors.set(doc, originals);
-  }
+  // Chapters are swapped in and out of the page: forget removed elements and
+  // read publisher colours for new ones without the reader's own ink on <body>.
+  const tracked = (originalColors.get(doc) ?? []).filter((original) => original.element.isConnected);
+  const known = new Set(tracked.map((original) => original.element));
+  const fresh = Array.from(doc.querySelectorAll<HTMLElement>("#reader-pages *")).filter((element) => !known.has(element));
+  const ink = [doc.body.style.getPropertyValue("color"), doc.body.style.getPropertyPriority("color")] as const;
+  if (fresh.length && ink[0]) doc.body.style.removeProperty("color");
+  const added = fresh.map((element) => {
+    const style = doc.defaultView!.getComputedStyle(element);
+    return { element, color: style.color, background: style.backgroundColor, border: style.borderTopColor };
+  });
+  if (fresh.length && ink[0]) doc.body.style.setProperty("color", ink[0], ink[1]);
+  const originals = [...tracked, ...added];
+  originalColors.set(doc, originals);
   const cache = new Map<string, string>();
   const map = (value: string, property: "color" | "background-color" | "border-color") => {
     const key = `${value}:${property}`; let mapped = cache.get(key);

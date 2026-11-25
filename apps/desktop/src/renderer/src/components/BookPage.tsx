@@ -48,6 +48,16 @@ function openPicker(details: HTMLDetailsElement | null): void {
   details.querySelector<HTMLElement>("input, button")?.focus({ preventScroll: true });
 }
 
+/** Requests beside the book itself. When one fails the book still shows, with that part marked. */
+type AuxiliaryPart = "organization" | "collections" | "tags" | "books";
+
+function auxiliaryProblem(failed: ReadonlySet<AuxiliaryPart>): string {
+  const parts: string[] = [];
+  if (failed.has("organization") || failed.has("collections") || failed.has("tags")) parts.push("collections and tags");
+  if (failed.has("books")) parts.push("your other books, so merging is unavailable");
+  return `Leaflogue couldn't load ${parts.join(" or ")} just now.`;
+}
+
 export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly bookId: BookId; readonly focusHighlightId?: HighlightId; readonly mergeWith?: BookId }) {
   const contextWorkspace = useContextWorkspace();
   const [confirm, confirmDialog] = useConfirm();
@@ -83,10 +93,25 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
     return () => { active = false; };
   }, [bookId]);
 
+  // Core contents decide what the page is: loading, the book, a book that
+  // doesn't exist, or a failed read with Retry. Every read takes a token so a
+  // slow, older reply can never replace a newer one.
+  const coreRequest = useRef(0);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const refreshBook = useCallback(async () => {
-    const next = await window.leaflogue.library.getBookContents(bookId);
-    setContents(next ?? null);
-    return next;
+    const current = ++coreRequest.current;
+    try {
+      const next = await window.leaflogue.library.getBookContents(bookId);
+      if (coreRequest.current !== current) return;
+      setContents(next ?? null);
+      setLoadFailed(false);
+      setRefreshFailed(false);
+    } catch {
+      // Keep what is on screen; the notice offers another try.
+      if (coreRequest.current === current) setRefreshFailed(true);
+    }
   }, [bookId]);
 
   useEffect(() => {
@@ -106,34 +131,47 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
     }
   }, [bookId, setError]);
 
+  const auxiliaryRequest = useRef(0);
+  const [auxiliaryFailed, setAuxiliaryFailed] = useState<ReadonlySet<AuxiliaryPart>>(new Set());
+  const loadAuxiliary = useCallback(async () => {
+    const current = ++auxiliaryRequest.current;
+    // A bridge that throws instead of rejecting still only marks its own part.
+    const attempt = <T,>(request: () => Promise<T>) => Promise.resolve().then(request);
+    const [nextOrganization, nextCollections, nextTags, books, source] = await Promise.allSettled([
+      attempt(() => window.leaflogue.organization.getBook(bookId)),
+      attempt(() => window.leaflogue.organization.listCollections()),
+      attempt(() => window.leaflogue.organization.listTags()),
+      attempt(() => window.leaflogue.library.listBooks()),
+      attempt(() => window.leaflogue.library.getMetadataSource(bookId)),
+    ]);
+    if (auxiliaryRequest.current !== current) return;
+    const failed = new Set<AuxiliaryPart>();
+    if (nextOrganization.status === "fulfilled") setOrganization(nextOrganization.value); else failed.add("organization");
+    if (nextCollections.status === "fulfilled") setCollections(nextCollections.value); else failed.add("collections");
+    if (nextTags.status === "fulfilled") setTags(nextTags.value); else failed.add("tags");
+    if (books.status === "fulfilled") setCandidates(books.value.filter((book) => book.id !== bookId && !book.archived));
+    else failed.add("books");
+    // Without a source the reset action is simply not offered.
+    setMetadataSource(source.status === "fulfilled" ? source.value : undefined);
+    setAuxiliaryFailed(failed);
+  }, [bookId]);
+
   useEffect(() => {
-    let active = true;
+    const current = ++coreRequest.current;
     setContents(undefined);
+    setLoadFailed(false);
+    setRefreshFailed(false);
     setError("");
-    void (async () => {
-      try {
-        const [next, nextOrganization, nextCollections, nextTags, books, source] = await Promise.all([
-          window.leaflogue.library.getBookContents(bookId),
-          window.leaflogue.organization.getBook(bookId),
-          window.leaflogue.organization.listCollections(),
-          window.leaflogue.organization.listTags(),
-          window.leaflogue.library.listBooks(),
-          window.leaflogue.library.getMetadataSource(bookId).catch(() => undefined),
-        ]);
-        if (!active) return;
-        setContents(next ?? null);
-        setMetadataSource(source);
-        setOrganization(nextOrganization);
-        setCollections(nextCollections);
-        setTags(nextTags);
-        setCandidates(books.filter((book) => book.id !== bookId && !book.archived));
-      } catch {
-        if (active) setContents(null);
-      }
-    })();
+    Promise.resolve().then(() => window.leaflogue.library.getBookContents(bookId)).then(
+      (next) => { if (coreRequest.current === current) setContents(next ?? null); },
+      () => { if (coreRequest.current === current) setLoadFailed(true); },
+    );
+    void loadAuxiliary();
     void refreshHistory();
-    return () => { active = false; };
-  }, [bookId, refreshHistory, setError]);
+    // Leaving the page retires its requests: no reply may land after that.
+    const requests = [coreRequest, auxiliaryRequest];
+    return () => { for (const request of requests) request.current++; };
+  }, [bookId, loadAttempt, loadAuxiliary, refreshHistory, setError]);
 
   const book = contents?.book;
   useCrumb(book?.title);
@@ -152,10 +190,10 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
       run: () => void setStatus(status),
     })),
     { id: "book.add-highlight", title: "Add a highlight", keywords: "passage quote keep", icon: "plus", run: () => addHighlightTrigger.current?.click() },
-    { id: "book.add-note", title: "Add a note to this book", icon: "note-paper", run: () => addNoteTrigger.current?.click() },
+    { id: "book.add-note", title: "Write a book note", keywords: "note thoughts reflection whole book", icon: "note-paper", run: () => addNoteTrigger.current?.click() },
     { id: "book.edit-metadata", title: "Edit book details", keywords: "metadata title author series isbn publisher", icon: "edit", run: () => metadataTrigger.current?.click() },
-    ...(collections.length > 0 ? [{ id: "book.collections", title: "Add to a collection", icon: "folder" as const, run: () => openPicker(collectionsDetails.current) }] : []),
-    ...(tags.length > 0 ? [{ id: "book.tags", title: "Tag this book", icon: "tag" as const, run: () => openPicker(tagsDetails.current) }] : []),
+    ...(collections.length > 0 && !auxiliaryFailed.has("organization") ? [{ id: "book.collections", title: "Add to a collection", icon: "folder" as const, run: () => openPicker(collectionsDetails.current) }] : []),
+    ...(tags.length > 0 && !auxiliaryFailed.has("organization") ? [{ id: "book.tags", title: "Tag this book", icon: "tag" as const, run: () => openPicker(tagsDetails.current) }] : []),
     { id: "book.passages", title: "Show this book's passages in Highlights", icon: "passages", run: () => navigate(href.highlights(undefined, { bookId: book.id })) },
     { id: "book.archive", title: "Archive this book", icon: "archive", run: () => void setShelf(true) },
   ] : book ? [
@@ -168,7 +206,19 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
   const mergeCandidates = candidates.filter((candidate) => `${candidate.title} ${candidate.authors.join(" ")}`.toLocaleLowerCase().includes(needle));
   const chosenCandidate = mergeCandidates.find((candidate) => candidate.id === mergeCandidateId) ?? mergeCandidates[0];
 
-  if (contents === undefined) return <Loading>Opening your book…</Loading>;
+  if (contents === undefined) {
+    if (!loadFailed && !refreshFailed) return <Loading>Opening your book…</Loading>;
+    return (
+      <div className="ll-empty">
+        <h1 className="ll-title">This book couldn't be opened</h1>
+        <p className="ll-muted" role="alert">Leaflogue couldn't read this book just now. Nothing in your library was changed.</p>
+        <div className={styles.actions}>
+          <button type="button" className="ll-button" onClick={() => setLoadAttempt((value) => value + 1)}>Try again</button>
+          <a className="ll-button-secondary" href={href.library()}>Back to library</a>
+        </div>
+      </div>
+    );
+  }
   if (contents === null || !book) {
     return (
       <div className="ll-empty">
@@ -255,12 +305,13 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
           <h1 className={sheet.title}>{book.title}</h1>
           <p className={sheet.authors}>{authorsLabel(book.authors)}{book.series ? ` · ${book.series}${book.seriesNumber ? ` ${book.seriesNumber}` : ""}` : ""}</p>
           <div className={styles.actions}>
-            {window.leaflogue.epub && <button className="ll-button-secondary" onClick={() => contextWorkspace?.showReader(book.id, book.title)}>Read</button>}
+            {window.leaflogue.reader && <button className="ll-button-secondary" onClick={() => contextWorkspace?.showReader(book.id, book.title)}>Read</button>}
             {!readOnly && (
               <>
-                <AddHighlight bookId={book.id} triggerRef={addHighlightTrigger} onSaved={async () => { setPassagesVersion((current) => current + 1); await refreshBook(); }} />
-                <Dialog label="Add a note without a passage" title="Add a note" icon={StickyNote} iconOnly triggerRef={addNoteTrigger}>
-                  {(close) => <NoteForm bookId={book.id} onClose={close} onSaved={async () => { await refreshBook(); }} />}
+                {/* Saving announces leaflogue:annotations-changed, which refreshes this page once. */}
+                <AddHighlight bookId={book.id} triggerRef={addHighlightTrigger} onSaved={() => undefined} />
+                <Dialog label="Write a book note" title="Write a book note" icon={StickyNote} secondary triggerRef={addNoteTrigger}>
+                  {(close) => <NoteForm bookId={book.id} onClose={close} onSaved={() => undefined} />}
                 </Dialog>
               </>
             )}
@@ -295,6 +346,13 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
         </div>
       </section>
 
+      {refreshFailed && (
+        <p role="status" className={sheet.notice}>
+          Leaflogue couldn't refresh this book, so what you see may be out of date. Your saved changes were kept.
+          <button type="button" className="ll-text-button" onClick={() => void refreshBook()}>Try again</button>
+        </p>
+      )}
+
       {timeline && (
         <div className={sheet.charts} data-columns={positions ? 3 : 2}>
           <Panel title="When you highlighted" actions={<span className="ui-sub">passages per {timeline.unit}</span>} padded>
@@ -313,19 +371,25 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
           {readOnly && (
             <p className={styles.archivedNotice}>This book is archived. Restore it from the book actions to add or edit its passages and notes.</p>
           )}
+          {(!readOnly || standaloneNotes.length > 0) && (
+            <section className={styles.standaloneNotes} aria-labelledby="book-notes-title">
+              <h2 id="book-notes-title">Book notes</h2>
+              {standaloneNotes.length === 0 ? (
+                <div className={sheet.bookNotesEmpty}>
+                  <p>Thoughts about the whole book belong here: what stayed with you, what you'd tell a friend, or how it changed your mind. They don't need a passage.</p>
+                  <button type="button" className="ll-text-button" onClick={() => addNoteTrigger.current?.click()}>
+                    <StickyNote size={16} aria-hidden="true" />Write your first book note
+                  </button>
+                </div>
+              ) : standaloneNotes.map((note) => <NoteCard key={note.id} note={note} readOnly={readOnly} onSaved={() => undefined} />)}
+            </section>
+          )}
           <HighlightBrowser
             bookId={book.id}
             focusHighlightId={focusHighlightId}
             readOnly={readOnly}
             version={passagesVersion}
-            onChanged={() => void refreshBook()}
           />
-          {standaloneNotes.length > 0 && (
-            <section className={styles.standaloneNotes} aria-labelledby="standalone-notes-title">
-              <h2 id="standalone-notes-title">Notes without passages</h2>
-              {standaloneNotes.map((note) => <NoteCard key={note.id} note={note} readOnly={readOnly} onSaved={async () => { await refreshBook(); }} />)}
-            </section>
-          )}
         </section>
         <aside className={`ui-panel ${sheet.details}`} aria-label="Book details">
           <div className="ui-panel-head"><h2 className="ui-label">Details</h2></div>
@@ -380,13 +444,19 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
               {historyTruncated && <p className="ll-muted">Showing the latest 100 changes.</p>}
             </details>
           )}
+          {auxiliaryFailed.size > 0 && (
+            <p role="status" className={sheet.notice}>
+              {auxiliaryProblem(auxiliaryFailed)}
+              <button type="button" className="ll-text-button" onClick={() => void loadAuxiliary()}>Try again</button>
+            </p>
+          )}
           {collections.length > 0 && (
             <details ref={collectionsDetails} className={`ll-disclosure ${styles.descriptionDetails}`}>
               <summary>Collections{memberNames(collections, organization?.collectionIds)}</summary>
               <SearchableMultiSelect
                 inline
                 label="Collections"
-                disabled={readOnly}
+                disabled={readOnly || auxiliaryFailed.has("organization")}
                 options={collections.map((item) => ({ id: item.id, label: item.name }))}
                 selected={organization?.collectionIds ?? []}
                 onChange={(ids) => changeMembership("collection", ids)}
@@ -399,7 +469,7 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
               <SearchableMultiSelect
                 inline
                 label="Tags"
-                disabled={readOnly}
+                disabled={readOnly || auxiliaryFailed.has("organization")}
                 options={tags.map((item) => ({ id: item.id, label: item.name }))}
                 selected={organization?.tagIds ?? []}
                 onChange={(ids) => changeMembership("tag", ids)}
@@ -431,7 +501,7 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
               </ul>
             </div>
           )}
-          {!readOnly && (
+          {!readOnly && !auxiliaryFailed.has("books") && (
             <details className={styles.mergeDetails} open={mergeWith ? true : undefined}>
               <summary>
                 <GitMerge size={16} aria-hidden="true" />

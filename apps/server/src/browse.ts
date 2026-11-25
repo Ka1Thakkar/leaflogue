@@ -13,7 +13,6 @@ import { BOOK_COLUMNS, mapBookRow } from "./reading";
 const MAX_BOOKS = 2_000;
 const MAX_PAGE_ITEMS = 50;
 const MAX_LIST = 1_000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const invalid = (message: string) => new ServerError("LEAFLOGUE_REQUEST_INVALID", message);
 const ms = (value: unknown) => value instanceof Date ? value.getTime() : Number(value);
@@ -30,12 +29,17 @@ function pageSize(numItems: number, maximum: number): number {
   return numItems;
 }
 
-function dayRange(day: string): { start: number; end: number } {
-  const start = Date.parse(`${day}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(day) || !Number.isFinite(start) || new Date(start).toISOString().slice(0, 10) !== day) {
-    throw invalid("Date must be a valid calendar date");
+/**
+ * The span `dateFrom`..`dateBefore` (epoch milliseconds, the end excluded),
+ * as a client sends it for a day in its own time zone. Either end may be
+ * left open.
+ */
+function exactRange(from: number | undefined, before: number | undefined) {
+  if (from === undefined && before === undefined) return undefined;
+  if ((from !== undefined && !Number.isSafeInteger(from)) || (before !== undefined && !Number.isSafeInteger(before))) {
+    throw invalid("Date range must be whole milliseconds");
   }
-  return { start, end: start + DAY_MS };
+  return { start: from, end: before };
 }
 
 function membershipMap(rows: { book_id: string; other: string }[]): Map<string, string[]> {
@@ -178,7 +182,8 @@ export interface HighlightQuery {
   readonly tagId?: string;
   readonly notes?: "with" | "without";
   readonly source?: "typed" | "imported";
-  readonly date?: string;
+  readonly dateFrom?: number;
+  readonly dateBefore?: number;
   readonly dateKind?: "added" | "imported";
   readonly sort?: "newest" | "oldest" | "updated" | "relevance";
   readonly paginationOpts: { readonly numItems: number; readonly cursor: string | null };
@@ -192,7 +197,7 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if ((args.bookId && !isUuid(args.bookId)) || (args.tagId && !isUuid(args.tagId))) {
     return { page: [], isDone: true, continueCursor: String(offset) };
   }
-  const range = args.date ? dayRange(args.date) : undefined;
+  const range = exactRange(args.dateFrom, args.dateBefore);
   const values: unknown[] = [libraryId];
   const value = (item: unknown) => `$${values.push(item)}`;
   const where = ["h.library_id = $1", "h.deleted_at IS NULL", "h.archived = false"];
@@ -201,7 +206,10 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if (search) {
     term = value(search);
     const pattern = value(`%${search.replace(/[\\%_]/gu, (character) => `\\${character}`)}%`);
-    where.push(`(to_tsvector('simple', h.text) @@ plainto_tsquery('simple', ${term}) OR h.text ILIKE ${pattern})`);
+    // A passage matches on its own text or on the text of one of its notes.
+    where.push(`(to_tsvector('simple', h.text) @@ plainto_tsquery('simple', ${term}) OR h.text ILIKE ${pattern} OR EXISTS (
+      SELECT 1 FROM leaflogue.notes AS n WHERE n.library_id = h.library_id AND n.highlight_id = h.id AND n.deleted_at IS NULL
+      AND (to_tsvector('simple', n.markdown) @@ plainto_tsquery('simple', ${term}) OR n.markdown ILIKE ${pattern})))`);
   }
   if (args.tagId) {
     where.push(`EXISTS (SELECT 1 FROM leaflogue.highlight_tags AS t WHERE t.library_id = h.library_id AND t.highlight_id = h.id AND t.tag_id = ${value(args.tagId)})`);
@@ -212,7 +220,8 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if (args.source) where.push(args.source === "imported" ? IMPORTED : `NOT ${IMPORTED}`);
   if (range) {
     const column = (args.dateKind ?? "added") === "imported" ? "link.updated_at" : "h.created_at";
-    where.push(`${column} >= to_timestamp(${value(range.start / 1000)}) AND ${column} < to_timestamp(${value(range.end / 1000)})`);
+    if (range.start !== undefined) where.push(`${column} >= to_timestamp(${value(range.start / 1000)})`);
+    if (range.end !== undefined) where.push(`${column} < to_timestamp(${value(range.end / 1000)})`);
   }
   const sort = search ? (args.sort ?? "relevance") : args.sort === "relevance" ? "oldest" : (args.sort ?? "oldest");
   const order = sort === "relevance" && search

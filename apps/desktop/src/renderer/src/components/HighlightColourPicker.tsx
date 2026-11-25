@@ -1,12 +1,12 @@
+import { HIGHLIGHT_COLOURS } from "@leaflogue/contracts";
 import { useId, useState } from "react";
 import type { Highlight } from "@leaflogue/contracts";
-import { currentHighlightPalette, HIGHLIGHT_COLOURS, highlightColour, updateHighlightColour, useHighlightColours } from "./highlight-colours";
+import { useHighlightPalette, highlightColour, updateHighlightColour } from "./highlight-colours";
 import styles from "./highlight-colours.module.css";
 export function HighlightColourPicker({ highlight, onSaved }: { readonly highlight: Highlight; readonly onSaved?: () => void | Promise<void> }) {
-  const colours = useHighlightColours();
   const [choice, setChoice] = useState<{ revision: number; colour: typeof HIGHLIGHT_COLOURS[number] }>();
-  const selected = choice?.revision === highlight.revision ? choice.colour : highlightColour(highlight, colours);
-  const palette = currentHighlightPalette(); const name = useId(); const [error, setError] = useState("");
+  const selected = choice?.revision === highlight.revision ? choice.colour : highlightColour(highlight);
+  const palette = useHighlightPalette(); const name = useId(); const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   async function save(colour: typeof HIGHLIGHT_COLOURS[number]) {
     setPending(true); setError(""); setChoice({ revision: highlight.revision, colour });

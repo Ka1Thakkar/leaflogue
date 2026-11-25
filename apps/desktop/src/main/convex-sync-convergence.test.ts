@@ -39,23 +39,17 @@ afterEach(() => {
   rmSync(directory, { recursive: true, force: true });
 });
 
-/** `deployment.contract` stands in for the version an older deployment reports at preflight. */
-async function device(name: string, syncKey = SYNC_KEY, deployment: { contract?: number; transition?: boolean } = {}) {
+async function device(name: string, syncKey = SYNC_KEY) {
   const library = new LocalLibrary(join(directory, `${name}.sqlite`));
   opened.push(library);
   const options = { deploymentUrl: DEPLOYMENT, syncKey, fetch: convexFetch(() => backend) };
   const { deviceId } = library.getSyncState();
   // Every device resolves the same one library through the key.
   await expect(ensureConvexLibrary(options)).resolves.toBe(libraryId);
-  const runner = () => {
-    if (deployment.transition) library.prepareHighlightColourSync(deployment.contract ?? 24);
-    return createSyncRunner({
+  const runner = () => createSyncRunner({
     ledger: library,
-    transport: new ConvexSyncTransport({
-      ...options, session: { libraryId, deviceId }, mutationContractVersion: deployment.contract, colourCompatibilityPrepared: deployment.transition && (deployment.contract ?? 24) >= 23,
-    }),
+    transport: new ConvexSyncTransport({ ...options, session: { libraryId, deviceId } }),
   });
-  };
   return {
     library,
     run: () => runner().run(),
@@ -98,35 +92,8 @@ function organization(library: LocalLibrary) {
 }
 
 describe("two-device sync convergence through Convex", () => {
-  it("continues ordinary sync on contract 23 and replays retained colours after upgrade", async () => {
-    const deployment = { contract: 23, transition: true };
-    const first = await device("transition-first", SYNC_KEY, deployment);
-    const second = await device("transition-second", SYNC_KEY, deployment);
-    const book = first.library.createBook({ title: "Transition" });
-    const highlight = first.library.createHighlight({ bookId: book.id, text: "Ordinary data", colour: "green" });
-    await first.sync(); await second.sync();
-    expect(first.library.countPendingSyncChanges()).toBe(0);
-    expect(first.library.prepareHighlightColourSync(23)).toBe(1);
-    const remote = second.library.getBookContents(book.id)!.highlights[0]!;
-    expect(remote.text).toBe("Ordinary data"); expect(remote.colour).toBeUndefined();
-    second.library.createNote({ bookId: book.id, highlightId: remote.id, markdown: "A note from the other device" });
-    await second.sync(); await first.sync();
-    expect(first.library.getBookContents(book.id)!.highlights[0]).toMatchObject({ colour: "green", notes: [{ markdown: "A note from the other device" }] });
-    const edited = first.library.getBookContents(book.id)!.highlights[0]!;
-    first.library.updateHighlight({ ...edited, text: "A text edit during the transition", colour: "blue", expectedRevision: edited.revision });
-    await first.sync(); await second.sync();
-    expect(second.library.getBookContents(book.id)!.highlights[0]).toMatchObject({ text: "A text edit during the transition" });
-    deployment.contract = 24;
-    await first.sync(); await second.sync();
-    expect(second.library.getBookContents(book.id)!.highlights[0]).toMatchObject({ colour: "blue", text: "A text edit during the transition" });
-    expect(first.library.prepareHighlightColourSync(24)).toBe(0);
-    expect(first.library.countPendingSyncChanges()).toBe(0);
-    expect(first.library.getBookContents(book.id)!.highlights[0]!.id).toBe(highlight.id);
-  });
-
-  it("queues colours until the backend upgrades, then syncs changes between installations", async () => {
-    const deployment: { contract?: number } = { contract: 23 };
-    const first = await device("colour-first", SYNC_KEY, deployment);
+  it("syncs colours and subsequent edits between installations", async () => {
+    const first = await device("colour-first");
     const second = await device("colour-second");
     const book = first.library.createBook({ title: "Shared colours" });
     const highlight = first.library.createHighlight({ bookId: book.id, text: "A shared line" });
@@ -135,9 +102,6 @@ describe("two-device sync convergence through Convex", () => {
     for (const colour of ["pink", "purple", "green"] as const) {
       edited = first.library.updateHighlight({ ...edited, colour, expectedRevision: edited.revision });
     }
-    expect(await first.run()).toMatchObject({ status: "failed", problem: { kind: "schema" } });
-    expect(first.library.listPendingSyncChanges().length).toBeGreaterThan(0);
-    delete deployment.contract;
     await first.sync(); await second.sync();
     const onSecond = second.library.getBookContents(book.id)!.highlights[0]!;
     expect(onSecond.colour).toBe("green");
@@ -221,36 +185,6 @@ describe("two-device sync convergence through Convex", () => {
     expect(first.library.listPendingSyncChanges()).toEqual([]);
   });
 
-  it("holds newer changes while the deployment is older, then sends them all once it is updated", async () => {
-    // Desktops update first: against a contract-22 deployment the new desktop
-    // sends what that contract can store and keeps the rest queued.
-    const deployment: { contract?: number } = { contract: 22 };
-    const first = await device("first", SYNC_KEY, deployment);
-    const second = await device("second");
-    const book = first.library.createBook({ title: "Piranesi" });
-    await expect(first.run()).resolves.toMatchObject({ status: "complete" });
-    const highlight = first.library.createHighlight({ bookId: book.id, text: "The House" });
-    const thread = first.library.createThread({ name: "Architecture" });
-    first.library.setHighlightThreadMembership({
-      bookId: book.id, highlightId: highlight.id, threadIds: [thread.id], expectedHighlightRevision: highlight.revision,
-    });
-    first.library.setBookReadingStatus({ id: book.id, status: "reading", expectedRevision: first.library.getBook(book.id)!.revision });
-    const held = await first.run();
-    expect(held).toMatchObject({ status: "failed", problem: { kind: "schema", message: expect.stringMatching(/Update the Convex deployment/) } });
-    expect(first.library.listPendingSyncChanges().length).toBeGreaterThan(0);
-    await second.sync();
-    expect(second.library.listBooks().map(({ title }) => title)).toEqual(["Piranesi"]);
-    expect(second.library.listThreads()).toEqual([]);
-
-    delete deployment.contract;
-    await first.sync();
-    await second.sync();
-    expect(first.library.listPendingSyncChanges()).toEqual([]);
-    expect(second.library.getHighlightThreadIds(book.id, highlight.id)).toEqual([thread.id]);
-    expect(second.library.getBook(book.id)).toMatchObject({ status: "reading" });
-    expect(second.library.listReadingStatusHistory(book.id)).toEqual(first.library.listReadingStatusHistory(book.id));
-    expect(reading(second.library)).toEqual(reading(first.library));
-  });
 
   it("keeps every device's reading-status history, including concurrent offline changes", async () => {
     const first = await device("first");

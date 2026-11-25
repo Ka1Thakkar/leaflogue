@@ -1070,7 +1070,9 @@ export interface ImportPreview {
   readonly warnings: readonly ImportWarning[];
 }
 
-export type ImportProvider = "kindle" | "kobo" | "koreader" | "pocketbook" | "tolino" | "boox" | "portable";
+export { IMPORT_PROVIDERS, IMPORT_PROVIDER_NAMES, isImportProvider, suggestedImportSourceName } from "./import-providers";
+export type { ImportProvider } from "./import-providers";
+import type { ImportProvider } from "./import-providers";
 
 export interface ImportSourceProfile {
   readonly id: string;
@@ -1570,7 +1572,6 @@ export interface SyncBackendUpdate {
   readonly installedSchema?: number;
   readonly requiredContract: number;
   readonly requiredSchema: number;
-  readonly deferredColours?: number;
   readonly updateDesktop?: boolean;
 }
 
@@ -1616,7 +1617,7 @@ export type SyncRunResult = (
   | (SyncRunCounts & { readonly status: "migration-review-required"; readonly migration: SyncMigrationProgress & {
     readonly reviewNoteId: NoteId;
     readonly reviewReason: "oversized" | "too-many";
-  } })) & { readonly backendUpdate?: SyncBackendUpdate };
+  } }));
 
 /**
  * Background sync as the header shows it. `off` means no sync provider is set
@@ -1885,48 +1886,75 @@ export const CALIBRE_DESCRIBE_CHANNEL = "calibre:describe";
 export const CALIBRE_CHOOSE_CHANNEL = "calibre:choose";
 export const CALIBRE_SEARCH_CHANNEL = "calibre:search";
 export const CALIBRE_LINK_CHANNEL = "calibre:link";
-export const EPUB_UNLINK_CHANNEL = "epub:unlink";
+export const READER_UNLINK_CHANNEL = "reader:unlink";
 export type CalibreFormat = "EPUB" | "KEPUB" | "PDF";
-export interface CalibreReference { readonly format?: CalibreFormat; readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
+export interface CalibreReference { readonly format: CalibreFormat; readonly libraryRoot: string; readonly libraryId: string; readonly bookUuid: string }
 export interface CalibreConnection { readonly libraryId: string; readonly name: string; readonly bookCount: number }
 export interface CalibreBook { readonly formats: readonly CalibreFormat[]; readonly uuid: string; readonly title: string; readonly authors: readonly string[]; readonly isbn13?: string; readonly match: "isbn" | "title-author" | "none" }
 export interface CalibreSearch { readonly books: readonly CalibreBook[]; readonly hasMore: boolean }
 
-export const EPUB_ATTACH_CHANNEL = "epub:attach";
-export const EPUB_OPEN_CHANNEL = "epub:open";
-export const EPUB_POSITION_CHANNEL = "epub:position";
+export const READER_ATTACH_CHANNEL = "reader:attach";
+export const READER_OPEN_CHANNEL = "reader:open";
+export const READER_POSITION_CHANNEL = "reader:position";
 
 export const PDF_BYTES_CHANNEL = "reader:pdf-bytes";
-export const EPUB_ANCHOR_CHANNEL = "epub:anchor";
-export const EPUB_BOOKMARKS_CHANNEL = "epub:bookmarks";
-export interface EpubBookmark { readonly chapter: number; readonly paragraph: number; readonly offset?: number }
+export const READER_ANCHOR_CHANNEL = "reader:anchor";
+export const READER_BOOKMARKS_CHANNEL = "reader:bookmarks";
+export const READER_RELOCATE_CHANNEL = "reader:relocate";
+export interface ReaderBookmark { readonly chapter: number; readonly paragraph: number; readonly offset?: number }
+/** Why a linked book file could not be opened; carried as `[book-file:<kind>(+calibre)]` in the error message. */
+export type ReaderFailureKind = "missing" | "changed" | "unreadable" | "invalid-link";
+export type ReaderRelocation =
+  | { readonly status: "cancelled" }
+  /** The chosen file is another edition; call relocate again with confirmation to link it. */
+  | { readonly status: "different-edition" }
+  | { readonly status: "relinked"; readonly document: ReaderDocument };
 
-export interface EpubDocument {
-  readonly format?: "epub" | "pdf";
+export interface ReaderDocument {
+  readonly format: "epub" | "pdf" | "article";
+  readonly source?: { readonly url: string; readonly capturedAt: number };
   readonly localAnchors?: Readonly<Record<string, string>>;
-  readonly bookmarks?: readonly EpubBookmark[];
+  readonly bookmarks?: readonly ReaderBookmark[];
+  /** The file is reached through a Calibre library link. */
+  readonly calibre?: boolean;
   readonly sha256: string;
   readonly chapters: readonly { readonly id: string; readonly title: string; readonly text: string; readonly html?: string; readonly styles?: string; readonly paragraphs?: readonly string[] }[];
   readonly position: { readonly chapter: number; readonly paragraph: number; readonly offset?: number };
 }
 
+export const ARTICLE_PREVIEW_CHANNEL = "article:preview";
+export const ARTICLE_SAVE_CHANNEL = "article:save";
+export const ARTICLE_CANCEL_CHANNEL = "article:cancel";
+export interface ArticlePreview {
+  readonly token: string; readonly url: string; readonly title: string; readonly author: string;
+  readonly excerpt: string; readonly paragraphs: number; readonly existing: boolean;
+}
+
 export interface LeaflogueBridge {
+  /** Desktop-only public web capture; full source text stays on this device. */
+  readonly articles?: {
+    preview(url: string, operationId: string): Promise<ArticlePreview>;
+    save(token: string): Promise<Book>;
+    cancel(operationId: string): Promise<void>;
+  };
   readonly calibre?: {
     describe(): Promise<CalibreConnection | undefined>;
     choose(): Promise<CalibreConnection | undefined>;
     search(bookId: BookId, query: string): Promise<CalibreSearch>;
-    link(bookId: BookId, bookUuid: string, format?: CalibreFormat): Promise<EpubDocument>;
+    link(bookId: BookId, bookUuid: string, format?: CalibreFormat): Promise<ReaderDocument>;
   };
   readonly catalog?: { search(query: string): Promise<CatalogSearch> };
   /** Desktop-only, local book files. Never automatically uploaded with library sync. */
-  readonly epub?: {
+  readonly reader?: {
     unlink?(bookId: BookId): Promise<void>;
-    attach(bookId: BookId): Promise<EpubDocument | undefined>;
-    open(bookId: BookId): Promise<EpubDocument | undefined>;
+    attach(bookId: BookId): Promise<ReaderDocument | undefined>;
+    open(bookId: BookId): Promise<ReaderDocument | undefined>;
     readPdf(bookId: BookId, sha256: string): Promise<Uint8Array>;
     saveAnchor(bookId: BookId, sha256: string, highlightId: HighlightId, location: string | null): Promise<Readonly<Record<string, string>>>;
-    saveBookmarks(bookId: BookId, sha256: string, bookmarks: readonly EpubBookmark[]): Promise<readonly EpubBookmark[]>;
+    saveBookmarks(bookId: BookId, sha256: string, bookmarks: readonly ReaderBookmark[]): Promise<readonly ReaderBookmark[]>;
     savePosition(bookId: BookId, sha256: string, chapter: number, paragraph: number, offset?: number): Promise<void>;
+    /** Choose where a moved book file is now. Pass true to link the file chosen last when it was another edition. */
+    relocate?(bookId: BookId, acceptDifferentEdition?: boolean): Promise<ReaderRelocation>;
   };
   readonly system: {
     getCapabilities(): Promise<SystemCapabilities>;

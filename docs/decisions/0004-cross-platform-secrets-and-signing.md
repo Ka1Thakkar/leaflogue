@@ -5,6 +5,19 @@ checksum" model for Linux is amended by
 [ADR 0007](0007-signed-updates-and-flathub.md): signed in-app updates from
 `v0.1.0`, Flathub as the recommended Linux install, and an optional checksum.
 
+## Implementation status — 24 November 2026
+
+The OS credential-store decision below remains unimplemented; it is a target,
+not a description of the shipped beta. Current builds use the protected config
+or environment workflow described in [ADR 0002](0002-protected-secret-config.md).
+POSIX permission checks do not establish Windows ACL protection, and current
+storage must not be described as encrypted by Keychain, DPAPI or Secret Service.
+The experimental unsigned Windows beta is documented in
+[beta validation](../beta-desktop-validation.md); its availability is an exception
+to the intended release gates below, not evidence those gates were completed.
+A credential-store migration and native Windows protection acceptance remain
+separate work requiring design and platform validation.
+
 ## Context
 
 ADR 0002 protects database and AI credentials in a configuration file held at

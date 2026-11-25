@@ -66,6 +66,64 @@ describe("Add book catalogue search", () => {
   });
 });
 
+/** Type into a details field the way a person does, so React sees the edit. */
+async function typeField(name: string, value: string) {
+  await act(async () => {
+    const field = container.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`)!;
+    const prototype = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(field, value);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const fieldValue = (name: string) => container.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`)!.value;
+const second = { ...item, providerId: "volume-2", title: "A quiet beginning (2nd edition)", authors: ["A Reader", "An Editor"], isbn13: "9780306406164", publisher: "Second Press" };
+async function searchCatalogue() {
+  container.querySelector<HTMLInputElement>('input[name="query"]')!.value = "reading";
+  await submit("Search book catalogue");
+}
+async function pick(index: number) {
+  await act(async () => { container.querySelectorAll<HTMLButtonElement>("li button")[index]!.click(); await tick(); });
+}
+
+describe("comparing catalogue editions", () => {
+  it("keeps a typed title when an edition is chosen, and fills only the untouched fields", async () => {
+    search.mockResolvedValue({ source: "google-books", items: [item, second] });
+    await typeField("title", "My own title");
+    await searchCatalogue();
+    await pick(0);
+    expect(fieldValue("title")).toBe("My own title");
+    expect(fieldValue("authors")).toBe("A Reader");
+    expect(fieldValue("isbn")).toBe(item.isbn13);
+    expect(container.textContent).toContain("Kept the title you typed");
+    // Another edition replaces what the first one filled, never what was typed.
+    await pick(1);
+    expect(fieldValue("title")).toBe("My own title");
+    expect(fieldValue("authors")).toBe("A Reader\nAn Editor");
+    expect(fieldValue("isbn")).toBe(second.isbn13);
+    await submit("Book details");
+    expect(createBook).toHaveBeenCalledWith({ title: "My own title", authors: ["A Reader", "An Editor"], isbn13: second.isbn13 });
+    expect(updateBookMetadata).toHaveBeenCalledWith(expect.objectContaining({ title: "My own title", publisher: "Second Press" }));
+  });
+
+  it("keeps a correction made to an edition's value when another edition is compared", async () => {
+    search.mockResolvedValue({ source: "google-books", items: [item, second] });
+    await searchCatalogue();
+    await pick(0);
+    await typeField("authors", "A. Reader");
+    await pick(1);
+    expect(fieldValue("authors")).toBe("A. Reader");
+    expect(fieldValue("title")).toBe(second.title);
+  });
+
+  it("fills a field the reader cleared when an edition is chosen again", async () => {
+    await typeField("title", "Draft");
+    await typeField("title", "");
+    await searchCatalogue();
+    await pick(0);
+    expect(fieldValue("title")).toBe(item.title);
+  });
+});
+
 async function typeQuery(value: string) {
   await act(async () => {
     const input = container.querySelector<HTMLInputElement>('input[name="query"]')!;

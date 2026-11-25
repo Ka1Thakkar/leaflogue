@@ -81,6 +81,10 @@
 .appearanceFields { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
 .appearanceFields select { max-width: 15rem; margin-top: 0; }
 .buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+/* What a backup holds, beside the button that makes one. */
+.backupScope { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.3rem 0.75rem; margin: 0.5rem 0 0; font-size: var(--text-sm); line-height: 1.5; }
+.backupScope dt { font: 600 var(--text-xs)/1.5 var(--font-condensed); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ui-dim); }
+.backupScope dd { margin: 0; color: var(--muted-foreground); }
 .status { margin-top: 0.75rem; color: var(--muted-foreground); font-size: var(--text-sm); line-height: 1.55; }
 .status:empty { display: none; }
 .panel .status { margin-top: 0.75rem; }

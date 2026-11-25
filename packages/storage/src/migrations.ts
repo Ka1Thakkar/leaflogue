@@ -995,6 +995,23 @@ export const migrations: readonly Migration[] = [
       colour TEXT NOT NULL CHECK (colour IN ('yellow','green','blue','pink','purple'))
     );`,
   },
+  {
+    version: 20,
+    // listHighlights checks provenance per row with
+    // EXISTS (SELECT 1 FROM source_annotations WHERE highlight_id = ...).
+    // Without this index every check scans the whole import table.
+    sql: `CREATE INDEX source_annotations_highlight ON source_annotations(highlight_id);`,
+  },
+  {
+    version: 21,
+    // Replay acknowledged, colour-less projections through the ordinary outbox
+    // before retiring the old backend compatibility journal. Current highlight
+    // state wins over an older journal value, including a later colour removal.
+    sql: `UPDATE highlights SET revision = revision + 1,
+      updated_at = max(updated_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+      WHERE deleted = 0 AND id IN (SELECT highlight_id FROM sync_deferred_colours);
+      DROP TABLE sync_deferred_colours;`,
+  },
 ];
 
 export const latestSchemaVersion = migrations.at(-1)?.version ?? 0;

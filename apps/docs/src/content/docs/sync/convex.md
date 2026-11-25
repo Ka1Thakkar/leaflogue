@@ -180,16 +180,13 @@ Do not create a replacement project, change the sync key, or reset your library.
 6. Choose **Check connection**, then **Sync now** in Leaflogue. Repeat Sync now
    if a large library reaches a bounded migration/sync limit.
 
-### During the transition
+### Matching desktop and backend versions
 
-This desktop can sync ordinary library data with a contract-23 backend while
-contract-24 highlight colours wait in a separate durable local queue. Text,
-notes, tags and other supported changes continue sending and receiving.
-The queue survives app restarts and SQLite backups. After upgrading the
-backend, the next sync sends the retained colours with fresh revisions.
+The desktop requires Convex schema 17 and mutation contract 24. Install the
+current desktop and deploy its matching backend bundle before syncing.
+Settings displays the installed and required versions and explains which needs
+an update. No data is exchanged with an incompatible backend.
 
-Settings displays the installed/required versions and explains which part needs
-an update. Older incompatible contracts (including contract 22, which cannot
-represent all current passage/thread data) may still pause sync to avoid losing
-information. Unsent edits remain local; fixing versions does not require
-re-importing your books.
+Unsent edits, including highlight colours, remain in the local database.
+SQLite migration 21 moves any previously deferred colour intent into the normal
+sync queue. Fixing versions does not require re-importing your books.

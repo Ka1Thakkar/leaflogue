@@ -11,13 +11,14 @@ function manifest(overrides: Record<string, unknown> = {}) {
   const version = (overrides.version as string | undefined) ?? "0.2.0";
   const architecture = (overrides.architecture as string | undefined) ?? "x64";
   return {
-    format: 1,
+    format: 2,
+    platform: "linux",
     product: "leaflogue",
     channel: "stable",
     version,
     architecture,
     releasedAt: "2026-10-01T00:00:00.000Z",
-    appImage: { name: `Leaflogue-${version}-${architecture === "x64" ? "x86_64" : "arm64"}.AppImage`, size: 100, sha512 },
+    artifact: { name: `Leaflogue-${version}-${architecture === "x64" ? "x86_64" : "arm64"}.AppImage`, size: 100, sha512 },
     ...overrides,
   };
 }
@@ -63,9 +64,9 @@ describe("signed update manifests", () => {
   it("refuse signed manifests with unexpected fields or a mismatched AppImage name", () => {
     expect(() => verifyAs(signed({ ...manifest(), url: "https://elsewhere.example/x" }))).toThrow(expect.objectContaining({ code: "format" }));
     const renamed = manifest();
-    expect(() => verifyAs(signed({ ...renamed, appImage: { ...renamed.appImage, name: "other.AppImage" } })))
+    expect(() => verifyAs(signed({ ...renamed, artifact: { ...renamed.artifact, name: "other.AppImage" } })))
       .toThrow(expect.objectContaining({ code: "format" }));
-    expect(() => verifyAs(signed({ ...renamed, appImage: { ...renamed.appImage, size: -1 } }))).toThrow(expect.objectContaining({ code: "format" }));
+    expect(() => verifyAs(signed({ ...renamed, artifact: { ...renamed.artifact, size: -1 } }))).toThrow(expect.objectContaining({ code: "format" }));
   });
 
   it("refuse malformed signature files", () => {

@@ -593,20 +593,14 @@ choose **Save connection**. Unsent changes stay queued until then.
 After updating the desktop, download and verify that release's Convex bundle,
 extract it, and run its `deploy.sh` again (`--production` for production). The
 new extracted directory asks you to select the existing project; it never needs
-the desktop sync key to deploy. This desktop accepts Convex schema 17 with
-mutation contracts 22–24. Contract 23 adds thread sync and contract 24 adds
-shared highlight colours. **Update every desktop first, then the deployment**:
-previous desktops accept contracts only up to 23 and refuse contract 24 until
-updated. Against contract 23, ordinary data continues syncing while unsupported colours are retained in a durable local queue until the backend is upgraded. Against a contract-22 deployment this desktop sends its queued
-changes in order until it reaches one that deployment cannot store (a thread,
-a new or edited passage, a book with reading history, or a daily pick). It
-stops there with "Update the Convex deployment…" in Settings, and that change
-and everything after it stay queued on this device. Sync does not pull until
-then. Once the deployment is updated, the next **Sync now** sends everything
-and nothing is dropped. **Check connection** names the exact release archive and
-deploy command when the backend is outside the window; sync stays off until it
-is compatible. **Sync now** applies bounded data migrations automatically before
-exchanging reading data.
+the desktop sync key to deploy. This desktop requires Convex schema 17 and
+mutation contract 24. Install the current desktop and deploy its matching bundle
+before syncing. **Check connection** names the exact release archive and deploy
+command on a version mismatch; no data is exchanged with a mismatched backend.
+Queued edits, including colours, remain in the local database. **Sync now**
+applies bounded database migrations before exchanging data. SQLite migration 21
+requeues any previously deferred colour intent through the ordinary outbox.
+
 
 ### Troubleshooting
 

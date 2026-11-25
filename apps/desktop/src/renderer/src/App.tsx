@@ -1,4 +1,3 @@
-import { migrateHighlightColours } from "./components/highlight-colours";
 import { ContextPanel, ContextPanelToggle, ContextWorkspaceProvider } from "./components/ContextPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Leaf, RefreshCw } from "./components/icons";
@@ -194,13 +193,7 @@ function Application() {
   const crumbs = [...baseCrumbs(route), ...(crumb ? [{ label: crumb }] : [])];
   const { expanded: sidebarExpanded, toggle: toggleSidebar } = sidebar;
   const syncOn = sync !== undefined && sync.state !== "off";
-  useEffect(() => {
-    if (!capabilities || capabilities.setupRequired) return;
-    const migrate = () => { void migrateHighlightColours().catch(() => undefined); };
-    migrate();
-    window.addEventListener("focus", migrate);
-    return () => window.removeEventListener("focus", migrate);
-  }, [capabilities]);
+
 
   const host = hostOf(capabilities?.host);
   const paletteShell = useMemo(() => ({ host, sidebarExpanded, toggleSidebar, syncOn }), [host, sidebarExpanded, toggleSidebar, syncOn]);
@@ -242,7 +235,8 @@ function Application() {
         <div id="content" tabIndex={-1} className="ui-main">
           <Page key={pageKey}>
             {route.name === "library" && <LibraryPage {...(route.collectionId ? { initialCollectionId: route.collectionId } : {})} {...(route.tagId ? { initialTagId: route.tagId } : {})} />}
-            {route.name === "book" && <BookPage bookId={route.bookId} focusHighlightId={route.highlightId} mergeWith={route.mergeWith} />}
+            {/* Keyed by book as well as by page, so a late reply for the previous book can never land on this one. */}
+            {route.name === "book" && <BookPage key={route.bookId} bookId={route.bookId} focusHighlightId={route.highlightId} mergeWith={route.mergeWith} />}
             {route.name === "highlights" && <HighlightsPage {...(route.search ? { initialSearch: route.search } : {})} {...(route.tagId ? { initialTagId: route.tagId } : {})} {...(route.bookId ? { initialBookId: route.bookId } : {})} />}
             {(route.name === "threads" || route.name === "thread") && <ThreadsPage {...(route.name === "thread" ? { selectedId: route.threadId } : {})} />}
             {route.name === "statistics" && <StatisticsPage />}

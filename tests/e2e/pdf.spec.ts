@@ -47,6 +47,7 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await expect(surround).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(reader.locator("body")).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(reader.locator("html")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await options.getByRole("tab", { name: "Appearance", exact: true }).click();
     await options.getByRole("switch", { name: "Dark mode", exact: true }).uncheck();
     await expect.poll(paperPixel).toEqual([255, 255, 255]);
     await expect(surround).toHaveCSS("background-color", "rgb(255, 255, 255)");
@@ -64,6 +65,7 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     await expect.poll(imagePixel).toEqual([82, 71, 66]);
     await expect(reader.locator("canvas")).toHaveCount(0);
     await options.getByRole("switch", { name: "Use theme colours", exact: true }).uncheck();
+    await options.getByRole("tab", { name: "Book", exact: true }).click();
     await options.getByRole("combobox", { name: "PDF zoom", exact: true }).click(); await page.getByRole("option", { name: "150%", exact: true }).click();
     await expect(reader.locator(".pdf-sheet").first()).toHaveCSS("transform", "matrix(1.5, 0, 0, 1.5, 0, 0)");
     await options.getByRole("combobox", { name: "PDF zoom", exact: true }).click(); await page.getByRole("option", { name: "Fit page", exact: true }).click();
@@ -83,7 +85,7 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     });
     await page.getByRole("toolbar", { name: "Selected text actions", exact: true }).getByRole("button", { name: "Highlight", exact: true }).click();
     await expect.poll(async () => page.evaluate(async (id) => (await window.leaflogue.library.getBookContents(id))!.highlights.length, saved.bookId)).toBe(2);
-    await expect.poll(async () => page.evaluate(async (id) => (await window.leaflogue.epub!.open(id))?.position.chapter, saved.bookId)).toBe(1);
+    await expect.poll(async () => page.evaluate(async (id) => (await window.leaflogue.reader!.open(id))?.position.chapter, saved.bookId)).toBe(1);
     await session.close(); session = await launch(profile); page = session.page;
     await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId);
     await page.getByRole("button", { name: "Read", exact: true }).click(); reader = page.frameLocator('iframe[title="PDF pages"]');
@@ -92,17 +94,20 @@ test("reads PDF pages and shares highlights and notes with the library", async (
     expect(contents!.highlights.some((h) => h.id === saved.highlightId && h.notes[0]?.markdown === "A shared note")).toBe(true);
     // One linked file, even across formats. Unlink is required before attaching another.
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await expect(page.evaluate(async (id) => window.leaflogue.epub!.attach(id), saved.bookId)).rejects.toThrow(/already/u);
-    await page.evaluate(async (id) => window.leaflogue.epub!.unlink!(id), saved.bookId);
+    await expect(page.evaluate(async (id) => window.leaflogue.reader!.attach(id), saved.bookId)).rejects.toThrow(/already/u);
+    await page.evaluate(async (id) => window.leaflogue.reader!.unlink!(id), saved.bookId);
     expect((await page.evaluate(async (id) => window.leaflogue.library.getBookContents(id), saved.bookId))!.highlights).toHaveLength(2);
     await session.chooseFile(resolve(__dirname, "../fixtures/local-reader.epub"));
-    await page.evaluate(async (id) => window.leaflogue.epub!.attach(id), saved.bookId);
+    await page.evaluate(async (id) => window.leaflogue.reader!.attach(id), saved.bookId);
     await session.close(); session = await launch(profile); page = session.page;
     await page.evaluate((id) => { location.hash = `#/library/${id}`; }, saved.bookId); await page.getByRole("button", { name: "Read", exact: true }).click();
+    // Both quotes are found in the EPUB; only the open chapter is painted, and the two sit in different chapters.
     await expect.poll(async () => page.locator('iframe[title="EPUB pages"]').evaluate((frame) => {
       const inner = (frame as HTMLIFrameElement).contentWindow as Window & typeof globalThis;
       return inner.CSS.highlights.get("leaflogue-saved")?.size ?? 0;
-    })).toBe(2);
+    })).toBe(1);
+    await page.frameLocator('iframe[title="EPUB pages"]').locator("body").click({ button: "right" });
+    await expect(page.getByRole("dialog", { name: "Reader options", exact: true }).getByText("Highlights in this book (2)")).toBeVisible();
     await session.close();
   } finally { await removeProfile(profile); }
 });
@@ -127,17 +132,20 @@ test("reads image-only PDFs without OCR messages or fabricated highlights", asyn
       const canvas = image.ownerDocument.createElement("canvas"); canvas.width = canvas.height = 1;
       canvas.getContext("2d")!.drawImage(image as HTMLImageElement, 0, 0);
       return Array.from(canvas.getContext("2d")!.getImageData(0, 0, 1, 1).data);
-    })).toEqual([255, 255, 255, 255]);
+    })).toEqual([0, 0, 0, 255]);
+    // The next page is painted ahead, so turning to it never shows a blank sheet.
+    await expect(reader.locator('article[data-chapter="1"] .pdf-page-image')).toHaveAttribute("data-rendered", "true");
+    await expect(reader.locator('article[data-chapter="1"] .pdf-sheet')).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(reader.locator("[data-paragraph]")).toHaveCount(0);
     await expect(page.getByText(/OCR|Image-only page/)).toHaveCount(0);
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } }); await page.keyboard.press("PageDown");
-    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.position.chapter, id)).toBe(1);
+    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.reader!.open(bookId))?.position.chapter, id)).toBe(1);
     await session.close();
   } finally { await removeProfile(profile); }
 });
 
 
-test("preserves the original page when text overlaps artwork", async () => {
+test("keeps text over artwork in place and tones the whole page to the reader's paper", async () => {
   const profile = createProfile();
   try {
     const file = join(profile.files, "overlap.pdf"); await writeFile(file, readerPdf(false, undefined, "overlap"));
@@ -153,7 +161,7 @@ test("preserves the original page when text overlaps artwork", async () => {
       const canvas = image.ownerDocument.createElement("canvas"); canvas.width = canvas.height = 1;
       canvas.getContext("2d")!.drawImage(image as HTMLImageElement, 0, 0);
       return Array.from(canvas.getContext("2d")!.getImageData(0, 0, 1, 1).data);
-    })).toEqual([255, 255, 255, 255]);
+    })).toEqual([0, 0, 0, 255]);
     await session.close();
   } finally { await removeProfile(profile); }
 });

@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { crc32 } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { EpubStore, epubText, parseEpub } from "./epub";
+import { epubText, parseEpub } from "./epub";
+import { ReaderStore } from "./reader-store";
+import { utimes } from "node:fs/promises";
 
 /** Minimal ZIP fixtures with real central directory and CRCs, no external tools. */
 function zip(files: Record<string, string | Buffer>): Buffer {
@@ -68,10 +70,10 @@ describe("local EPUB reader", () => {
     const id = "12345678-1234-4234-8234-123456789abc"; const highlightId = "22345678-1234-4234-8234-123456789abc";
     try {
       const source = join(root, "book.epub"); const bytes = zip(files); await writeFile(source, bytes);
-      const store = new EpubStore(root); const book = await store.attach(id, source);
+      const store = new ReaderStore(root); const book = await store.attach(id, source);
       const location = `epub:${book.sha256}:0:1:0:1:3`;
       await store.saveAnchor(id, book.sha256, highlightId, location);
-      expect((await new EpubStore(root).open(id))?.localAnchors).toEqual({ [highlightId]: location });
+      expect((await new ReaderStore(root).open(id))?.localAnchors).toEqual({ [highlightId]: location });
       for (const invalid of [`epub:other:0:1:0:1:3`, `epub:${book.sha256}:99:1:0:1:3`, `epub:${book.sha256}:0:1:9:1:3`, `epub:${book.sha256}:0:1:0:1:999`, `epub:${book.sha256}:0:1:-1:1:3`]) await expect(store.saveAnchor(id, book.sha256, highlightId, invalid)).rejects.toThrow();
       expect(await readFile(source)).toEqual(bytes);
       await store.saveAnchor(id, book.sha256, highlightId, null);
@@ -86,10 +88,10 @@ describe("local EPUB reader", () => {
     try {
       const source = join(root, "book.epub"); const bytes = zip(files);
       await writeFile(source, bytes);
-      const store = new EpubStore(root); const document = await store.attach(id, source);
+      const store = new ReaderStore(root); const document = await store.attach(id, source);
       const bookmarks = [{ chapter: 0, paragraph: 1, offset: 2 }];
       await store.saveBookmarks(id, document.sha256, bookmarks);
-      expect((await new EpubStore(root).open(id))?.bookmarks).toEqual(bookmarks);
+      expect((await new ReaderStore(root).open(id))?.bookmarks).toEqual(bookmarks);
       await expect(store.saveBookmarks(id, "other-edition", [])).rejects.toThrow(/edition/u);
       for (const invalid of [[{ chapter: 9, paragraph: 0 }], [{ chapter: 0, paragraph: 1, offset: 999 }], [bookmarks[0], bookmarks[0]], Array(501).fill(bookmarks[0]), null]) await expect(store.saveBookmarks(id, document.sha256, invalid)).rejects.toThrow();
       expect((await store.open(id))?.bookmarks).toEqual(bookmarks);
@@ -104,21 +106,21 @@ describe("local EPUB reader", () => {
     const root = await mkdtemp(join(tmpdir(), "leaflogue-epub-"));
     const id = "12345678-1234-4234-8234-123456789abc";
     try {
-      const store = new EpubStore(root);
+      const store = new ReaderStore(root);
       expect(await store.open(id)).toBeUndefined();
       const bytes = zip(files);
       const source = join(root, "original.epub");
       await writeFile(source, bytes);
       const document = await store.attach(id, source);
       await store.savePosition(id, document.sha256, 0, 2);
-      expect((await new EpubStore(root).open(id))?.position).toEqual({ chapter: 0, paragraph: 2 });
+      expect((await new ReaderStore(root).open(id))?.position).toEqual({ chapter: 0, paragraph: 2 });
       expect(await readFile(source)).toEqual(bytes);
       await expect(store.attach(id, source)).rejects.toThrow(/already/u);
       await expect(store.savePosition(id, "different-edition", 0, 0)).rejects.toThrow();
       await expect(store.savePosition(id, document.sha256, -1, 0)).rejects.toThrow();
       await expect(store.savePosition(id, document.sha256, 0, 999)).rejects.toThrow();
       await store.savePosition(id, document.sha256, 0, 1, 3);
-      expect((await new EpubStore(root).open(id))?.position).toEqual({ chapter: 0, paragraph: 1, offset: 3 });
+      expect((await new ReaderStore(root).open(id))?.position).toEqual({ chapter: 0, paragraph: 1, offset: 3 });
       await expect(store.savePosition(id, document.sha256, 0, 1, 9999)).rejects.toThrow();
       await expect(store.open("../../outside")).rejects.toThrow();
       expect((await readdir(root)).filter((name) => name.endsWith(".epub"))).toEqual(["original.epub"]);
@@ -126,6 +128,114 @@ describe("local EPUB reader", () => {
       await expect(store.open(id)).rejects.toThrow(/changed/u);
       await rm(source);
       await expect(store.open(id)).rejects.toThrow(/moved or is unavailable/u);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+});
+
+describe("linked book state", () => {
+  const id = "12345678-1234-4234-8234-123456789abc";
+  async function linked(prefix: string) {
+    const root = await mkdtemp(join(tmpdir(), prefix));
+    const source = join(root, "book.epub"); await writeFile(source, zip(files));
+    let parses = 0;
+    const store = new ReaderStore(root, undefined, (bytes) => { parses++; return parseEpub(bytes); });
+    const document = await store.attach(id, source);
+    return { root, source, store, document, parses: () => parses };
+  }
+  it("saves positions, bookmarks and reviewed locations without parsing the book again", async () => {
+    const { root, source, store, document, parses } = await linked("leaflogue-parse-cache-");
+    try {
+      await store.open(id);
+      for (let index = 0; index < 20; index++) await store.savePosition(id, document.sha256, 0, index % 3, index % 2);
+      await store.saveBookmarks(id, document.sha256, [{ chapter: 0, paragraph: 1 }]);
+      await store.saveAnchor(id, document.sha256, "22345678-1234-4234-8234-123456789abc", `epub:${document.sha256}:0:1:0:1:3`);
+      await store.open(id);
+      // Linking parsed the book once; opening and every save reuse that parse.
+      expect(parses()).toBe(1);
+      expect((await store.open(id))?.bookmarks).toEqual([{ chapter: 0, paragraph: 1, offset: 0 }]);
+      // A changed file is noticed by its size and modification time, keeping edition protection.
+      await writeFile(source, zip({ ...files, "OPS/second.xhtml": "<html><body><p>Edited edition</p></body></html>" }));
+      await utimes(source, new Date(), new Date(Date.now() + 5000));
+      await expect(store.savePosition(id, document.sha256, 0, 0)).rejects.toThrow(/changed/u);
+      // Unlinking forgets the cached edition.
+      await store.unlink(id);
+      await expect(store.savePosition(id, document.sha256, 0, 0)).rejects.toThrow(/invalid/u);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("opens a book whose optional sidecars are damaged and keeps the damaged files for recovery", async () => {
+    const { root, store, document } = await linked("leaflogue-sidecars-");
+    try {
+      for (const [suffix, body] of [["anchors.json", "null"], ["bookmarks.json", "null"], ["json", "null"]] as const) await writeFile(join(root, `${id}.${suffix}`), body);
+      const opened = await store.open(id);
+      expect(opened?.sha256).toBe(document.sha256);
+      expect(opened?.position).toEqual({ chapter: 0, paragraph: 0 });
+      expect(opened?.bookmarks).toBeUndefined();
+      expect((await readdir(root)).filter((name) => name.includes(".corrupt-")).length).toBe(3);
+      // Malformed JSON and hash-matching but malformed bookmarks also stop blocking the book.
+      await writeFile(join(root, `${id}.anchors.json`), "{not json");
+      await writeFile(join(root, `${id}.bookmarks.json`), JSON.stringify({ sha256: document.sha256, bookmarks: [{ chapter: 0, paragraph: 1 }, null, { chapter: 9, paragraph: 0 }, { chapter: 0, paragraph: 1 }] }));
+      await writeFile(join(root, `${id}.json`), JSON.stringify({ sha256: document.sha256, chapter: "x" }));
+      const recovered = await store.open(id);
+      expect(recovered?.bookmarks).toEqual([{ chapter: 0, paragraph: 1, offset: 0 }]);
+      expect(recovered?.localAnchors).toBeUndefined();
+      expect((await new ReaderStore(root).open(id))?.bookmarks).toEqual([{ chapter: 0, paragraph: 1, offset: 0 }]);
+      expect((await readdir(root)).filter((name) => name.includes(".corrupt-")).length).toBe(5);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("relinks a moved file of the same edition and keeps every piece of local state", async () => {
+    const { root, source, store, document } = await linked("leaflogue-relocate-");
+    try {
+      const highlight = "22345678-1234-4234-8234-123456789abc"; const location = `epub:${document.sha256}:0:1:0:1:3`;
+      await store.savePosition(id, document.sha256, 0, 2);
+      await store.saveBookmarks(id, document.sha256, [{ chapter: 1, paragraph: 0 }]);
+      await store.saveAnchor(id, document.sha256, highlight, location);
+      const moved = join(root, "moved.epub"); await writeFile(moved, await readFile(source)); await rm(source);
+      await expect(store.open(id)).rejects.toThrow(/\[book-file:missing\]/u);
+      const result = await store.relocate(id, moved);
+      expect(result.status).toBe("relinked");
+      const reopened = await new ReaderStore(root).open(id);
+      expect(reopened?.position).toEqual({ chapter: 0, paragraph: 2 });
+      expect(reopened?.bookmarks).toEqual([{ chapter: 1, paragraph: 0, offset: 0 }]);
+      expect(reopened?.localAnchors).toEqual({ [highlight]: location });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("links another edition only after confirmation, keeping bookmarks that still exist", async () => {
+    const { root, source, store, document } = await linked("leaflogue-relocate-edition-");
+    try {
+      await store.savePosition(id, document.sha256, 0, 2);
+      await store.saveBookmarks(id, document.sha256, [{ chapter: 0, paragraph: 0 }, { chapter: 0, paragraph: 2 }]);
+      const other = join(root, "other.epub");
+      await writeFile(other, zip({ ...files, "OPS/first.xhtml": "<html><body><p>Only one paragraph now.</p></body></html>" }));
+      await writeFile(source, zip({ ...files, "OPS/second.xhtml": "<html><body><p>Edited edition</p></body></html>" }));
+      await expect(store.open(id)).rejects.toThrow(/\[book-file:changed\]/u);
+      expect(await store.relocate(id, other)).toEqual({ status: "different-edition" });
+      await expect(store.open(id)).rejects.toThrow(/changed/u);
+      const result = await store.relocate(id, other, true);
+      if (result.status !== "relinked") throw new Error("Expected a relinked book");
+      expect(result.document.sha256).not.toBe(document.sha256);
+      expect(result.document.bookmarks).toEqual([{ chapter: 0, paragraph: 0, offset: 0 }]);
+      expect(result.document.position).toEqual({ chapter: 0, paragraph: 0 });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("reports unreadable files and damaged links with their own failure kinds", async () => {
+    const { root, source, store } = await linked("leaflogue-failure-kinds-");
+    try {
+      await writeFile(source, "not a book");
+      await expect(store.open(id)).rejects.toThrow(/\[book-file:unreadable\]/u);
+      await writeFile(join(root, `${id}.attachment.json`), "null");
+      await expect(store.open(id)).rejects.toThrow(/\[book-file:invalid-link\]/u);
+      await store.unlink(id);
+      expect(await store.open(id)).toBeUndefined();
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("leaves Calibre-linked books to the Calibre reconnect path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "leaflogue-relocate-calibre-"));
+    try {
+      const source = join(root, "book.epub"); await writeFile(source, zip(files));
+      await new ReaderStore(root, async () => source).attach(id, source, { libraryRoot: root, libraryId: id, bookUuid: id, format: "EPUB" });
+      const store = new ReaderStore(root, async () => { throw new Error("gone"); });
+      await expect(store.open(id)).rejects.toThrow(/\[book-file:missing\+calibre\]/u);
+      await expect(store.relocate(id, source)).rejects.toThrow(/Calibre/u);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 });

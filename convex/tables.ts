@@ -72,6 +72,9 @@ export const leaflogueTables = {
   })
     .index("by_library_and_id", ["libraryId", "id"])
     .index("by_library_archived_and_id", ["libraryId", "archived", "id"])
+    // The web shelf: live (not archived, not deleted) books only, so
+    // tombstones never take places in its bounded read.
+    .index("by_library_archived_deleted_and_id", ["libraryId", "archived", "deletedAt", "id"])
     .index("by_library_and_isbn13", ["libraryId", "isbn13"]),
 
   readingStatusEvents: defineTable({
@@ -181,7 +184,8 @@ export const leaflogueTables = {
     .index("by_library_deleted_and_updated", ["libraryId", "deletedAt", "updatedAt"])
     .index("by_library_book_deleted_and_created", ["libraryId", "bookId", "deletedAt", "createdAt"])
     .index("by_library_book_deleted_and_updated", ["libraryId", "bookId", "deletedAt", "updatedAt"])
-    .searchIndex("search_text", { searchField: "text", filterFields: ["libraryId", "bookId", "deletedAt"] }),
+    // `id` lets a note-body search ask whether a passage already matched on its own text.
+    .searchIndex("search_text", { searchField: "text", filterFields: ["libraryId", "bookId", "deletedAt", "id"] }),
 
   notes: defineTable({
     libraryId: v.string(),
@@ -200,7 +204,9 @@ export const leaflogueTables = {
     .index("by_library_attachment_ready_and_id", ["libraryId", "attachmentBoundsReady", "id"])
     .index("by_library_and_book", ["libraryId", "bookId"])
     .index("by_library_and_highlight", ["libraryId", "highlightId"])
-    .index("by_library_highlight_and_deleted", ["libraryId", "highlightId", "deletedAt"]),
+    .index("by_library_highlight_and_deleted", ["libraryId", "highlightId", "deletedAt"])
+    // Passage search also matches words in a passage's notes.
+    .searchIndex("search_markdown", { searchField: "markdown", filterFields: ["libraryId", "bookId", "highlightId", "deletedAt"] }),
 
   collections: defineTable({
     libraryId: v.string(),

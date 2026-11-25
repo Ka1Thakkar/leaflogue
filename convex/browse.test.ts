@@ -136,13 +136,12 @@ describe("browsing a library", () => {
 
     expect(texts(await owner.query(highlights, { libraryId, notes: "with", paginationOpts: page() }))).toEqual(["Every pane held a season."]);
     expect(texts(await owner.query(highlights, { libraryId, notes: "without", paginationOpts: page() }))).toHaveLength(2);
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", paginationOpts: page() })))
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), paginationOpts: page() })))
       .toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", bookId: ATLAS, paginationOpts: page() })))
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), bookId: ATLAS, paginationOpts: page() })))
       .toEqual(["Rain is a map of where the sky has been."]);
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", dateKind: "imported", paginationOpts: page() }))).toEqual([]);
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), dateKind: "imported", paginationOpts: page() }))).toEqual([]);
     expect(texts(await owner.query(highlights, { libraryId, source: "imported", paginationOpts: page() }))).toEqual([]);
-    await expect(owner.query(highlights, { libraryId, date: "2026-02-30", paginationOpts: page() })).rejects.toThrow("valid calendar date");
   });
 
   it("shows threads with their passages, and what a passage belongs to", async () => {
@@ -177,5 +176,122 @@ describe("browsing a library", () => {
     expect(rows.filter((row) => row.deletedAt !== undefined)).toHaveLength(1);
     expect(Object.keys(rows[0]!)).not.toContain("libraryId");
     expect(Object.keys(rows[0]!)).not.toContain("_id");
+  });
+});
+
+/** Every page of a passage query, read the way the web client reads it. */
+async function allPassages(read: (cursor: string | null) => Promise<Page>): Promise<Passage[]> {
+  const seen: Passage[] = [];
+  let cursor: string | null = null;
+  for (let round = 0; round < 50; round += 1) {
+    const result = await read(cursor);
+    seen.push(...result.page);
+    if (result.isDone) return seen;
+    cursor = result.continueCursor;
+  }
+  throw new Error("Paging did not finish");
+}
+
+const createNote = m<{ id: string; revision: number }>("runtime:createNote");
+const updateNote = m<{ id: string; revision: number }>("runtime:updateNote");
+const deleteNote = m("runtime:deleteNote");
+
+describe("web parity with the other backends", () => {
+  it("keeps deleted books from crowding live ones off the shelf", async () => {
+    const { t, owner, libraryId } = await library();
+    // More tombstones than the shelf bound, all sorting before a live book.
+    await t.run(async (ctx) => {
+      for (let n = 0; n < 2_001; n += 1) {
+        await ctx.db.insert("books", {
+          libraryId, id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`, title: `Gone ${n}`, authors: [],
+          status: "unread", archived: false, deletedAt: 1, highlightCount: 0, noteCount: 0, readingDataBytes: 0,
+          revision: 2, createdAt: 1, updatedAt: 1,
+        });
+      }
+    });
+    const shelf = await owner.query(books, { libraryId });
+    expect(shelf.map((entry) => entry.title).sort()).toEqual(["An Atlas of Rain", "The Glass Orchard"]);
+  });
+
+  it("still refuses a shelf with more than 2,000 live books", async () => {
+    const { t, owner, libraryId } = await library();
+    await t.run(async (ctx) => {
+      for (let n = 0; n < 1_999; n += 1) {
+        await ctx.db.insert("books", {
+          libraryId, id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`, title: `Live ${n}`, authors: [],
+          status: "unread", archived: false, highlightCount: 0, noteCount: 0, readingDataBytes: 0,
+          revision: 1, createdAt: 1, updatedAt: 1,
+        });
+      }
+    });
+    await expect(owner.query(books, { libraryId })).rejects.toThrow("too many books");
+  });
+
+  it("shows every note on a passage past fifty", async () => {
+    const { owner, libraryId, first } = await library();
+    for (let n = 0; n < 50; n += 1) {
+      await owner.mutation(createNote, { libraryId, id: id(1_000 + n), bookId: ORCHARD, highlightId: first.id, markdown: `Note ${n}` });
+    }
+    // The passage was written with one note already, so it now has 51.
+    const shown = await owner.query(highlight, { libraryId, highlightId: first.id });
+    expect(shown?.notes).toHaveLength(51);
+    const listed = (await owner.query(highlights, { libraryId, bookId: ORCHARD, paginationOpts: page() })).page
+      .find((passage) => passage.id === first.id);
+    expect(listed?.notes).toHaveLength(51);
+  });
+
+  it("finds passages by words in their notes, once each, and never by deleted notes", async () => {
+    const { owner, libraryId, third } = await library();
+    // id(1)'s note is "Seasons as windows."; give id(3) two notes that match too.
+    const lantern = await owner.mutation(createNote, { libraryId, id: id(501), bookId: ATLAS, highlightId: third.id, markdown: "Windows like lanterns" });
+    await owner.mutation(createNote, { libraryId, id: id(502), bookId: ATLAS, highlightId: third.id, markdown: "More windows" });
+    // A book note matches but belongs to no passage.
+    await owner.mutation(createNote, { libraryId, id: id(503), bookId: ORCHARD, markdown: "windows everywhere" });
+    // Text and note both match: still listed once.
+    await owner.mutation(createNote, { libraryId, id: id(504), bookId: ORCHARD, highlightId: id(2), markdown: "weather windows" });
+
+    const search = (term: string, extra: Args = {}) => allPassages((cursor) =>
+      owner.query(highlights, { libraryId, search: term, ...extra, paginationOpts: { numItems: 1, cursor } }));
+    const found = await search("windows");
+    expect(found.map((passage) => passage.id).sort()).toEqual([id(1), id(2), id(3)].sort());
+    expect((await search("weather")).map((passage) => passage.id)).toEqual([id(2)]);
+    expect((await search("windows", { bookId: ATLAS })).map((passage) => passage.id)).toEqual([id(3)]);
+
+    // Only a deleted note mentions lanterns; an edit removes the other mention.
+    expect((await search("lanterns")).map((passage) => passage.id)).toEqual([id(3)]);
+    await owner.mutation(deleteNote, { libraryId, id: id(501), bookId: ATLAS, expectedRevision: lantern.revision });
+    expect(await search("lanterns")).toEqual([]);
+    const seasons = await owner.query(highlight, { libraryId, highlightId: id(1) }) as unknown as { notes: { id: string; revision: number }[] };
+    await owner.mutation(updateNote, { libraryId, id: seasons.notes[0]!.id, bookId: ORCHARD, markdown: "Seasons as panes.", expectedRevision: seasons.notes[0]!.revision });
+    expect((await search("windows")).map((passage) => passage.id).sort()).toEqual([id(2), id(3)].sort());
+  });
+
+  it("filters by an exact local day, including the hours before UTC midnight", async () => {
+    const { owner, libraryId } = await library();
+    // 01:30 on 3 January in India (UTC+5:30) is still 2 January in UTC.
+    vi.setSystemTime(Date.UTC(2026, 0, 2, 20));
+    await owner.mutation(createHighlight, { libraryId, id: id(601), bookId: ORCHARD, text: "Early in Kolkata." });
+    // 19:00 on 3 January in California (UTC-8) is already 4 January in UTC.
+    vi.setSystemTime(Date.UTC(2026, 0, 4, 3));
+    await owner.mutation(createHighlight, { libraryId, id: id(602), bookId: ORCHARD, text: "Late in Oakland." });
+
+    const day = async (start: number, args: Args = {}) => (await allPassages((cursor) => owner.query(highlights, {
+      libraryId, dateFrom: start, dateBefore: start + 24 * 60 * 60 * 1000, ...args, paginationOpts: { numItems: 50, cursor },
+    }))).map((passage) => passage.text);
+    const india = Date.UTC(2026, 0, 3) - 5.5 * 60 * 60 * 1000;
+    const california = Date.UTC(2026, 0, 3) + 8 * 60 * 60 * 1000;
+    expect(await day(india)).toEqual(["Early in Kolkata.", "The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
+    expect(await day(india, { bookId: ATLAS })).toEqual(["Rain is a map of where the sky has been."]);
+    expect(await day(india, { search: "kolkata" })).toEqual(["Early in Kolkata."]);
+    expect(await day(california)).toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been.", "Late in Oakland."]);
+    expect(await day(california, { search: "kolkata" })).toEqual([]);
+    // Passages just outside the span are left out.
+    expect(await day(india + 24 * 60 * 60 * 1000)).not.toContain("Early in Kolkata.");
+
+    // UTC ranges and invalid millisecond bounds use the same protocol.
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), paginationOpts: page() })))
+      .toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
+    await expect(owner.query(highlights, { libraryId, dateFrom: india, dateBefore: 0.5, paginationOpts: page() })).rejects.toThrow("whole milliseconds");
+    await expect(owner.query(highlights, { libraryId, dateFrom: 0.5, paginationOpts: page() })).rejects.toThrow("whole milliseconds");
   });
 });

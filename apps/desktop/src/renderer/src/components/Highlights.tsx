@@ -1,5 +1,5 @@
 import { HighlightColourPicker } from "./HighlightColourPicker";
-import { currentHighlightPalette, highlightColour, useHighlightColours } from "./highlight-colours";
+import { useHighlightPalette, highlightColour } from "./highlight-colours";
 import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
@@ -22,10 +22,15 @@ import { HighlightTags, HighlightThreads, ImportedOriginal, PassageContext } fro
 
 const PAGE_SIZE = 20;
 
-function Annotation({ highlight, showBook, focused = false }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean }) {
+/**
+ * `refreshList` re-reads this list only. Forms and note cards announce their own
+ * change with `leaflogue:annotations-changed`, so announcing it again from the
+ * list would make every listener (the book page, the reader) refresh twice.
+ */
+function Annotation({ highlight, showBook, focused = false, refreshList }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean; readonly refreshList: () => Promise<void> }) {
   const contextWorkspace = useContextWorkspace();
-  const colours = useHighlightColours();
-  const highlightInk = currentHighlightPalette()[highlightColour(highlight, colours)].ink;
+  const palette = useHighlightPalette();
+  const highlightInk = palette[highlightColour(highlight)].ink;
   const { tags, reload, readOnly, aiEnabled, activeId, setActiveId } = useContext(PassageContext);
   const [confirm, confirmDialog] = useConfirm();
   const [editing, setEditing] = useState(false);
@@ -89,20 +94,20 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
       </div>
       {deleted && !error && <p role="status" className="ll-muted">Highlight deleted.</p>}
       {editing ? (
-        <HighlightForm bookId={highlight.bookId} highlight={highlight} onClose={() => setEditing(false)} onSaved={reload} />
+        <HighlightForm bookId={highlight.bookId} highlight={highlight} onClose={() => setEditing(false)} onSaved={refreshList} />
       ) : (
         <div className={styles.record}>
           <div className={styles.passage}>
             <blockquote className={styles.quote}>
               <PassageText text={highlight.text} />
             </blockquote>
-            {window.leaflogue.epub && contextWorkspace && <button className={styles.contextLink} onClick={() => contextWorkspace.showPassage(highlight)}><BookOpen size={15} aria-hidden="true" />Read in context</button>}
-            {highlight.notes.map((note) => <NoteCard key={note.id} note={note} readOnly={readOnly} onSaved={reload} />)}
+            {window.leaflogue.reader && contextWorkspace && <button className={styles.contextLink} onClick={() => contextWorkspace.showPassage(highlight)}><BookOpen size={15} aria-hidden="true" />Read in context</button>}
+            {highlight.notes.map((note) => <NoteCard key={note.id} note={note} readOnly={readOnly} onSaved={refreshList} />)}
             {tagNames.length > 0 && <ul className={styles.tagChips} aria-label="Tags">{tagNames.map((tag) => <li key={tag.id}>{tag.name}</li>)}</ul>}
           </div>
           {!readOnly && !deleted && (
             <div className={styles.actions}>
-              <HighlightColourPicker highlight={highlight} onSaved={reload} />
+              <HighlightColourPicker highlight={highlight} onSaved={refreshList} />
               {aiEnabled && (
                 <button className="ll-icon-button" aria-label="Explain this passage" title="Explain this passage" ref={explainTrigger} onClick={() => contextWorkspace?.showAssistant({ highlight, reload, readOnly })}><Sparkles size={18} aria-hidden="true" /></button>
               )}
@@ -113,7 +118,7 @@ function Annotation({ highlight, showBook, focused = false }: { readonly highlig
                 {(close) => <HighlightTags highlight={highlight} onClose={close} />}
               </Dialog>
               <Dialog label="Add another note" title="Add a note" icon={StickyNote} iconOnly triggerRef={noteTrigger}>
-                {(close) => <NoteForm bookId={highlight.bookId} highlightId={highlight.id} onClose={close} onSaved={reload} />}
+                {(close) => <NoteForm bookId={highlight.bookId} highlightId={highlight.id} onClose={close} onSaved={refreshList} />}
               </Dialog>
               <button className="ll-icon-button" aria-label="Edit quote" title="Edit quote" disabled={pending} onClick={() => setEditing(true)}>
                 <Pencil size={18} aria-hidden="true" />
@@ -174,7 +179,6 @@ export function HighlightList({
   aiEnabled = false,
   tags,
   version,
-  onChanged,
 }: {
   readonly bookId?: BookId;
   readonly filters: HighlightFilters;
@@ -183,7 +187,6 @@ export function HighlightList({
   readonly aiEnabled?: boolean;
   readonly tags: readonly Tag[];
   readonly version?: number;
-  readonly onChanged?: () => void;
 }) {
   const search = useDeferredValue(filters.search.trim());
   const [results, setResults] = useState<readonly HighlightListEntry[]>();
@@ -256,11 +259,13 @@ export function HighlightList({
     void load(Math.max(PAGE_SIZE, loaded.current));
   }, [version]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const refreshList = useCallback(() => load(Math.max(PAGE_SIZE, loaded.current), true), [load]);
+  // For changes that nothing else announces, such as deleting a passage or
+  // changing its tags: refresh here, then tell the book page and the reader.
   const reload = useCallback(async () => {
-    await load(Math.max(PAGE_SIZE, loaded.current), true);
-    onChanged?.();
+    await refreshList();
     window.dispatchEvent(new Event("leaflogue:annotations-changed"));
-  }, [load, onChanged]);
+  }, [refreshList]);
 
   // Appends the next page instead of re-reading everything already shown.
   const loadingMoreRef = useRef(false);
@@ -340,7 +345,7 @@ export function HighlightList({
             )}
             {results.length > 0 && (
               <div className={`ui-panel ${styles.passageList}`}>
-                {results.map((highlight) => <Annotation key={highlight.id} highlight={highlight} showBook={!bookId} focused={highlight.id === focusHighlightId} />)}
+                {results.map((highlight) => <Annotation key={highlight.id} highlight={highlight} showBook={!bookId} focused={highlight.id === focusHighlightId} refreshList={refreshList} />)}
               </div>
             )}
             {hasMore && (
@@ -362,7 +367,6 @@ export function HighlightBrowser({
   focusHighlightId,
   readOnly,
   version,
-  onChanged,
   initialSearch,
   initialTagId,
   initialBookId,
@@ -374,7 +378,6 @@ export function HighlightBrowser({
   readonly focusHighlightId?: HighlightId;
   readonly readOnly?: boolean;
   readonly version?: number;
-  readonly onChanged?: () => void;
 }) {
   const [filters, setFilters] = useState<HighlightFilters>(() => ({
     ...DEFAULT_FILTERS,
@@ -493,7 +496,6 @@ export function HighlightBrowser({
           aiEnabled={aiEnabled}
           tags={tags}
           version={version}
-          onChanged={onChanged}
         />
       )}
     </>

@@ -1,5 +1,6 @@
+import { HIGHLIGHT_COLOURS } from "@leaflogue/contracts";
 import { v } from "convex/values";
-export const highlightColourValidator = v.union(v.literal("yellow"), v.literal("green"), v.literal("blue"), v.literal("pink"), v.literal("purple"));
+export const highlightColourValidator = v.union(...HIGHLIGHT_COLOURS.map((colour) => v.literal(colour)));
 const readingStatus = v.union(
   v.literal("unread"),
   v.literal("reading"),

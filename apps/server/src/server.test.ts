@@ -253,6 +253,9 @@ describe("API", () => {
     expect(await run(cookie, "library:createBook")).toMatchObject({ http: 404, errorData: { code: "LEAFLOGUE_FUNCTION_UNKNOWN" } });
     expect(await run(cookie, "runtime:createNote", { libraryId, id: randomUUID(), bookId: randomUUID(), markdown: "x", origin: "import" }))
       .toMatchObject({ http: 400, errorData: { code: "LEAFLOGUE_REQUEST_INVALID" } });
+    // Exact local-day bounds are accepted beside the older UTC date.
+    expect(await value(cookie, "browse:highlights", { libraryId, dateFrom: 0, dateBefore: 86_400_000, paginationOpts: { numItems: 10, cursor: null } }))
+      .toMatchObject({ page: [], isDone: true });
     expect(await run(undefined, "reading:listBooks", { libraryId, paginationOpts: { numItems: 10, cursor: null } }))
       .toMatchObject({ http: 401, errorData: { code: "LEAFLOGUE_AUTH_REQUIRED" } });
     expect(await run(cookie, "reading:listBooks", { libraryId: randomUUID(), paginationOpts: { numItems: 10, cursor: null } }))

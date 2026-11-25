@@ -112,11 +112,10 @@ signed beta updates through **Settings → Updates → Install and restart**.
 Windows ZIP/Linux tarball copies remain manual. This is a beta feed, not a
 stable update channel.
 
-This release uses local SQLite schema **19**, PostgreSQL schema **14**, and
-Convex schema **17**, mutation contract **24**. The desktop accepts Convex
-contracts **22–24**. Update desktops before updating the deployment. Contract
-23 continues ordinary data sync while unsupported colours wait locally;
-contract 22 may pause changes it cannot represent. Follow the
+This release uses local SQLite schema **21**, PostgreSQL schema **14**, and
+Convex schema **17**, mutation contract **24**. The desktop requires the current
+contract. Install the desktop and deploy its matching bundle before syncing;
+pending edits remain local until versions match. Follow the
 [backend upgrade guide](/sync/convex/#upgrading-an-existing-deployment).
 Back up your library before changing versions.
 

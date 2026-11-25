@@ -4,7 +4,7 @@ import { aiAvailable } from "../palette/actions";
 import { href, navigate, parseRoute, useHash } from "../router";
 import type { AiConfigurationSummary, BookId, HighlightId, HighlightListEntry } from "@leaflogue/contracts";
 import { BookOpen, Sparkles, X } from "./icons";
-import { EpubReader } from "./EpubReader";
+import { Reader } from "./Reader";
 import { ExplainPassage, PassageContext } from "./PassageActions";
 import styles from "./context-panel.module.css";
 
@@ -123,7 +123,7 @@ export function ContextPanel() {
       <button className="ll-icon-button" aria-label="Collapse context panel" title="Collapse context panel" onClick={() => { context.close(); document.querySelector<HTMLButtonElement>('button[aria-controls="reading-context"]')?.focus(); }}><X size={16} aria-hidden="true" /></button>
     </header>
     <section role="tabpanel" id="context-reader" aria-labelledby="context-reader-tab" hidden={tab !== "reader"} className={styles.body}>
-      {book ? <EpubReader key={book.id} bookId={book.id} embedded onExplain={aiAvailable(ai) ? (highlight, readOnly) => {
+      {book ? <Reader key={book.id} bookId={book.id} embedded onExplain={aiAvailable(ai) ? (highlight, readOnly) => {
         context.showAssistant({ highlight: { ...highlight, bookTitle: book.title, authors: [], imported: false, tagIds: [] }, readOnly, reload: async () => { window.dispatchEvent(new Event("leaflogue:annotations-changed")); } });
       } : undefined} target={readerTarget} active={open && tab === "reader"} onOpenInBook={(id) => { context.setExpanded(false); if (window.innerWidth <= 900) context.close(); navigate(href.book(book.id, id)); }} /> : <div className={styles.empty}><BookOpen size={28} aria-hidden="true" /><h2>Keep your book beside you</h2><p>Open a book in your library and choose Read to bring its EPUB here.</p></div>}
     </section>
