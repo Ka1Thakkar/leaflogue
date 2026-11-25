@@ -1,4 +1,4 @@
-import { normalizeHighlightColour } from "@leaflogue/contracts";
+import { normalizeHighlightColour, syncedParentBookId } from "@leaflogue/contracts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import type {
@@ -43,6 +43,7 @@ import type {
   ReadingStatusEvent,
   ReadingStatusEventId,
   SetBookArchived,
+  DeleteBook,
   SetBookCompletionDate,
   SetBookReadingStatus,
   SetBookCollectionMembership,
@@ -338,6 +339,20 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
         LEFT JOIN leaflogue.synced_writers AS writers
           ON writers.library_id = $1 AND writers.entity_type = $3 AND writers.entity_id = $2
       `, [this.#libraryId, entityId, change.entityType])).rows[0] : undefined;
+      const parentId = syncedParentBookId(change);
+      if (parentId) {
+        const deleted = await this.#client.query(`
+          SELECT 1 FROM leaflogue.books WHERE library_id = $1 AND id = $2 AND deleted_at IS NOT NULL
+          UNION ALL SELECT 1 FROM leaflogue.sync_tombstones WHERE library_id = $1 AND entity_type = 'book' AND entity_id = $2 LIMIT 1
+        `, [this.#libraryId, parentId]);
+        if (deleted.rows.length) {
+          if ((change.entityType === "highlight" || change.entityType === "note") && incomingBody && incomingBody !== current?.body) {
+            await this.#preserveSyncConflict(change, incomingBody, undefined,
+              { deviceId: change.deviceId, deviceRevision: change.deviceRevision, operation: "upsert" }, "tombstone");
+          }
+          return "superseded";
+        }
+      }
       // Claiming the entity and writing it share one transaction, so a change
       // that loses the claim never touches the row.
       const claim = await this.#client.query(`
@@ -384,14 +399,7 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
       if (change.entityType === "daily-selection") return this.#applySyncedDailySelection(change);
 
       if (change.operation === "tombstone") {
-        const removed = await this.#client.query<{ revision: number }>(`
-          UPDATE leaflogue.books SET deleted_at = now(), revision = revision + 1, updated_at = now()
-          WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL
-          RETURNING revision
-        `, [this.#libraryId, entityId]);
-        await this.#client.query("DELETE FROM leaflogue.collection_books WHERE library_id = $1 AND book_id = $2", [this.#libraryId, entityId]);
-        await this.#client.query("DELETE FROM leaflogue.book_tags WHERE library_id = $1 AND book_id = $2", [this.#libraryId, entityId]);
-        const revision = await this.#recordSyncedTombstone("book", entityId, entityId, removed.rows[0]?.revision);
+        const revision = await this.#tombstoneBook(entityId);
         await this.#recordChange("book", entityId, revision);
         return "applied";
       }
@@ -1239,6 +1247,30 @@ export class PostgresLibraryMutations implements OnlineLibraryMutations, OnlineO
       await this.#recordWebChange("book", input.bookId, bookRevision);
       await this.#recordWebChange("note", input.id, Number(row.revision));
       return { bookId: input.bookId, bookRevision, revision: Number(row.revision), notesDeleted: 1, complete: true };
+    });
+  }
+
+  async #tombstoneBook(id: string): Promise<number> {
+    const removed = await this.#client.query<{ revision: number }>(`
+      UPDATE leaflogue.books SET deleted_at = now(), revision = revision + 1, updated_at = now()
+      WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL RETURNING revision
+    `, [this.#libraryId, id]);
+    await this.#client.query("DELETE FROM leaflogue.collection_books WHERE library_id = $1 AND book_id = $2", [this.#libraryId, id]);
+    await this.#client.query("DELETE FROM leaflogue.book_tags WHERE library_id = $1 AND book_id = $2", [this.#libraryId, id]);
+    return this.#recordSyncedTombstone("book", id, id, removed.rows[0]?.revision);
+  }
+
+  async deleteBook(input: DeleteBook): Promise<void> {
+    requireRevision(input.expectedRevision, "Book");
+    return this.#transaction(async () => {
+      const result = await this.#client.query<{ revision: number; archived: boolean }>(`
+        SELECT revision, archived FROM leaflogue.books
+        WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL FOR UPDATE
+      `, [this.#libraryId, input.id]);
+      const book = result.rows[0];
+      if (!book || !book.archived || Number(book.revision) !== input.expectedRevision) throw new Error("Only an unchanged archived item can be deleted");
+      const revision = await this.#tombstoneBook(input.id);
+      await this.#recordWebChange("book", input.id, revision);
     });
   }
 

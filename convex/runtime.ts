@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import type {
   DataModelFromSchemaDefinition,
   FunctionReference,
@@ -26,6 +27,8 @@ import {
   noteValidator,
   readingStatusChangeValidator,
   setBookArchivedArgs,
+  deleteBookArgs,
+  type DeleteBookArgs,
   setBookCompletionDateArgs,
   setBookReadingStatusArgs,
   type SetBookArchivedArgs,
@@ -49,6 +52,7 @@ type DataModel = DataModelFromSchemaDefinition<typeof schema>;
 const mutation = mutationGeneric as MutationBuilder<DataModel, "public">;
 
 const internal = {
+  deleteBook: internalMutationReference<DeleteBookArgs, null>("library:deleteBook"),
   createBook: internalMutationReference<CreateBookArgs, BookResult>("library:createBook"),
   updateBookMetadata: internalMutationReference<UpdateBookMetadataArgs, BookResult>("library:updateBookMetadata"),
   createHighlight: internalMutationReference<CreateHighlightArgs, HighlightResult>("library:createHighlight"),
@@ -132,6 +136,15 @@ export const updateNote = mutation({
   handler: async (ctx, args) => {
     await requireLibraryAccess(ctx, args.libraryId, "write");
     return ctx.runMutation(internal.updateNote, args);
+  },
+});
+
+export const deleteBook = mutation({
+  args: deleteBookArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireLibraryAccess(ctx, args.libraryId, "write");
+    return ctx.runMutation(internal.deleteBook, args);
   },
 });
 

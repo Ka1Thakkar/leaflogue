@@ -178,3 +178,25 @@ describe("browsing a PostgreSQL library", () => {
     expect(exportedBook).toMatchObject({ title: "The Glass Orchard", status: "finished", completedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/u) });
   });
 });
+
+it("deletes an archived item with a web tombstone and removes it from browse results", async () => {
+  const item = await library.createBook({ id: randomUUID() as never, title: "Archived item", authors: [] });
+  const passage = await library.createHighlight({ bookId: item.id, text: "A saved passage", noteMarkdown: "A note" });
+  const current = await browse.book(client, libraryId, item.id);
+  const revision = Number(current!.revision);
+  await expect(library.deleteBook({ id: item.id, expectedRevision: revision })).rejects.toThrow("archived");
+  const archived = await library.setBookArchived({ id: item.id, archived: true, expectedRevision: revision });
+  await expect(library.deleteBook({ id: item.id, expectedRevision: revision })).rejects.toThrow("unchanged");
+  await library.deleteBook({ id: item.id, expectedRevision: archived.revision });
+  expect(await browse.book(client, libraryId, item.id)).toBeNull();
+  expect((await browse.highlights(client, libraryId, { bookId: item.id, paginationOpts: page() })).page).toEqual([]);
+  const claim = await client.query<{ operation: string }>("SELECT operation FROM leaflogue.synced_writers WHERE library_id = $1 AND entity_type = 'book' AND entity_id = $2", [libraryId, item.id]);
+  expect(claim.rows[0]?.operation).toBe("tombstone");
+  await expect(library.applySyncedChange({
+    entityType: "highlight", operation: "upsert", deviceId: randomUUID(), deviceRevision: passage.revision + 1,
+    highlight: { ...passage, text: "An offline passage edit" }, tagIds: [], threadIds: [],
+  })).resolves.toBe("superseded");
+  const preserved = await client.query<{ losing_body: string }>("SELECT losing_body FROM leaflogue.sync_conflicts WHERE library_id = $1 AND entity_id = $2", [libraryId, passage.id]);
+  expect(preserved.rows.map(row => row.losing_body)).toContain("An offline passage edit");
+  await expect(library.setBookArchived({ id: item.id, archived: false, expectedRevision: archived.revision + 1 })).rejects.toThrow();
+});

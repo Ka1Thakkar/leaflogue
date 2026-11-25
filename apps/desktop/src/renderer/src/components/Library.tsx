@@ -5,17 +5,15 @@ import { ArrowDownWideNarrow, Folder, Library as LibraryIcon, Plus, Search, Tags
 import type { Book, BookId, BookOrganization, Collection, CollectionId, LibraryBookStatistics, LibraryDuplicates, LibraryStatistics, ReadingStatus, Tag, TagId } from "@leaflogue/contracts";
 import { TitleRow } from "@leaflogue/ui";
 import { useDesktop } from "../host";
-import { href, navigate } from "../router";
+import { href } from "../router";
 import { Dashboard, DashboardControls, useDashboard } from "./dashboard/Dashboard";
 import { authorsLabel, countOf, Cover, Dialog, Empty, FilterToggle, ImportTrigger, InlineError, Loading, statusLabel } from "./shared";
 import { readingSummary } from "./reading-summary";
-import { addBookRequests } from "../palette/actions";
+import { addToLibraryRequests } from "../palette/actions";
 import { useCommands } from "../palette/commands";
 import styles from "./knowledge.module.css";
 import sheet from "./library.module.css";
-import { useContextWorkspace } from "./ContextPanel";
-import { ArticleForm } from "./ArticleForm";
-import { BookForm } from "./BookForms";
+import { AddToLibrary } from "./AddToLibrary";
 import { CollectionManager, TagManager } from "./Organization";
 
 type Sort = "series" | "recent" | "title" | "author" | "highlights";
@@ -39,7 +37,6 @@ function sortBooks(books: readonly Book[], sort: Sort): Book[] {
 }
 
 export function LibraryPage({ initialCollectionId, initialTagId }: { readonly initialCollectionId?: CollectionId; readonly initialTagId?: TagId } = {}) {
-  const context = useContextWorkspace();
   const [shelf, setShelf] = useState<"active" | "archived">("active");
   const [books, setBooks] = useState<readonly Book[]>();
   const [collections, setCollections] = useState<readonly Collection[]>([]);
@@ -128,10 +125,10 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
   const summary = statistics && shelf === "active" && statistics.totals.highlights > 0 ? readingSummary(statistics) : undefined;
   const dashboard = useDashboard("library");
   const showDashboard = shelf === "active" && statistics !== undefined && statistics.totals.highlights > 0;
-  const addBookTrigger = useRef<HTMLButtonElement>(null);
+  const addTrigger = useRef<HTMLButtonElement>(null);
   const collectionsTrigger = useRef<HTMLButtonElement>(null);
   const tagsTrigger = useRef<HTMLButtonElement>(null);
-  addBookRequests.useReceiver(() => addBookTrigger.current?.click());
+  addToLibraryRequests.useReceiver(() => addTrigger.current?.click());
   useCommands(dashboard.editing ? [] : [
     ...(showDashboard && dashboard.layout ? [{ id: "page.customise", title: "Customise this page", subtitle: "Arrange the library's widgets", keywords: "dashboard widgets layout", icon: "layout" as const, run: dashboard.start }] : []),
     { id: "library.collections", title: "Manage collections", icon: "folder", run: () => collectionsTrigger.current?.click() },
@@ -276,12 +273,9 @@ export function LibraryPage({ initialCollectionId, initialTagId }: { readonly in
           <>
             {!dashboard.editing && (
               <>
-                <Dialog label="Add book" title="Add a book" icon={Plus} triggerRef={addBookTrigger}>
-                  {(close) => <BookForm onClose={close} onSaved={(book) => navigate(href.book(book.id))} />}
+                <Dialog label="Add to library" title="Add to your library" icon={Plus} triggerRef={addTrigger}>
+                  {(close) => <AddToLibrary onClose={close} />}
                 </Dialog>
-                {window.leaflogue.articles && <Dialog label="Add article" title="Capture a web article" secondary>
-                  {(close) => <ArticleForm onClose={close} onSaved={(book) => { navigate(href.book(book.id)); context?.showReader(book.id, book.title); }} />}
-                </Dialog>}
                 <Dialog label="Collections" title="Manage collections" icon={Folder} secondary triggerRef={collectionsTrigger}>
                   {(close) => <CollectionManager onClose={close} onChanged={refresh} />}
                 </Dialog>

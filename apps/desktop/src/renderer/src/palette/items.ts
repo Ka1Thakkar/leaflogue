@@ -6,7 +6,7 @@ import type { PageCommand } from "./commands";
 import { normalize } from "./fuzzy";
 import type { RecentEntry } from "./recent";
 import { onHost, openSetting, sectionLabel, settingsFor } from "./settings-index";
-import { addBook, saveAppearance, shownMode, startImport } from "./actions";
+import { addToLibrary, saveAppearance, shownMode, startImport } from "./actions";
 
 /** The palette's groups, in the order they appear when nothing outranks them. */
 export const GROUPS = ["Recent", "This page", "Books", "Passages", "Notes", "Tags", "Threads", "Collections", "Pages", "Settings", "Actions", "Search"] as const;
@@ -169,7 +169,7 @@ export function actionItems(sources: PaletteSources, shell: ShellState, pageComm
     });
   }
   action("import-file", { title: "Import highlights from a file", keywords: "import kobo kindle koreader clippings", icon: "import", run: () => startImport({ kind: "file" }), secondary: { label: "Open the import page", run: go(href.import()) } });
-  action("add-book", { title: "Add a book", keywords: "new create", icon: "plus", run: addBook });
+  action("add-to-library", { title: "Add to library", keywords: "new create book article capture", icon: "plus", run: addToLibrary });
   if (shell.host.kind === "desktop") {
     // Files saved on this computer, backups, and updates are the desktop app's own.
     action("export", { title: "Export your library", keywords: "markdown json obsidian download", icon: "upload", run: () => openSetting({ id: "export", activate: true }), secondary: { label: "Show in Settings", run: () => openSetting({ id: "export" }) } });

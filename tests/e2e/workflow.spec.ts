@@ -15,7 +15,8 @@ import {
   writePortableExport,
 } from "./fixtures";
 import { createProfile, launch, removeProfile, type Profile } from "./harness";
-import { chooseShelf, confirmDialog, importFile, openBook, openImport, openRail, passage } from "./steps";
+import { importFile, openBook, openImport, openRail, passage } from "./steps";
+import { chooseShelf, confirmDialog } from "../shared/library";
 
 /**
  * The explicit `v0.1.0` local workflow, in order, through the real interface
@@ -52,8 +53,8 @@ test("completes the v0.1.0 local workflow without network access", async () => {
 
   await test.step("create a library: the empty shelf, then a first book and passage", async () => {
     await expect(page.getByRole("heading", { name: "A place for what stays with you." })).toBeVisible();
-    await page.getByRole("button", { name: "Add book" }).click();
-    const form = page.getByRole("dialog", { name: "Add a book" });
+    await page.getByRole("button", { name: "Add to library" }).click();
+    const form = page.getByRole("dialog", { name: "Add to your library" });
     await form.getByLabel("Title").fill(MANUAL_BOOK);
     await form.getByLabel("Authors").fill("Nell Ashby");
     await form.getByRole("button", { name: "Add book" }).click();
@@ -252,8 +253,8 @@ test("completes the v0.1.0 local workflow without network access", async () => {
 
   await test.step("refuse an invalid backup and keep the current library", async () => {
     await openRail(page, "Library");
-    await page.getByRole("button", { name: "Add book" }).click();
-    const form = page.getByRole("dialog", { name: "Add a book" });
+    await page.getByRole("button", { name: "Add to library" }).click();
+    const form = page.getByRole("dialog", { name: "Add to your library" });
     await form.getByLabel("Title").fill("Added after the backup");
     await form.getByRole("button", { name: "Add book" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Added after the backup" })).toBeVisible();

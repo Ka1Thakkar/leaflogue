@@ -118,6 +118,8 @@ export const FUNCTIONS: Readonly<Record<string, ServerFunction>> = {
     (mutations, input) => mutations.updateNote(input as never)),
   "runtime:deleteNote": mutation(object({ libraryId, id, bookId: id, expectedRevision: number }),
     (mutations, input) => mutations.deleteNote(input as never)),
+  "runtime:deleteBook": mutation(object({ libraryId, id, expectedRevision: number }),
+    (mutations, input) => mutations.deleteBook(input as never)),
   "runtime:setBookArchived": mutation(object({ libraryId, id, archived: boolean, expectedRevision: number }),
     (mutations, input) => mutations.setBookArchived(input as never)),
   "runtime:setBookReadingStatus": mutation(object({ libraryId, id, status: literal("unread", "reading", "finished", "paused"), expectedRevision: number }),

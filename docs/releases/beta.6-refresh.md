@@ -7,7 +7,9 @@ Do not create a new release or bump the version solely for these features.
 Target: the existing published prerelease v0.1.1-beta.6. This document records
 scope and gates, not publication approval or a claim that downloads contain it.
 
-Included changes: Goodreads CSV books/reviews through the canonical importer;
+Included changes: a unified Add flow for books and articles; confirmed deletion
+of archived library items through shared sync tombstones; Goodreads CSV
+books/reviews through the canonical importer;
 public HTTPS article preview/confirm/save through the shared local reader; the
 reader and performance fixes already on develop, and the shared-boundary
 refactor recorded in ADR 0009 (SQLite migration 21, current backend protocol). StoryGraph is deferred until a

@@ -3332,3 +3332,27 @@ describe("shared highlight colours", () => {
     } finally { first.close(); second.close(); }
   });
 });
+
+describe("deleting archived library items", () => {
+  it("requires an archived current revision and hides writing through the existing tombstone", () => {
+    const library = new LocalLibrary(":memory:");
+    try {
+      const book = library.createBook({ title: "Saved article" });
+      library.createHighlight({ bookId: book.id, text: "A passage", noteMarkdown: "An attached note" });
+      library.createNote({ bookId: book.id, markdown: "A reflection" });
+      const current = library.getBook(book.id)!;
+      expect(() => library.deleteBook({ id: book.id, expectedRevision: current.revision })).toThrow("archived");
+      const archived = library.setBookArchived({ id: book.id, archived: true, expectedRevision: current.revision });
+      expect(() => library.deleteBook({ id: book.id, expectedRevision: current.revision })).toThrow("unchanged");
+      expect(library.listBooks({ includeArchived: true })).toHaveLength(1);
+      library.deleteBook({ id: book.id, expectedRevision: archived.revision });
+      expect(library.getBook(book.id)).toBeUndefined();
+      expect(library.getBookContents(book.id)).toBeUndefined();
+      expect(library.listBooks({ includeArchived: true })).toEqual([]);
+      expect(library.listHighlights({ bookId: book.id }).entries).toEqual([]);
+      expect(library.resolvePendingSyncChanges().changes.map(({ change }) => change)).toContainEqual(expect.objectContaining({ entityType: "book", operation: "tombstone", entityId: book.id }));
+      expect(() => library.setBookArchived({ id: book.id, archived: false, expectedRevision: archived.revision + 1 })).toThrow();
+      expect(() => library.deleteBook({ id: book.id, expectedRevision: archived.revision })).toThrow();
+    } finally { library.close(); }
+  });
+});

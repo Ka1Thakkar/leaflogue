@@ -355,3 +355,35 @@ describe("two-device sync convergence through Convex", () => {
     expect(organization(fresh.library)).toEqual(organization(first.library));
   });
 });
+
+it("keeps an archived deletion deleted when an offline device edits the old item", async () => {
+  const first = await device("delete-first");
+  const second = await device("delete-second");
+  const book = first.library.createBook({ title: "An item to remove" });
+  first.library.createHighlight({ bookId: book.id, text: "Saved writing" });
+  await first.sync(); await second.sync();
+  const stale = second.library.getBook(book.id)!;
+  const archived = first.library.setBookArchived({ id: book.id, archived: true, expectedRevision: first.library.getBook(book.id)!.revision });
+  first.library.deleteBook({ id: book.id, expectedRevision: archived.revision });
+  await first.sync();
+  second.library.updateBookMetadata({ id: book.id, title: "An offline edit", authors: [], expectedRevision: stale.revision });
+  const passage = second.library.getBookContents(book.id)!.highlights[0]!;
+  second.library.updateHighlight({ ...passage, text: "Writing edited offline", expectedRevision: passage.revision });
+  await second.sync(); await first.sync();
+  expect(first.library.listBooks({ includeArchived: true })).toEqual([]);
+  expect(second.library.listBooks({ includeArchived: true })).toEqual([]);
+  const fresh = await device("delete-fresh"); await fresh.sync();
+  expect(fresh.library.listBooks({ includeArchived: true })).toEqual([]);
+});
+
+it("settles deletion before an item's first sync without creating orphan writing", async () => {
+  const first = await device("unsynced-delete");
+  const book = first.library.createBook({ title: "Never shared" });
+  first.library.createHighlight({ bookId: book.id, text: "Unsent passage", noteMarkdown: "Unsent note" });
+  const archived = first.library.setBookArchived({ id: book.id, archived: true, expectedRevision: first.library.getBook(book.id)!.revision });
+  first.library.deleteBook({ id: book.id, expectedRevision: archived.revision });
+  await first.sync();
+  expect(first.library.listPendingSyncChanges()).toEqual([]);
+  const fresh = await device("unsynced-fresh"); await fresh.sync();
+  expect(fresh.library.listBooks({ includeArchived: true })).toEqual([]);
+});

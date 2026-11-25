@@ -1082,7 +1082,7 @@ describe("library", () => {
       if (name) openWhenFocused.set(name, this.closest("dialog")?.open === true);
     });
     try {
-      await click(button("Add book"));
+      await click(button("Add to library"));
     } finally {
       focus.mockRestore();
     }
@@ -2160,7 +2160,7 @@ describe("command palette", () => {
     await openPalette();
     await type(">");
     expect(new Set(groupNames())).toEqual(new Set(["Actions", "This page"]));
-    expect(titles()).toContain("Add a book");
+    expect(titles()).toContain("Add to library");
     expect(titles()).not.toContain("Piranesi");
 
     await type("#");
@@ -2320,7 +2320,7 @@ describe("command palette", () => {
       await openPalette();
       await type(">");
       const actions = titles();
-      expect(actions).toEqual(expect.arrayContaining(["Import highlights from a file", "Add a book", "Sign out"]));
+      expect(actions).toEqual(expect.arrayContaining(["Import highlights from a file", "Add to library", "Sign out"]));
       for (const missing of ["Export your library", "Create a backup", "Check for updates", "Sync now"]) expect(actions).not.toContain(missing);
       await type("/");
       expect(titles()).not.toContain("Review synced changes");
@@ -2360,10 +2360,10 @@ describe("command palette", () => {
     expect(document.querySelector("[aria-label='Main navigation']")?.hasAttribute("data-expanded")).toBe(true);
 
     await openPalette();
-    await type(">add a book");
+    await type(">add to library");
     await press("Enter");
     expect(window.location.hash).toBe("#/library");
-    expect(document.querySelector<HTMLDialogElement>("dialog[aria-labelledby]:has(input[name='title'])")?.open ?? Array.from(document.querySelectorAll("dialog[open] h2")).some((heading) => heading.textContent === "Add a book")).toBe(true);
+    expect(document.querySelector<HTMLDialogElement>("dialog[aria-labelledby]:has(input[name='title'])")?.open ?? Array.from(document.querySelectorAll("dialog[open] h2")).some((heading) => heading.textContent === "Add to your library")).toBe(true);
   });
 
   it("switches between light and dark from the palette", async () => {

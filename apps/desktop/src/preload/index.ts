@@ -16,6 +16,7 @@ import {
   LIBRARY_LIST_READING_STATUS_CHANNEL,
   LIBRARY_MERGE_BOOKS_CHANNEL,
   LIBRARY_SET_BOOK_ARCHIVED_CHANNEL,
+  LIBRARY_DELETE_BOOK_CHANNEL,
   LIBRARY_SET_COMPLETION_DATE_CHANNEL,
   LIBRARY_SET_READING_STATUS_CHANNEL,
   LIBRARY_UPDATE_HIGHLIGHT_CHANNEL,
@@ -154,6 +155,7 @@ import {
   type WidgetResult,
   type RestoreReceipt,
   type SetBookArchived,
+  type DeleteBook,
   type SetBookCompletionDate,
   type SetBookReadingStatus,
   type ReadingStatusHistoryPage,
@@ -259,6 +261,7 @@ const bridge: LeaflogueBridge = Object.freeze({
       ipcRenderer.invoke(LIBRARY_HIGHLIGHT_SOURCE_CHANNEL, bookId, highlightId) as Promise<HighlightSource | undefined>,
     resetHighlightToSource: (input: ResetHighlightToSource): Promise<Highlight> =>
       ipcRenderer.invoke(LIBRARY_RESET_HIGHLIGHT_CHANNEL, input) as Promise<Highlight>,
+    deleteBook: (input: DeleteBook): Promise<void> => ipcRenderer.invoke(LIBRARY_DELETE_BOOK_CHANNEL, input) as Promise<void>,
     setBookArchived: (input: SetBookArchived): Promise<BookArchiveChange> =>
       ipcRenderer.invoke(LIBRARY_SET_BOOK_ARCHIVED_CHANNEL, input) as Promise<BookArchiveChange>,
     listReadingStatusHistory: (id: BookId): Promise<ReadingStatusHistoryPage> =>

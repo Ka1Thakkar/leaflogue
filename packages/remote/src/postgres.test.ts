@@ -797,7 +797,7 @@ describe("PostgreSQL annotation mutation parity", () => {
     client.selectedRows.push([{
       body: "Local passage", book_id: bookId, deleted_at: null,
       device_id: "8f3c7a10-0000-4000-8000-000000000000", device_revision: 2, operation: "upsert",
-    }], [{ duplicate: false, pending_count: 20 }]);
+    }], [], [{ duplicate: false, pending_count: 20 }]);
     client.returningRows.push([{ device_id: "9f3c7a10-0000-4000-8000-000000000000" }]);
     const mutations = new PostgresLibraryMutations(client, libraryId);
     await expect(mutations.applySyncedChange(syncedHighlight())).rejects.toThrow(/too many pending conflicts/);

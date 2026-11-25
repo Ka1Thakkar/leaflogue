@@ -247,6 +247,11 @@ export interface AnnotationDeletionReceipt {
   readonly complete: boolean;
 }
 
+export interface DeleteBook {
+  readonly id: BookId;
+  readonly expectedRevision: number;
+}
+
 export interface SetBookArchived {
   readonly id: BookId;
   readonly archived: boolean;
@@ -611,6 +616,7 @@ export interface LibraryRepository {
   updateNote(input: UpdateNote): Note;
   deleteHighlight(input: DeleteHighlight): AnnotationDeletionReceipt;
   deleteNote(input: DeleteNote): AnnotationDeletionReceipt;
+  deleteBook(input: DeleteBook): void;
   setBookArchived(input: SetBookArchived): BookArchiveChange;
   iterateReadingStatusHistory(id: BookId): Iterable<ReadingStatusEvent>;
   listReadingStatusHistory(id: BookId, options?: { readonly limit?: number }): readonly ReadingStatusEvent[];
@@ -653,6 +659,7 @@ export interface OnlineLibraryMutations {
   updateNote(input: UpdateNote): Promise<Note>;
   deleteHighlight(input: DeleteHighlight): Promise<AnnotationDeletionReceipt>;
   deleteNote(input: DeleteNote): Promise<AnnotationDeletionReceipt>;
+  deleteBook(input: DeleteBook): Promise<void>;
   setBookArchived(input: SetBookArchived): Promise<BookArchiveChange>;
   setBookReadingStatus(input: SetBookReadingStatus): Promise<BookReadingStatusChange>;
   setBookCompletionDate(input: SetBookCompletionDate): Promise<Book>;
@@ -902,6 +909,14 @@ export type SyncedChange = SyncedBookUpsert | SyncedBookTombstone |
   SyncedHighlightUpsert | SyncedHighlightTombstone | SyncedNoteUpsert | SyncedNoteTombstone |
   SyncedCollectionUpsert | SyncedCollectionTombstone | SyncedTagUpsert | SyncedTagTombstone |
   SyncedThreadUpsert | SyncedThreadTombstone | SyncedDailySelectionUpsert | SyncedDailySelectionTombstone;
+
+/** Annotation upserts inherit their parent's deletion; an absent parent still requires ordered replay. */
+export function syncedParentBookId(change: SyncedChange): BookId | undefined {
+  if (change.operation !== "upsert") return undefined;
+  if (change.entityType === "highlight") return change.highlight.bookId;
+  if (change.entityType === "note") return change.note.bookId;
+  return undefined;
+}
 
 /**
  * Whether a replayed change took effect. "superseded" is an ordinary outcome,
@@ -1778,6 +1793,7 @@ export const LIBRARY_DELETE_HIGHLIGHT_CHANNEL = "library:delete-highlight";
 export const LIBRARY_DELETE_NOTE_CHANNEL = "library:delete-note";
 export const LIBRARY_HIGHLIGHT_SOURCE_CHANNEL = "library:get-highlight-source";
 export const LIBRARY_RESET_HIGHLIGHT_CHANNEL = "library:reset-highlight-to-source";
+export const LIBRARY_DELETE_BOOK_CHANNEL = "library:delete-book";
 export const LIBRARY_SET_BOOK_ARCHIVED_CHANNEL = "library:set-book-archived";
 export const LIBRARY_LIST_READING_STATUS_CHANNEL = "library:list-reading-status";
 export const LIBRARY_SET_READING_STATUS_CHANNEL = "library:set-reading-status";
@@ -1983,6 +1999,7 @@ export interface LeaflogueBridge {
     deleteNote(input: DeleteNote): Promise<AnnotationDeletionReceipt>;
     getHighlightSource(bookId: BookId, highlightId: HighlightId): Promise<HighlightSource | undefined>;
     resetHighlightToSource(input: ResetHighlightToSource): Promise<Highlight>;
+    deleteBook(input: DeleteBook): Promise<void>;
     setBookArchived(input: SetBookArchived): Promise<BookArchiveChange>;
     listReadingStatusHistory(id: BookId): Promise<ReadingStatusHistoryPage>;
     setBookReadingStatus(input: SetBookReadingStatus): Promise<BookReadingStatusChange>;

@@ -22,8 +22,8 @@ test("searches the hosted library and offers what the web app can do", async ({ 
 
   await page.goto("/");
   await expect(page.getByRole("status").filter({ hasText: "Saved online" })).toBeVisible();
-  await page.getByRole("button", { name: "Add book" }).click();
-  const form = page.getByRole("dialog", { name: "Add a book" });
+  await page.getByRole("button", { name: "Add to library" }).click();
+  const form = page.getByRole("dialog", { name: "Add to your library" });
   await form.getByLabel("Title").fill("The Lantern Ledger");
   await form.getByLabel("Authors").fill("Mira Okafor");
   await form.getByRole("button", { name: "Add book" }).click();
