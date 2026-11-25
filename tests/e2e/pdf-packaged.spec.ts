@@ -15,8 +15,6 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     app.page.on("pageerror", (error) => errors.push(error.stack ?? error.message));
     app.page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
     await completeLocalSetup(app.page);
-    await app.page.evaluate(() => localStorage.setItem("leaflogue.reader-display", JSON.stringify({ dark: true, theme: true })));
-    await app.page.reload();
     const setup = await app.page.evaluate(async () => ({ id: (await window.leaflogue.library.createBook({ title: "Packaged PDF", authors: [] })).id, file: (await window.leaflogue.system.getCapabilities()).storagePaths.libraryFile }));
     const font = await readFile(join(dirname(createRequire(__filename).resolve("pdfjs-dist/package.json")), "standard_fonts", "LiberationSans-Regular.ttf"));
     const bytes = !scanned && process.env.LEAFLOGUE_TEST_PDF ? await readFile(process.env.LEAFLOGUE_TEST_PDF) : readerPdf(scanned, font, !scanned);
@@ -29,6 +27,13 @@ for (const scanned of [false, true]) test(`displays ${scanned ? "image-only" : "
     const first = reader.locator('article[data-chapter="0"] .pdf-page-image');
     await expect(first).toHaveAttribute("data-rendered", "true"); await expect(first).toBeInViewport();
     expect(await first.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(300);
+    // Configure the current reader through its controls, not a retired storage key.
+    await reader.locator("body").click({ button: "right" });
+    const options = app.page.getByRole("dialog", { name: "Reader options", exact: true });
+    await options.getByRole("tab", { name: "Appearance", exact: true }).click();
+    await options.getByRole("switch", { name: "Dark mode", exact: true }).check();
+    await options.getByRole("switch", { name: "Use theme colours", exact: true }).check();
+    await options.getByRole("button", { name: "Close reader options", exact: true }).click();
     const framePaper = await app.page.evaluate(async () => { const a = await window.leaflogue.appearance.describe(); return a.themes.find((t) => t.id === a.themeId)!.dark.paper; });
     const frameRgb = `rgb(${[1, 3, 5].map((offset) => parseInt(framePaper.slice(offset, offset + 2), 16)).join(", ")})`;
     await expect(reader.locator("body")).toHaveCSS("background-color", frameRgb);
