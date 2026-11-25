@@ -1,3 +1,4 @@
+import { aiProviderName, COMPANION_PROMPTS, MAX_COMPANION_PROMPT_CHARACTERS } from "@leaflogue/ai";
 import type { AiConfigurationSummary, AiProviderConfigurationSummary, AiTaskDisclosure, HighlightId, LeaflogueBridge } from "@leaflogue/contracts";
 import { BackendError } from "../transport/transport";
 import { storage, type LibraryClient } from "./client";
@@ -31,21 +32,8 @@ interface Disclosed {
   readonly notes: readonly string[];
 }
 
-const PROVIDER_NAMES: Readonly<Record<string, string>> = {
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  gemini: "Google Gemini",
-  mistral: "Mistral",
-  xai: "xAI",
-  deepseek: "DeepSeek",
-  "openai-compatible": "OpenAI-compatible",
-};
 /** Providers whose free tier may use what is sent to improve their products. */
 const FREE_TIER_TRAINING = new Set(["gemini"]);
-/** The companion's preset opening (COMPANION_PROMPTS.explain in @leaflogue/ai), which skips its scope check. */
-const EXPLAIN_PROMPT = "Explain this passage.";
-/** The companion's limit on one question (MAX_COMPANION_PROMPT_CHARACTERS). */
-const MAX_PROMPT_CHARACTERS = 2_000;
 const NOTES_HEADING = "\n\nMy notes on this passage:";
 const KEPT_DISCLOSURES = 20;
 
@@ -64,10 +52,10 @@ function consented(): Set<string> {
 /** The reader's notes that fit in one companion question, whole and in order. */
 function notesThatFit(notes: readonly string[]): string[] {
   const kept: string[] = [];
-  let length = EXPLAIN_PROMPT.length + NOTES_HEADING.length;
+  let length = COMPANION_PROMPTS.explain.length + NOTES_HEADING.length;
   for (const note of notes) {
     const line = `\n- ${note.trim()}`;
-    if (length + line.length > MAX_PROMPT_CHARACTERS) break;
+    if (length + line.length > MAX_COMPANION_PROMPT_CHARACTERS) break;
     kept.push(note.trim());
     length += line.length;
   }
@@ -75,7 +63,7 @@ function notesThatFit(notes: readonly string[]): string[] {
 }
 
 function explainPrompt(notes: readonly string[]): string {
-  return notes.length ? `${EXPLAIN_PROMPT}${NOTES_HEADING}${notes.map((note) => `\n- ${note}`).join("")}` : EXPLAIN_PROMPT;
+  return notes.length ? `${COMPANION_PROMPTS.explain}${NOTES_HEADING}${notes.map((note) => `\n- ${note}`).join("")}` : COMPANION_PROMPTS.explain;
 }
 
 export function createAi(client: LibraryClient): LeaflogueBridge["ai"] {
@@ -154,7 +142,7 @@ export function createAi(client: LibraryClient): LeaflogueBridge["ai"] {
       return {
         disclosureId,
         providerId: provider.id,
-        providerName: PROVIDER_NAMES[provider.id] ?? provider.id,
+        providerName: aiProviderName(provider.id),
         model: provider.selectedModel,
         trainsOnFreeTier: FREE_TIER_TRAINING.has(provider.id),
         consented: provider.consented,

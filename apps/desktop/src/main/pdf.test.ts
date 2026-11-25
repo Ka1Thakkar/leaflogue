@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readerPdf } from "../../../../tests/e2e/pdf-fixture";
 import { parsePdf } from "./pdf";
-import { EpubStore } from "./epub";
+import { ReaderStore } from "./reader-store";
 describe("local PDF reading", () => {
   it("extracts text and inert positioned markup while accepting image-only pages", async () => {
     const book = await parsePdf(readerPdf());
@@ -20,11 +20,11 @@ describe("local PDF reading", () => {
     const root = await mkdtemp(join(tmpdir(), "leaflogue-pdf-")); const id = "12345678-1234-4234-8234-123456789abc";
     try {
       const bytes = readerPdf(); const file = join(root, "original.pdf"); await writeFile(file, bytes);
-      const store = new EpubStore(root); const book = await store.attach(id, file);
+      const store = new ReaderStore(root); const book = await store.attach(id, file);
       await expect(store.attach(id, file)).rejects.toThrow(/already/u);
       expect(Buffer.from(await store.readPdf(id, book.sha256))).toEqual(bytes);
       await store.savePosition(id, book.sha256, 1, 0);
-      expect((await new EpubStore(root).open(id))?.position.chapter).toBe(1);
+      expect((await new ReaderStore(root).open(id))?.position.chapter).toBe(1);
       await writeFile(file, readerPdf(true)); await expect(store.readPdf(id, book.sha256)).rejects.toThrow(/changed/u);
       await store.unlink(id); const scan = await store.attach(id, file); await store.savePosition(id, scan.sha256, 1, 0);
       expect((await store.open(id))?.position.chapter).toBe(1);

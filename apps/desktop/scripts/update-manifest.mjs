@@ -38,18 +38,17 @@ export function createUpdateManifest({ channel = "stable", platform = "linux", v
   if (!["linux", "mac", "windows"].includes(platform)) throw new Error("Update platform is invalid");
   if (channel === "stable" && version.includes("-")) throw new Error("The stable channel cannot publish a pre-release");
   if (architecture !== "x64" && architecture !== "arm64") throw new Error("Architecture must be x64 or arm64");
-  const legacy = channel === "stable" && platform === "linux";
   const name = platform === "linux" ? expectedAppImageName(version, architecture) : `Leaflogue-${version}-${platform}-${architecture}.${platform === "mac" ? "zip" : "exe"}`;
   const artifact = { name, size, sha512 };
   const manifest = {
-    format: legacy ? 1 : 2,
-    ...(!legacy ? { platform } : {}),
+    format: 2,
+    platform,
     product: "leaflogue",
     channel,
     version,
     architecture,
     releasedAt,
-    ...(legacy ? { appImage: artifact } : { artifact }),
+    artifact,
   };
   return Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }

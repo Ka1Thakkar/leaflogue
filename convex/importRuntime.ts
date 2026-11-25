@@ -1,3 +1,4 @@
+import { IMPORT_PROVIDERS } from "@leaflogue/contracts";
 import type { DataModelFromSchemaDefinition, DocumentByName, GenericDatabaseReader, GenericMutationCtx, MutationBuilder, QueryBuilder } from "convex/server";
 import { makeFunctionReference, mutationGeneric, queryGeneric } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
@@ -30,10 +31,7 @@ const MAX_TEXT_CHARACTERS = 100_000;
 const MAX_NOTE_BYTES = 24 * 1024;
 const MAX_LOCATION_CHARACTERS = 2_000;
 
-const providerValidator = v.union(
-  v.literal("kindle"), v.literal("kobo"), v.literal("koreader"), v.literal("pocketbook"),
-  v.literal("tolino"), v.literal("boox"), v.literal("portable"),
-);
+const providerValidator = v.union(...IMPORT_PROVIDERS.map((provider) => v.literal(provider)));
 const importBookValidator = v.object({
   providerRecordId: v.string(),
   title: v.string(),

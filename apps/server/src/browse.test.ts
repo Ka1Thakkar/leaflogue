@@ -98,13 +98,12 @@ describe("browsing a PostgreSQL library", () => {
 
     expect(texts(await browse.highlights(client, libraryId, { notes: "with", paginationOpts: page() }))).toEqual(["Every pane held a season."]);
     expect(texts(await browse.highlights(client, libraryId, { notes: "without", paginationOpts: page() }))).toHaveLength(2);
-    expect(texts(await browse.highlights(client, libraryId, { date: "2026-01-03", paginationOpts: page() })))
+    expect(texts(await browse.highlights(client, libraryId, { dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), paginationOpts: page() })))
       .toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
-    expect(texts(await browse.highlights(client, libraryId, { date: "2026-01-03", bookId: atlas, paginationOpts: page() })))
+    expect(texts(await browse.highlights(client, libraryId, { dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), bookId: atlas, paginationOpts: page() })))
       .toEqual(["Rain is a map of where the sky has been."]);
-    expect(texts(await browse.highlights(client, libraryId, { date: "2026-01-03", dateKind: "imported", paginationOpts: page() }))).toEqual([]);
+    expect(texts(await browse.highlights(client, libraryId, { dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), dateKind: "imported", paginationOpts: page() }))).toEqual([]);
     expect(texts(await browse.highlights(client, libraryId, { source: "imported", paginationOpts: page() }))).toEqual([]);
-    await expect(browse.highlights(client, libraryId, { date: "2026-02-30", paginationOpts: page() })).rejects.toThrow("valid calendar date");
   });
 
   it("finds passages by words in their notes, but not in deleted notes", async () => {
@@ -145,7 +144,7 @@ describe("browsing a PostgreSQL library", () => {
       .toEqual(["Every pane held a season."]);
     expect(texts(await browse.highlights(client, libraryId, { dateFrom: Date.parse("2026-01-04T03:00:00Z"), paginationOpts: page() })))
       .toEqual(["Late in Oakland."]);
-    await expect(browse.highlights(client, libraryId, { date: "2026-01-03", dateFrom: india, paginationOpts: page() })).rejects.toThrow("not both");
+    await expect(browse.highlights(client, libraryId, { dateFrom: india, dateBefore: 0.5, paginationOpts: page() })).rejects.toThrow("whole milliseconds");
   });
 
   it("shows threads, memberships, reading history, and export pages", async () => {

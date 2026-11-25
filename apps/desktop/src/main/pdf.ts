@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import type { EpubDocument } from "@leaflogue/contracts";
+import type { ReaderDocument } from "@leaflogue/contracts";
 const escape = (value: string) => value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 /** Parse only page geometry and text. PDF scripts, forms, links and attachments never enter the application DOM. */
-const parsed = new Map<string, Promise<EpubDocument>>();
-export function parsePdf(bytes: Buffer): Promise<EpubDocument> {
+const parsed = new Map<string, Promise<ReaderDocument>>();
+export function parsePdf(bytes: Buffer): Promise<ReaderDocument> {
   const hash = createHash("sha256").update(bytes).digest("hex");
   const known = parsed.get(hash); if (known) return known;
   const pending = extractPdf(bytes); parsed.set(hash, pending);
@@ -11,14 +11,14 @@ export function parsePdf(bytes: Buffer): Promise<EpubDocument> {
   void pending.catch(() => parsed.delete(hash));
   return pending;
 }
-async function extractPdf(bytes: Buffer): Promise<EpubDocument> {
+async function extractPdf(bytes: Buffer): Promise<ReaderDocument> {
   if (bytes.length > 50 * 1024 * 1024) throw new Error("PDF exceeds the 50 MB limit.");
   const { getDocument, Util } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const task = getDocument({ data: new Uint8Array(bytes), enableXfa: false, useSystemFonts: false, disableFontFace: true, useWorkerFetch: false });
   try {
     const pdf = await task.promise;
     if (pdf.numPages > 1000) throw new Error("PDF exceeds the 1,000 page limit.");
-    const chapters: EpubDocument["chapters"][number][] = []; let size = 0;
+    const chapters: ReaderDocument["chapters"][number][] = []; let size = 0;
     for (let index = 0; index < pdf.numPages; index++) {
       const page = await pdf.getPage(index + 1); const viewport = page.getViewport({ scale: 1 });
       if (![viewport.width, viewport.height].every((n) => Number.isFinite(n) && n > 0 && n <= 14400)) throw new Error("Unsupported PDF page dimensions.");

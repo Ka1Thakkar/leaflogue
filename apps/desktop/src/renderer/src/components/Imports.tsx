@@ -1,3 +1,4 @@
+import { IMPORT_PROVIDER_NAMES } from "@leaflogue/contracts";
 
 import { Select, SelectItem } from "@leaflogue/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -19,6 +20,7 @@ const SOURCES: readonly { readonly name: string; readonly file: string; readonly
   { name: "PocketBook or Vivlio", file: "books.db", where: "In system/config on the reader" },
   { name: "Tolino", file: "notes.txt", where: "At the top of the reader's drive" },
   { name: "Boox", file: "Exported highlights", where: "Export from NeoReader, then choose the .txt or its folder", folder: true, web: { file: "Exported highlights", where: "Export from NeoReader, then choose every .txt at once" } },
+  { name: "Goodreads", file: "Library export CSV", where: "My Books → Import and export → Export Library" },
   { name: "Leaflogue", file: "Library JSON", where: "An export from another Leaflogue library" },
 ];
 
@@ -32,24 +34,15 @@ export interface ImportRecord {
   readonly failed?: boolean;
 }
 
-const PROVIDERS: Record<PendingImport["provider"], { readonly file: string; readonly placeholder: string }> = {
+const PROVIDERS: Record<PendingImport["provider"], { readonly file: string; readonly placeholder: string; readonly actionLabel?: string }> = {
   kobo: { file: "Kobo database", placeholder: "My Kobo Clara" },
   kindle: { file: "Kindle My Clippings.txt", placeholder: "My Kindle" },
   koreader: { file: "KOReader highlights", placeholder: "KOReader on my Kobo" },
   pocketbook: { file: "PocketBook library", placeholder: "My PocketBook" },
   tolino: { file: "Tolino notes.txt", placeholder: "My Tolino" },
   boox: { file: "Boox highlights export", placeholder: "My Boox" },
+  goodreads: { file: "Goodreads CSV", placeholder: "My Goodreads library", actionLabel: "Import books and reviews" },
   portable: { file: "Portable JSON", placeholder: "Reading export" },
-};
-
-/** What a plugged-in reader is called in the import dialog. */
-const READER_NAMES: Record<ConnectedReader["kind"], string> = {
-  kobo: "Kobo",
-  kindle: "Kindle",
-  koreader: "KOReader",
-  pocketbook: "PocketBook",
-  tolino: "Tolino",
-  boox: "Boox",
 };
 
 function providerLabel(provider: PendingImport["provider"]): string {
@@ -92,7 +85,7 @@ export function ImportTool({ history, onImported }: {
     setBusy(true);
     setError("");
     setReceipt(undefined);
-    setStage(from === "file" ? (desktop ? "Reading the file on this computer…" : "Reading the file…") : from === "folder" ? "Looking for highlights in that folder…" : `Reading your ${READER_NAMES[from.kind]}…`);
+    setStage(from === "file" ? (desktop ? "Reading the file on this computer…" : "Reading the file…") : from === "folder" ? "Looking for highlights in that folder…" : `Reading your ${IMPORT_PROVIDER_NAMES[from.kind]}…`);
     try {
       const next = from === "file"
         ? await window.leaflogue.imports.chooseFile()
@@ -165,7 +158,7 @@ export function ImportTool({ history, onImported }: {
   const rows = [...books].sort((a, b) => (perBook.get(b.providerRecordId)?.passages ?? 0) - (perBook.get(a.providerRecordId)?.passages ?? 0));
   return (
     <div className={sheet.page}>
-      <TitleRow title="Import" meta={desktop ? "Bring highlights and notes in from your e-reader. Files are read on this computer and never changed." : "Bring highlights and notes in from your e-reader. Files are read in this browser and never changed."} />
+      <TitleRow title="Import" meta={desktop ? "Bring books, highlights and notes in from your e-reader or Goodreads. Files are read on this computer and never changed." : "Bring books, highlights and notes in from your e-reader or Goodreads. Files are read in this browser and never changed."} />
       <form className={sheet.form} onSubmit={(event) => { event.preventDefault(); void commit(); }}>
         <fieldset disabled={busy} className={sheet.fieldset}>
           <legend className="sr-only">Import</legend>
@@ -175,9 +168,9 @@ export function ImportTool({ history, onImported }: {
                 {readers.map((reader) => (
                   <li key={reader.id}>
                     <Usb size={16} aria-hidden="true" />
-                    <span>{reader.kind === "koreader" ? <>KOReader highlights are on <strong>{reader.label}</strong>.</> : <>Your {READER_NAMES[reader.kind]} <strong>{reader.label}</strong> is plugged in.</>}</span>
+                    <span>{reader.kind === "koreader" ? <>KOReader highlights are on <strong>{reader.label}</strong>.</> : <>Your {IMPORT_PROVIDER_NAMES[reader.kind]} <strong>{reader.label}</strong> is plugged in.</>}</span>
                     <button type="button" className="ll-button" onClick={() => void choose(reader)}>
-                      Import from {READER_NAMES[reader.kind]}
+                      Import from {IMPORT_PROVIDER_NAMES[reader.kind]}
                     </button>
                   </li>
                 ))}
@@ -275,7 +268,7 @@ export function ImportTool({ history, onImported }: {
                 <div className={sheet.footer}>
                   <span className="ui-sub">Edits you made here are always kept. Anything that changed in both places waits for you to review.</span>
                   <button type="button" className="ll-button-secondary" disabled={busy} onClick={() => { setPending(undefined); setError(""); }}>Cancel import</button>
-                  <button type="submit" className="ll-button" disabled={busy || sourceId === "review" || Boolean(reviewNeeded) || (!sourceId && !sourceName.trim())}>Import highlights and notes</button>
+                  <button type="submit" className="ll-button" disabled={busy || sourceId === "review" || Boolean(reviewNeeded) || (!sourceId && !sourceName.trim())}>{PROVIDERS[pending.provider].actionLabel ?? "Import highlights and notes"}</button>
                 </div>
               </Panel>
             </>

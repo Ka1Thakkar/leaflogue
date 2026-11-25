@@ -113,30 +113,11 @@ describe("listHighlights", () => {
     expect(transport.calls[1]?.args).not.toHaveProperty("date");
   });
 
-  it("falls back to a UTC date for a backend that refuses exact bounds", async () => {
-    const from = new Date(2026, 9, 8).getTime();
-    const before = new Date(2026, 9, 9).getTime();
-    transport.on("browse:highlights", (args) => {
-      if ("dateFrom" in args) throw new BackendError("The library could not complete that request. Try again shortly.");
-      return { page: [passage(1, { createdAt: from + 60_000 }), passage(2, { createdAt: before + 60_000 })], isDone: true, continueCursor: "" };
-    });
-    const library = bridge().library;
-    const page = await library.listHighlights({ dateKind: "created", dateFrom: from, dateBefore: before });
-    expect(page.entries.map(({ id }) => id)).toEqual(["h1"]);
-    expect(transport.calls.map(({ args }) => args.date)).toEqual([undefined, "2026-10-08"]);
-    expect(transport.calls[1]?.args).not.toHaveProperty("dateFrom");
-
-    // Later reads go straight to the older form.
-    await library.listHighlights({ dateKind: "imported", dateFrom: from, dateBefore: before });
-    expect(transport.calls[2]?.args).toMatchObject({ date: "2026-10-08", dateKind: "imported" });
-
-    // Errors a newer backend gives are not mistaken for an older one.
-    const offline = new FakeTransport().on("browse:highlights", () => {
-      throw new BackendError("Offline", "LEAFLOGUE_OFFLINE");
-    });
-    transport = offline;
-    await expect(bridge().library.listHighlights({ dateFrom: from, dateBefore: before })).rejects.toMatchObject({ code: "LEAFLOGUE_OFFLINE" });
-    expect(offline.calls).toHaveLength(1);
+  it("reports a refused date query without silently retrying a less precise form", async () => {
+    transport.on("browse:highlights", () => { throw new BackendError("Invalid request", "LEAFLOGUE_REQUEST_INVALID"); });
+    await expect(bridge().library.listHighlights({ dateFrom: 1, dateBefore: 2 })).rejects.toMatchObject({ code: "LEAFLOGUE_REQUEST_INVALID" });
+    expect(transport.calls).toHaveLength(1);
+    expect(transport.calls[0]?.args).toMatchObject({ dateFrom: 1, dateBefore: 2 });
   });
 });
 

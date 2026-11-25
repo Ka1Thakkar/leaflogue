@@ -36,8 +36,8 @@ function ipv6Words(address: string): readonly number[] | undefined {
   return [...leading, ...Array.from({ length: missing }, () => 0), ...trailing];
 }
 
-/** Only globally routable unicast addresses may receive a pasted cover request. */
-export function isPublicCoverAddress(address: string): boolean {
+/** Only globally routable unicast addresses may receive a pasted public resource request. */
+export function isPublicResourceAddress(address: string): boolean {
   const ipv4 = ipv4Bytes(address);
   if (ipv4) {
     const [a, b, c] = ipv4;
@@ -70,7 +70,7 @@ function responseAllowsBody(status: number): boolean {
 export function responseFromIncoming(incoming: IncomingMessage): Response {
   const status = incoming.statusCode ?? 500;
   if (!Number.isInteger(status) || status < 200 || status > 599) {
-    throw new Error("Cover server returned an invalid status");
+    throw new Error("Resource server returned an invalid status");
   }
   const headers = new Headers();
   for (const [name, value] of Object.entries(incoming.headers)) {
@@ -88,15 +88,15 @@ export function responseFromIncoming(incoming: IncomingMessage): Response {
   });
 }
 
-export async function resolvePublicCoverAddress(
+export async function resolvePublicResourceAddress(
   hostname: string,
   resolver: AddressResolver = async (name) => lookup(name, { all: true, verbatim: true }) as Promise<ResolvedAddress[]>,
 ): Promise<ResolvedAddress> {
   const literal = hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
   const family = isIP(literal);
   const addresses = family ? [{ address: literal, family: family as 4 | 6 }] : await resolver(literal);
-  if (addresses.length === 0 || addresses.some(({ address }) => !isPublicCoverAddress(address))) {
-    throw new Error("Cover host does not resolve to a public address");
+  if (addresses.length === 0 || addresses.some(({ address }) => !isPublicResourceAddress(address))) {
+    throw new Error("Resource host does not resolve to a public address");
   }
   return addresses[0]!;
 }
@@ -109,9 +109,21 @@ export function pinnedAddressLookup(resolved: ResolvedAddress): LookupFunction {
 }
 
 /** HTTPS fetch with DNS resolution pinned to the public address we validated. */
-export async function fetchPublicCover(url: string, init: RequestInit): Promise<Response> {
+export async function fetchPublicResource(url: string, init: RequestInit, resolver?: AddressResolver): Promise<Response> {
+  init.signal?.throwIfAborted();
   const parsed = new URL(url);
-  const resolved = await resolvePublicCoverAddress(parsed.hostname);
+  const pending = resolvePublicResourceAddress(parsed.hostname, resolver);
+  const resolved = await new Promise<ResolvedAddress>((resolve, reject) => {
+    const signal = init.signal;
+    const abort = () => {
+      signal?.removeEventListener("abort", abort);
+      reject(signal?.reason instanceof Error ? signal.reason : new Error("Public resource request cancelled."));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    pending.then(address => { signal?.removeEventListener("abort", abort); resolve(address); },
+      error => { signal?.removeEventListener("abort", abort); reject(error instanceof Error ? error : new Error("Public resource DNS lookup failed.")); });
+    if (signal?.aborted) abort();
+  });
   return new Promise<Response>((resolve, reject) => {
     const requestHeaders = new Headers(init.headers);
     const outgoing = request(parsed, {
@@ -124,7 +136,7 @@ export async function fetchPublicCover(url: string, init: RequestInit): Promise<
         resolve(responseFromIncoming(incoming));
       } catch (error) {
         incoming.destroy();
-        reject(error instanceof Error ? error : new Error("Cover response could not be read"));
+        reject(error instanceof Error ? error : new Error("Resource response could not be read"));
       }
     });
     outgoing.once("error", reject);

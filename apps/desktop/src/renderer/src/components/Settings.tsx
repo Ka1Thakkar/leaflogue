@@ -1,3 +1,4 @@
+import { aiProviderName as providerName } from "@leaflogue/ai";
 
 import { Select, SelectItem } from "@leaflogue/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,19 +26,6 @@ import { useConfirm } from "./Confirm";
 import { ExportLibrary } from "./Library";
 import { countOf, InlineError, Loading } from "./shared";
 import styles from "./settings.module.css";
-
-function providerName(id: string): string {
-  const names: Readonly<Record<string, string>> = {
-    openai: "OpenAI",
-    anthropic: "Anthropic",
-    gemini: "Google Gemini",
-    mistral: "Mistral",
-    xai: "xAI",
-    deepseek: "DeepSeek",
-    "openai-compatible": "OpenAI-compatible",
-  };
-  return names[id] ?? id;
-}
 
 /** Stands in for a saved secret, which the interface never receives. */
 const SAVED_SECRET = "•••••••••••••••• Saved — leave blank to keep";
@@ -613,7 +601,7 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
   }, [config, onDirtyChange, provider, syncKey, value]);
   const convexSaved = savedProviderSelected && provider === "convex";
   const syncResult = syncStatus?.lastResult;
-  const backendUpdate = (syncResult?.status === "failed" ? syncResult.problem.backendUpdate : undefined) ?? syncResult?.backendUpdate ?? status?.backendUpdate ??
+  const backendUpdate = (syncResult?.status === "failed" ? syncResult.problem.backendUpdate : undefined) ?? status?.backendUpdate ??
     (status?.mutationContractVersion !== undefined && status.mutationContractVersion < 24 ? { installedContract: status.mutationContractVersion, installedSchema: status.schemaVersion, requiredContract: 24, requiredSchema: 17, updateDesktop: false } : undefined);
   const safeVersion = /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/u.test(desktopVersion) ? desktopVersion : "VERSION";
   const keyNeeded = provider === "convex" && !(config?.provider === "convex" && config.syncKeySaved);
@@ -633,8 +621,8 @@ function RemoteSection({ onConfigLocationChanged, onDirtyChange }: {
       </section>}
       {config?.provider === "convex" && backendUpdate && <section className={styles.syncProgress} aria-label="Backend upgrade guidance">
         <h3>{backendUpdate.updateDesktop ? "Your desktop app needs an update" : "Your backend needs an update"}</h3>
-        <p>Installed backend: schema {backendUpdate.installedSchema ?? "unknown"}, contract {backendUpdate.installedContract ?? "unknown"}. This app supports schema {backendUpdate.requiredSchema}, contracts 22–24; shared highlight colours need contract {backendUpdate.requiredContract}.</p>
-        <p>Your local database upgrades automatically when the desktop app opens. Convex is a separate upgrade, performed once by the deployment owner. Queued edits and deferred colour choices remain saved on this device.</p>
+        <p>Installed backend: schema {backendUpdate.installedSchema ?? "unknown"}, contract {backendUpdate.installedContract ?? "unknown"}. This app supports schema {backendUpdate.requiredSchema}, contract {backendUpdate.requiredContract}.</p>
+        <p>Your local database upgrades automatically when the desktop app opens. Convex is a separate upgrade, performed once by the deployment owner. Queued edits, including highlight colours, remain saved on this device.</p>
         {backendUpdate.updateDesktop ? <p>Install a desktop version that supports this newer backend before syncing.</p> : <>
           <p>Using someone else’s hosted backend? Ask its administrator to upgrade. If you own the deployment:</p>
           <ol><li>Download <code>Leaflogue-Convex-{safeVersion}.tar.gz</code> and its checksum from the matching release and verify them.</li>

@@ -136,13 +136,12 @@ describe("browsing a library", () => {
 
     expect(texts(await owner.query(highlights, { libraryId, notes: "with", paginationOpts: page() }))).toEqual(["Every pane held a season."]);
     expect(texts(await owner.query(highlights, { libraryId, notes: "without", paginationOpts: page() }))).toHaveLength(2);
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", paginationOpts: page() })))
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), paginationOpts: page() })))
       .toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", bookId: ATLAS, paginationOpts: page() })))
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), bookId: ATLAS, paginationOpts: page() })))
       .toEqual(["Rain is a map of where the sky has been."]);
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", dateKind: "imported", paginationOpts: page() }))).toEqual([]);
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), dateKind: "imported", paginationOpts: page() }))).toEqual([]);
     expect(texts(await owner.query(highlights, { libraryId, source: "imported", paginationOpts: page() }))).toEqual([]);
-    await expect(owner.query(highlights, { libraryId, date: "2026-02-30", paginationOpts: page() })).rejects.toThrow("valid calendar date");
   });
 
   it("shows threads with their passages, and what a passage belongs to", async () => {
@@ -289,10 +288,10 @@ describe("web parity with the other backends", () => {
     // Passages just outside the span are left out.
     expect(await day(india + 24 * 60 * 60 * 1000)).not.toContain("Early in Kolkata.");
 
-    // Older clients' UTC day still works; giving both forms is refused.
-    expect(texts(await owner.query(highlights, { libraryId, date: "2026-01-03", paginationOpts: page() })))
+    // UTC ranges and invalid millisecond bounds use the same protocol.
+    expect(texts(await owner.query(highlights, { libraryId, dateFrom: Date.UTC(2026, 0, 3), dateBefore: Date.UTC(2026, 0, 4), paginationOpts: page() })))
       .toEqual(["The orchard kept its own weather.", "Rain is a map of where the sky has been."]);
-    await expect(owner.query(highlights, { libraryId, date: "2026-01-03", dateFrom: india, paginationOpts: page() })).rejects.toThrow("not both");
+    await expect(owner.query(highlights, { libraryId, dateFrom: india, dateBefore: 0.5, paginationOpts: page() })).rejects.toThrow("whole milliseconds");
     await expect(owner.query(highlights, { libraryId, dateFrom: 0.5, paginationOpts: page() })).rejects.toThrow("whole milliseconds");
   });
 });

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LocalLibrary } from "@leaflogue/storage";
 import { describe, expect, it } from "vitest";
-import { migrateLegacyDesktopFiles, prepareDesktopDirectories, resolveDesktopPaths, type DesktopPaths } from "./desktop-paths";
+import { migrateDesktopLibrary, prepareDesktopDirectories, resolveDesktopPaths, type DesktopPaths } from "./desktop-paths";
 
 describe("desktop filesystem layout", () => {
   it("uses absolute XDG roots and ignores invalid relative overrides", () => {
@@ -36,7 +36,7 @@ describe("desktop filesystem layout", () => {
       const identity = readFileSync(`${legacyPath}.device-id`, "utf8");
       expect(existsSync(`${legacyPath}-wal`)).toBe(true);
 
-      expect(await migrateLegacyDesktopFiles(fixture.paths)).toEqual([
+      expect(await migrateDesktopLibrary(fixture.paths)).toEqual([
         "library.sqlite.device-id",
         "library.sqlite",
       ]);
@@ -48,7 +48,7 @@ describe("desktop filesystem layout", () => {
       migrated.close();
       expect(existsSync(legacyPath)).toBe(true);
       expect(statSync(fixture.paths.libraryFile).mode & 0o777).toBe(0o600);
-      expect(await migrateLegacyDesktopFiles(fixture.paths)).toEqual([]);
+      expect(await migrateDesktopLibrary(fixture.paths)).toEqual([]);
       legacy.close();
     } finally {
       fixture.cleanup();
@@ -63,8 +63,8 @@ describe("desktop filesystem layout", () => {
       const created = legacy.createBook({ title: "The Dispossessed" });
 
       await Promise.all([
-        migrateLegacyDesktopFiles(fixture.paths),
-        migrateLegacyDesktopFiles(fixture.paths),
+        migrateDesktopLibrary(fixture.paths),
+        migrateDesktopLibrary(fixture.paths),
       ]);
 
       const migrated = new LocalLibrary(fixture.paths.libraryFile);
@@ -91,7 +91,7 @@ describe("desktop filesystem layout", () => {
         { mode: 0o600 },
       );
 
-      expect(await migrateLegacyDesktopFiles(fixture.paths)).toEqual(["library.sqlite"]);
+      expect(await migrateDesktopLibrary(fixture.paths)).toEqual(["library.sqlite"]);
       const migrated = new LocalLibrary(fixture.paths.libraryFile);
       expect(migrated.listBooks()).toEqual([created]);
       migrated.close();
@@ -111,32 +111,11 @@ describe("desktop filesystem layout", () => {
       writeFileSync(legacyPath, "unverified replacement", { mode: 0o600 });
       writeFileSync(`${legacyPath}.restore-state.json`, JSON.stringify({ version: 1, hadOriginal: true }), { mode: 0o600 });
 
-      await migrateLegacyDesktopFiles(fixture.paths);
+      await migrateDesktopLibrary(fixture.paths);
 
       const migrated = new LocalLibrary(fixture.paths.libraryFile);
       expect(migrated.listBooks()).toEqual([created]);
       migrated.close();
-    } finally {
-      fixture.cleanup();
-    }
-  });
-
-  it("publishes the active external config locator independently of a prior partial default copy", async () => {
-    const fixture = desktopFixture();
-    try {
-      const external = join(fixture.root, "external.json");
-      writeFileSync(external, "{}", { mode: 0o600 });
-      writeFileSync(fixture.paths.defaultConfigFile, "partial legacy default", { mode: 0o600 });
-      writeFileSync(
-        join(fixture.paths.legacyUserDataDirectory, "remote-config-location.json"),
-        `${JSON.stringify({ path: external })}\n`,
-        { mode: 0o600 },
-      );
-
-      expect(await migrateLegacyDesktopFiles(fixture.paths)).toEqual(["remote-config-location.json"]);
-      expect(JSON.parse(readFileSync(fixture.paths.configLocatorFile, "utf8"))).toEqual({ path: external });
-      expect(readFileSync(fixture.paths.defaultConfigFile, "utf8")).toBe("partial legacy default");
-      expect(await migrateLegacyDesktopFiles(fixture.paths)).toEqual([]);
     } finally {
       fixture.cleanup();
     }
@@ -150,8 +129,8 @@ describe("desktop filesystem layout", () => {
       symlinkSync(legacyConfig, join(fixture.paths.legacyUserDataDirectory, "library.sqlite"));
       writeFileSync(join(fixture.paths.legacyUserDataDirectory, "Cookies"), "browser state", { mode: 0o600 });
 
-      expect(await migrateLegacyDesktopFiles(fixture.paths)).toEqual(["config.json"]);
-      expect(readFileSync(fixture.paths.defaultConfigFile, "utf8")).toBe("legacy config");
+      expect(await migrateDesktopLibrary(fixture.paths)).toEqual([]);
+      expect(existsSync(fixture.paths.defaultConfigFile)).toBe(false);
       expect(existsSync(fixture.paths.libraryFile)).toBe(false);
     } finally {
       fixture.cleanup();

@@ -74,7 +74,7 @@ describe("Calibre book formats", () => {
       expect(await readFile(join(library, "metadata.db"))).toEqual(before);
       expect((await service.reference(bookUuid, "EPUB")).path).toBe(join(library, "Author/Book/a-book.epub"));
       const { format: _format, ...legacy } = reference; void _format;
-      expect(await service.resolve(legacy)).toBe(join(library, "Author/Book/a-book.epub"));
+      await expect(service.resolve(legacy)).rejects.toThrow("Choose EPUB, KEPUB or PDF");
       await rename(path, join(library, "Author/Book/kobo-renamed.kepub"));
       const changed = new DatabaseSync(join(library, "metadata.db")); changed.exec("UPDATE data SET name='kobo-renamed' WHERE format='KEPUB'"); changed.close();
       const moved = join(root, "Moved Calibre"); await rename(library, moved); await service.connect(moved);

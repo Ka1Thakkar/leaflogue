@@ -21,7 +21,7 @@ for (const newer of [false, true]) test(`explains a ${newer ? "newer" : "older"}
     await expect(guide).toBeVisible();
     await expect(guide.getByRole("heading", { name: newer ? "Your desktop app needs an update" : "Your backend needs an update" })).toBeVisible();
     await expect(guide).toContainText(`contract ${newer ? 25 : 21}`);
-    await expect(guide).toContainText("Queued edits and deferred colour choices remain saved");
+    await expect(guide).toContainText("Queued edits, including highlight colours, remain saved");
     await expect(guide.getByRole("button", { name: "Upgrade instructions" })).toBeVisible();
     if (!newer) await expect(guide).toContainText("/deploy.sh --production");
     await session.close();

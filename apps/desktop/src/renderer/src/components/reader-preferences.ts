@@ -38,7 +38,6 @@ interface Store {
   presets: { name: string; preferences: ReaderPreferences }[];
 }
 const KEY = "leaflogue.reader-preferences.v1";
-const LEGACY_KEY = "leaflogue.reader-display";
 const emptyStore = (): Store => ({ global: { ...DEFAULT_READER_PREFERENCES }, books: {}, inactiveBooks: {}, presets: [] });
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 function readItem(key: string): { present: boolean; value?: unknown; malformed?: boolean } {
@@ -55,15 +54,11 @@ function bookSection(value: unknown): Record<string, ReaderPreferences> {
 }
 /**
  * Each section is read on its own, so one damaged part never resets the
- * others. The legacy display setting is only a migration source when no
- * current preferences exist.
+ * others. Only the current preference store is read.
  */
 export function readReaderPreferenceStore(): Store {
   const current = readItem(KEY);
-  if (!current.present) {
-    const legacy = readItem(LEGACY_KEY);
-    return { ...emptyStore(), global: validateReaderPreferences(legacy.malformed ? undefined : legacy.value) };
-  }
+  if (!current.present) return emptyStore();
   if (!isRecord(current.value)) {
     // Keep the unreadable original so nothing is lost when defaults are saved.
     try { const raw = localStorage.getItem(KEY); if (raw !== null) localStorage.setItem(`${KEY}.corrupt`, raw); } catch { /* Storage unavailable. */ }

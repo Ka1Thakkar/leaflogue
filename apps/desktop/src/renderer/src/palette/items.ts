@@ -1,3 +1,4 @@
+import { IMPORT_PROVIDER_NAMES } from "@leaflogue/contracts";
 import type { AppearanceConfiguration, Book, Collection, ConnectedReader, HighlightListEntry, SystemHost, Tag, Thread } from "@leaflogue/contracts";
 import type { IconName } from "@leaflogue/ui";
 import { href, navigate } from "../router";
@@ -157,7 +158,7 @@ export function actionItems(sources: PaletteSources, shell: ShellState, pageComm
   const items: PaletteItem[] = [];
   const action = (id: string, item: Omit<PaletteItem, "key" | "group">) => items.push({ key: `cmd:${id}`, group: "Actions", ...item });
   for (const reader of sources.readers) {
-    const name = { kobo: "Kobo", kindle: "Kindle", koreader: "KOReader", pocketbook: "PocketBook", tolino: "Tolino", boox: "Boox" }[reader.kind];
+    const name = IMPORT_PROVIDER_NAMES[reader.kind];
     action(`import-reader.${reader.id}`, {
       title: `Import from your ${name}`,
       subtitle: `${reader.label} is plugged in`,

@@ -1,4 +1,4 @@
-import { DEFAULT_AI_PROVIDERS as SHARED_DEFAULT_AI_PROVIDERS, type AiProviderDefaults } from "@leaflogue/ai";
+import { isAiProviderId, DEFAULT_AI_PROVIDERS as SHARED_DEFAULT_AI_PROVIDERS, type AiProviderDefaults } from "@leaflogue/ai";
 import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
@@ -12,7 +12,6 @@ const MAX_CONFIG_BYTES = 64 * 1024;
 const MAX_THEME_BYTES = 32 * 1024;
 const ENVIRONMENT_NAME = /^[A-Z_][A-Z0-9_]*$/;
 const PROVIDER_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const AI_PROVIDER_IDS = new Set(["openai", "anthropic", "gemini", "mistral", "xai", "deepseek", "openai-compatible"]);
 const AI_CAPABILITIES = new Set(["chat", "structured-output", "vision", "tools"]);
 const BUILT_IN_THEME_IDS = new Set(BUILT_IN_THEMES.map(({ id }) => id));
 
@@ -970,7 +969,7 @@ function parseAiDocument(value: unknown): ParsedAiDocument {
   const selectedModels = stringRecord(input.selectedModels, "Selected AI models");
   const providers: Record<string, ParsedAiProvider> = {};
   for (const [id, rawProvider] of Object.entries(input.providers as Record<string, unknown>)) {
-    if (!PROVIDER_ID.test(id) || !AI_PROVIDER_IDS.has(id) || typeof rawProvider !== "object" || rawProvider === null || Array.isArray(rawProvider)) throw new Error("AI provider configuration is invalid");
+    if (!PROVIDER_ID.test(id) || !isAiProviderId(id) || typeof rawProvider !== "object" || rawProvider === null || Array.isArray(rawProvider)) throw new Error("AI provider configuration is invalid");
     const defaults = DEFAULT_AI_PROVIDERS[id];
     const configured = rawProvider as Record<string, unknown>;
     const raw: Record<string, unknown> = {

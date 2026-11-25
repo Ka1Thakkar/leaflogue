@@ -305,7 +305,7 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
           <h1 className={sheet.title}>{book.title}</h1>
           <p className={sheet.authors}>{authorsLabel(book.authors)}{book.series ? ` · ${book.series}${book.seriesNumber ? ` ${book.seriesNumber}` : ""}` : ""}</p>
           <div className={styles.actions}>
-            {window.leaflogue.epub && <button className="ll-button-secondary" onClick={() => contextWorkspace?.showReader(book.id, book.title)}>Read</button>}
+            {window.leaflogue.reader && <button className="ll-button-secondary" onClick={() => contextWorkspace?.showReader(book.id, book.title)}>Read</button>}
             {!readOnly && (
               <>
                 {/* Saving announces leaflogue:annotations-changed, which refreshes this page once. */}

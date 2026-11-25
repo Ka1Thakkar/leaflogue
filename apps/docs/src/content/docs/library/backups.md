@@ -67,3 +67,10 @@ set the reader up the way you like it.
 To keep links, positions, and bookmarks too, copy
 `<library.sqlite>.epubs/` and `<library.sqlite>.calibre.json` from beside your
 library while Leaflogue is closed.
+
+
+Captured article text is stored separately in the `.articles` directory beside
+the library database. Database backups and portable exports do not include it.
+For full article reading-context recovery, retain that directory and the existing
+reader sidecars as well as the database. Saved quotations and notes remain in the
+database and are included normally.

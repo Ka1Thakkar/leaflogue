@@ -10,6 +10,7 @@ import {
   parseKOReaderSidecars,
   parsePortableJson,
   parseTolinoNotes,
+  parseGoodreadsCsv,
 } from "@leaflogue/importers";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import type { DatabaseReply, DatabaseRequest } from "./database.worker";
@@ -21,7 +22,7 @@ export interface ReadImport {
 }
 
 /** What the file picker offers: the same files the desktop's import dialog does. */
-export const IMPORT_ACCEPT = ".sqlite,.sqlite3,.db,.txt,.json,.lua";
+export const IMPORT_ACCEPT = ".sqlite,.sqlite3,.db,.txt,.json,.lua,.csv";
 
 const MAX_TEXT_BYTES = 16 * 1024 * 1024;
 const MAX_SIDECAR_BYTES = 8 * 1024 * 1024;
@@ -54,6 +55,9 @@ export async function readImportFiles(files: readonly File[], readDatabase: Read
     const sources = files.every((file) => extension(file) === ".txt") ? await Promise.all(files.map((file) => text(file, MAX_TEXT_BYTES))) : [];
     if (!sources.length || !sources.every(looksLikeBooxExport)) throw new Error("Choose one file, or several KOReader or Boox files.");
     return { provider: "boox", fileName, preview: await parseBooxExports(sources) };
+  }
+  if (extension(first) === ".csv") {
+    return { provider: "goodreads", fileName, preview: parseGoodreadsCsv(await text(first, MAX_TEXT_BYTES)) };
   }
   if (extension(first) === ".txt") {
     const source = await text(first, MAX_TEXT_BYTES);

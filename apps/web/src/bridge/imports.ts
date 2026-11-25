@@ -1,13 +1,10 @@
+import { suggestedImportSourceName } from "@leaflogue/contracts";
 import type { ImportBook, ImportProvider, ImportReceipt, ImportSourceProfile, LeaflogueBridge, PendingImport } from "@leaflogue/contracts";
 import { IMPORT_ACCEPT, readImportFiles, type ReadImport } from "../import/files";
 import { BackendError } from "../transport/transport";
 import { newId, type LibraryClient } from "./client";
 
 type Imports = Pick<LeaflogueBridge["imports"], "chooseFile" | "commit">;
-
-const PROVIDER_NAMES: Record<ImportProvider, string> = {
-  kobo: "Kobo", kindle: "Kindle", koreader: "KOReader", pocketbook: "PocketBook", tolino: "Tolino", boox: "Boox", portable: "Portable",
-};
 
 /** The server takes at most 100 records a call; Convex also limits a call's size. */
 const BATCH_RECORDS = 100;
@@ -46,12 +43,6 @@ export function batches<T>(records: readonly T[]): T[][] {
   return result;
 }
 
-function suggestedName(provider: ImportProvider, fileName: string): string {
-  const stem = fileName.replace(/\.[^.]*$/u, "").trim();
-  const name = PROVIDER_NAMES[provider];
-  return stem && !/^\d+ files$/u.test(stem) && stem.toLocaleLowerCase("en") !== name.toLocaleLowerCase("en") ? `${name} — ${stem}`.slice(0, 200) : `${name} library`;
-}
-
 /**
  * Importing in the browser: the chosen files are read here with the desktop's
  * importers, reviewed in the same dialog, then sent in batches. Unlike the
@@ -80,7 +71,7 @@ export function createFileImports(client: LibraryClient, choose = pickFiles, rea
         preview: imported.preview,
         sourceProfiles,
         newSourceId,
-        suggestedSourceName: suggestedName(imported.provider, imported.fileName),
+        suggestedSourceName: suggestedImportSourceName(imported.provider, imported.fileName.replace(/\.[^.]*$/u, "")),
       };
     },
 

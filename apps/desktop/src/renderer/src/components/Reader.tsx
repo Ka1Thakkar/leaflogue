@@ -1,8 +1,9 @@
+import { HIGHLIGHT_COLOURS } from "@leaflogue/contracts";
 import { ReaderPreferenceControls, READER_TABS, type ReaderTab } from "./ReaderPreferences";
 import { applyReaderTypography, useReaderPreferences, type ReaderTypography } from "./reader-preferences";
 import { readerKeyAction } from "./reader-keys";
 import { HighlightColourPicker } from "./HighlightColourPicker";
-import { HIGHLIGHT_COLOURS, highlightColour, highlightPalette, useHighlightColours } from "./highlight-colours";
+import { highlightColour, highlightPalette } from "./highlight-colours";
 import { usePdfPages } from "./pdf-pages";
 import { searchReader, readerTextRange } from "./reader-search";
 import { CalibrePicker } from "./CalibrePicker";
@@ -13,29 +14,29 @@ import { matchReaderHighlight, matchReaderLocation, parseReaderLocation, readerH
 import { createPageEstimate, measureChapter, pagesBefore, resetPageEstimate, totalPages } from "./reader-pages";
 import { Icon, Select, SelectItem } from "@leaflogue/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BookId, HighlightId, EpubDocument, EpubFailureKind, BookContents, AppearanceConfiguration, Highlight as SavedHighlight } from "@leaflogue/contracts";
+import type { BookId, HighlightId, ReaderDocument, ReaderFailureKind, BookContents, AppearanceConfiguration, Highlight as SavedHighlight } from "@leaflogue/contracts";
 import { InlineError } from "./shared";
 import styles from "./epub-reader.module.css";
 
-type Position = EpubDocument["position"];
+type Position = ReaderDocument["position"];
 const escape = (value: string) => value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 const GAP = 48;
 /** One chapter as reading markup. Paragraph numbers are chapter-scoped, as saved positions and anchors expect. */
-const chapterMarkup = (book: EpubDocument, index: number) => {
+const chapterMarkup = (book: ReaderDocument, index: number) => {
   const item = book.chapters[index]!;
   return `<article data-chapter="${index}" data-path="${escape(item.id)}" aria-label="${escape(item.title)}">${item.html ?? item.text.split("\n\n").map((text, paragraph) => `<p data-paragraph="${paragraph}">${escape(text)}</p>`).join("")}</article>`;
 };
 const tagParagraphs = (root: ParentNode) => {
   for (const node of root.querySelectorAll<HTMLElement>("[data-paragraph]")) node.dataset.chapter = node.closest<HTMLElement>("article[data-chapter]")!.dataset.chapter;
 };
-const wholeBooks = new WeakMap<EpubDocument, DocumentFragment>();
+const wholeBooks = new WeakMap<ReaderDocument, DocumentFragment>();
 /**
  * Where highlights, anchors and reviewed locations are matched. EPUB pages hold
  * one chapter, so matching uses an inert copy of the whole book: parsed the same
  * way, but never laid out, styled, scripted or loaded from. PDF pages are all
  * in the reading document already.
  */
-function annotationDocument(book: EpubDocument | undefined, frame: HTMLIFrameElement | null): ReaderRoot | undefined {
+function annotationDocument(book: ReaderDocument | undefined, frame: HTMLIFrameElement | null): ReaderRoot | undefined {
   if (!book) return undefined;
   if (book.format === "pdf") {
     // Matching can run before the layout pass labels paragraphs; labelling is idempotent.
@@ -55,24 +56,23 @@ function annotationDocument(book: EpubDocument | undefined, frame: HTMLIFrameEle
 }
 
 /** Friendly wording for a book file that could not be opened; the technical message stays secondary. */
-const FAILURES: Record<EpubFailureKind, string> = {
+const FAILURES: Record<ReaderFailureKind, string> = {
   missing: "Leaflogue can't find this book's file. It may have been moved, renamed or deleted.",
   changed: "The book file has changed since it was linked, so it may be a different edition.",
   unreadable: "This book file can't be opened. It may be damaged, protected or in a format Leaflogue doesn't support.",
   "invalid-link": "This book's file link is damaged.",
 };
-export interface OpenFailure { readonly kind: EpubFailureKind | "unknown"; readonly calibre: boolean; readonly detail: string }
+export interface OpenFailure { readonly kind: ReaderFailureKind | "unknown"; readonly calibre: boolean; readonly detail: string }
 export function describeOpenFailure(failure: unknown): OpenFailure {
   const text = failure instanceof Error ? failure.message : String(failure);
   const marker = /\s*\[book-file:(missing|changed|unreadable|invalid-link)(\+calibre)?\]/u.exec(text);
   const detail = text.replace(/^Error invoking remote method '[^']+': (?:Error: )?/u, "").replace(/\s*\[book-file:[^\]]*\]/u, "").trim();
-  return { kind: (marker?.[1] as EpubFailureKind | undefined) ?? "unknown", calibre: Boolean(marker?.[2]), detail };
+  return { kind: (marker?.[1] as ReaderFailureKind | undefined) ?? "unknown", calibre: Boolean(marker?.[2]), detail };
 }
 
 /** Publisher markup stays inside a scriptless, network-denied reading document. */
-export function EpubReader({ bookId, embedded = false, target, active = true, onOpenInBook, onExplain }: { readonly bookId: BookId; readonly embedded?: boolean; readonly target?: { highlightId: HighlightId; requestId: number }; readonly active?: boolean; readonly onExplain?: (highlight: SavedHighlight, readOnly: boolean) => void; readonly onOpenInBook?: (id: HighlightId) => void }) {
-  const [book, setBook] = useState<EpubDocument>();
-  const highlightColours = useHighlightColours();
+export function Reader({ bookId, embedded = false, target, active = true, onOpenInBook, onExplain }: { readonly bookId: BookId; readonly embedded?: boolean; readonly target?: { highlightId: HighlightId; requestId: number }; readonly active?: boolean; readonly onExplain?: (highlight: SavedHighlight, readOnly: boolean) => void; readonly onOpenInBook?: (id: HighlightId) => void }) {
+  const [book, setBook] = useState<ReaderDocument>();
   const [confirm, confirmDialog] = useConfirm();
   // `keyboard` marks actions opened from the highlights list: they take focus and return it to the page.
   const [activeHighlight, setActiveHighlight] = useState<{ id: HighlightId; left: number; top: number; note?: boolean; keyboard?: boolean }>();
@@ -223,12 +223,12 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const ranges = matches.map((match) => match.range);
     inner.CSS.highlights.set("leaflogue-saved", new inner.Highlight(...ranges));
     for (const colour of HIGHLIGHT_COLOURS) {
-      const coloured = new inner.Highlight(...matches.filter(({ highlight }) => highlightColour(highlight, highlightColours) === colour).map(({ range }) => range));
+      const coloured = new inner.Highlight(...matches.filter(({ highlight }) => highlightColour(highlight) === colour).map(({ range }) => range));
       coloured.priority = 1; inner.CSS.highlights.set(`leaflogue-colour-${colour}`, coloured);
     }
     refreshNoteMarkers.current();
     return () => { paintedRanges.current = []; inner.CSS.highlights.delete("leaflogue-saved"); for (const colour of HIGHLIGHT_COLOURS) inner.CSS.highlights.delete(`leaflogue-colour-${colour}`); };
-  }, [book, placed, loaded, annotationVersion, windowVersion, highlightColours]);
+  }, [book, placed, loaded, annotationVersion, windowVersion]);
   const options = useRef<HTMLDivElement>(null);
   const jump = useRef<(chapter: number) => void>(() => undefined);
   useEffect(() => { if (optionsOpen) options.current?.focus(); }, [optionsOpen]);
@@ -251,7 +251,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     if (!book) return;
     const persist = (next: Position) => {
       saveQueue.current = saveQueue.current.catch(() => undefined).then(async () => {
-        await window.leaflogue.epub!.savePosition(bookId, book.sha256, next.chapter, next.paragraph, next.offset);
+        await window.leaflogue.reader!.savePosition(bookId, book.sha256, next.chapter, next.paragraph, next.offset);
         if (active) setSaved("Position saved");
       }).catch(() => { if (active) setError("Your reading position could not be saved."); });
     };
@@ -267,7 +267,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   }, [book, bookId]);
   useEffect(() => {
     let active = true;
-    void window.leaflogue.epub?.open(bookId).then((next) => {
+    void window.leaflogue.reader?.open(bookId).then((next) => {
       if (!active) return;
       anchor.current = next?.position ?? { chapter: 0, paragraph: 0 };
       setBook(next); setChapter(anchor.current.chapter); setOpenFailure(undefined);
@@ -282,7 +282,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   const updateBookmarks = async (next: readonly Position[]) => {
     if (!book || savingBookmark) return;
     setSavingBookmark(true);
-    try { setBookmarks(await window.leaflogue.epub!.saveBookmarks(bookId, book.sha256, next)); setSaved("Bookmarks saved"); }
+    try { setBookmarks(await window.leaflogue.reader!.saveBookmarks(bookId, book.sha256, next)); setSaved("Bookmarks saved"); }
     catch { setError("Your bookmarks could not be saved. Try again."); }
     finally { setSavingBookmark(false); }
   };
@@ -290,7 +290,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     if (!book || savingAnchor) return;
     setSavingAnchor(true);
     try {
-      setLocalAnchors(await window.leaflogue.epub!.saveAnchor(bookId, book.sha256, id, location));
+      setLocalAnchors(await window.leaflogue.reader!.saveAnchor(bookId, book.sha256, id, location));
       setReview(undefined); options.current?.focus(); setSaved(location ? "Highlight location confirmed" : "Reviewed location removed");
     } catch { setError("This location could not be saved. Your highlight has not changed."); }
     finally { setSavingAnchor(false); }
@@ -590,7 +590,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
     const whole = annotationDocument(book, frame.current);
     const location = highlight && whole ? matchReaderLocation(whole, book, { ...highlight, sourceLocation: localAnchors[highlight.id] ?? highlight.sourceLocation }) : undefined;
     const range = location && goTo.current(location.chapter, (live) => readerLocationRange(live, location));
-    if (!range) { setError(highlight ? "This highlight could not be uniquely matched to the attached EPUB. It may belong to a different edition." : "This highlight is no longer in your library."); return; }
+    if (!range) { setError(highlight ? "This highlight could not be uniquely matched to the linked source. It may belong to a different edition." : "This highlight is no longer in your library."); return; }
     setError(""); setOptionsOpen(false);
     frame.current?.contentWindow?.focus();
   }, [target, active, book, contents, loaded, annotationVersion, localAnchors]);
@@ -659,13 +659,13 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   async function unlink() {
     const calibreLinked = book?.calibre ?? openFailure?.calibre ?? false;
     const message = `This removes the link to this book file on this device, along with your reading position, bookmarks and reviewed highlight locations for it${calibreLinked ? ", and its Calibre link" : ""}. Your original file, the book, its highlights and notes stay in place.`;
-    if (!window.leaflogue.epub?.unlink || !await confirm({ title: "Unlink this book file?", message, confirmLabel: "Unlink file" })) return;
-    try { await window.leaflogue.epub.unlink(bookId); setBook(undefined); setOpenFailure(undefined); setError(""); setOptionsOpen(false); setActiveHighlight(undefined); setNoteMarkers([]); }
+    if (!window.leaflogue.reader?.unlink || !await confirm({ title: "Unlink this book file?", message, confirmLabel: "Unlink file" })) return;
+    try { await window.leaflogue.reader.unlink(bookId); setBook(undefined); setOpenFailure(undefined); setError(""); setOptionsOpen(false); setActiveHighlight(undefined); setNoteMarkers([]); }
     catch { setError("The book file link could not be removed."); }
   }
   /** Find a moved file. The same edition relinks silently; another edition needs the reader's agreement. */
   async function locate() {
-    const epub = window.leaflogue.epub;
+    const epub = window.leaflogue.reader;
     if (!epub?.relocate) return;
     setBusy(true); setError("");
     try {
@@ -683,28 +683,29 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
   }
   async function attach() {
     setBusy(true); setError("");
-    try { const next = await window.leaflogue.epub!.attach(bookId); if (next) { anchor.current = next.position; setBook(next); setChapter(0); setOpened(true); } }
+    try { const next = await window.leaflogue.reader!.attach(bookId); if (next) { anchor.current = next.position; setBook(next); setChapter(0); setOpened(true); } }
     catch (failure) { setError(describeOpenFailure(failure).detail || "The book file could not be linked."); } finally { setBusy(false); }
   }
-  if (!window.leaflogue.epub) return null;
-  return <section className={styles.reader} aria-label={book?.format === "pdf" ? "Local PDF reader" : "Local EPUB reader"}>
+  if (!window.leaflogue.reader) return null;
+  return <section className={styles.reader} aria-label={book?.format === "article" ? "Local article reader" : book?.format === "pdf" ? "Local PDF reader" : "Local EPUB reader"}>
     {confirmDialog}
     {!book && openFailure && <div role="group" aria-label="Book file problem" className={styles.failure}>
       <InlineError>{openFailure.kind === "unknown" ? "This book file could not be opened." : FAILURES[openFailure.kind]}</InlineError>
       <p className="ll-muted">{openFailure.calibre ? "Reconnect it from Calibre to keep reading, or unlink it and link the book again." : "Locate the file to keep reading. If it is the same edition, your place, bookmarks and highlight locations are kept."}</p>
       <div className={styles.pageActions}>
-        {openFailure.calibre ? window.leaflogue.calibre && <button className="ll-button" onClick={() => setCalibreOpen(true)}>Reconnect from Calibre</button> : window.leaflogue.epub.relocate && <button className="ll-button" disabled={busy} onClick={() => void locate()}>Locate file…</button>}
-        {window.leaflogue.epub.unlink && <button className="ll-button-secondary" disabled={busy} onClick={() => void unlink()}>Unlink book file</button>}
+        {openFailure.calibre ? window.leaflogue.calibre && <button className="ll-button" onClick={() => setCalibreOpen(true)}>Reconnect from Calibre</button> : window.leaflogue.reader.relocate && <button className="ll-button" disabled={busy} onClick={() => void locate()}>Locate file…</button>}
+        {window.leaflogue.reader.unlink && <button className="ll-button-secondary" disabled={busy} onClick={() => void unlink()}>Unlink book file</button>}
       </div>
       {openFailure.detail && <details className={styles.readerTools}><summary>Technical details</summary><p className="ll-muted">{openFailure.detail}</p></details>}
     </div>}
     {!book && !openFailure && <><p className="ll-muted">{target ? "Link a book file to find this highlight in its original context." : "Link an EPUB or PDF to read it here."} The file stays in its original location.</p><button className="ll-button-secondary" disabled={busy} onClick={attach}>{busy ? "Checking for book file…" : "Attach book file"}</button>{window.leaflogue.calibre && <button className="ll-button-secondary" onClick={() => setCalibreOpen(true)}>Link from Calibre</button>}<p className="ll-muted">Book files are not included in library backups.</p></>}
     {error && <InlineError>{error}</InlineError>}
-    {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : "Read EPUB"}</button>}
+    {book?.source && <p className="ll-muted">Captured {new Date(book.source.capturedAt).toLocaleDateString()} from {new URL(book.source.url).hostname}. Full article text stays on this computer. <button className="ll-text-button" onClick={() => void window.leaflogue.system.openExternal(book.source!.url)}>Open source website</button></p>}
+    {book && !embedded && <button className="ll-button-secondary" onClick={() => setOpened(!opened)}>{opened ? "Close reader" : book.format === "article" ? "Read article" : book.format === "pdf" ? "Read PDF" : "Read EPUB"}</button>}
     {calibreOpen && <div className={styles.overlay}><div role="dialog" aria-label="Calibre library" className={styles.options} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setCalibreOpen(false); } }}><CalibrePicker bookId={bookId} title={contents?.book.title ?? ""} onClose={() => setCalibreOpen(false)} onLinked={(next) => { anchor.current = next.position; setBook(next); setChapter(next.position.chapter); setCalibreOpen(false); setOptionsOpen(false); setOpened(true); setError(""); setOpenFailure(undefined); }} /></div></div>}
     {opened && book && <>
       <div className={styles.viewport} ref={viewport} style={{ background: preferences.surround === "app" ? "var(--ui-bg)" : readerPaper }} role="region" aria-label="Book pages" onContextMenu={(event) => { event.preventDefault(); menu.current(event.clientX, event.clientY); }}>
-        <iframe ref={frame} className={styles.frame} title={book.format === "pdf" ? "PDF pages" : "EPUB pages"} sandbox="allow-same-origin" srcDoc={source} onLoad={() => setLoaded((value) => value + 1)} />
+        <iframe ref={frame} className={styles.frame} title={book.format === "article" ? "Article pages" : book.format === "pdf" ? "PDF pages" : "EPUB pages"} sandbox="allow-same-origin" srcDoc={source} onLoad={() => setLoaded((value) => value + 1)} />
       </div>
       {!optionsOpen && !calibreOpen && active && noteMarkers.map((marker) => <button key={marker.id} className={styles.noteMarker} aria-label={marker.label} title={marker.label} style={{ left: marker.left, top: marker.top }} onClick={() => { setSelected(undefined); setActiveHighlight({ id: marker.id, left: Math.min(marker.left, window.innerWidth - 344), top: marker.top }); }}><Icon name="note-paper" size={15} aria-hidden="true" /></button>)}
       {activeHighlight && activePassage && !optionsOpen && <div ref={highlightActions} tabIndex={-1} data-reader-selection role="dialog" aria-label="Saved highlight actions" className={styles.selection} style={{ left: activeHighlight.left, top: Math.min(activeHighlight.top, window.innerHeight - (activeHighlight.note ? 280 : 160)) }} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActiveHighlight(undefined); } }}>
@@ -785,7 +786,7 @@ export function EpubReader({ bookId, embedded = false, target, active = true, on
           </details>
           <p className="ll-muted">{matchStatus.matched} highlights shown{matchStatus.unmatched ? ` · ${matchStatus.unmatched} could not be matched to this edition` : ""}</p>
           {window.leaflogue.calibre && <button className="ll-button-secondary" onClick={() => setCalibreOpen(true)}>Manage Calibre link</button>}
-          {window.leaflogue.epub?.unlink && <button className="ll-button-secondary" onClick={() => void unlink()}>Unlink book file</button>}
+          {window.leaflogue.reader?.unlink && <button className="ll-button-secondary" onClick={() => void unlink()}>Unlink book file</button>}
           <details className={styles.shortcuts}><summary>Keyboard shortcuts</summary><dl><dt>Next page</dt><dd>→ / Space / Page Down</dd><dt>Previous page</dt><dd>← / Shift+Space / Page Up</dd><dt>Reader options</dt><dd>Shift+F10</dd></dl></details>
           </div></div>
         </div>

@@ -57,7 +57,7 @@ test("attaches an inert local EPUB and resumes the same edition after restart", 
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
     await expect(page.frameLocator('iframe[title="EPUB pages"]').getByRole("article", { name: "A second chapter" })).toBeInViewport();
-    const position = await page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.position, id);
+    const position = await page.evaluate(async (bookId) => (await window.leaflogue.reader!.open(bookId))?.position, id);
     expect(position).toEqual({ chapter: 1, paragraph: 0 });
     await session.close();
   } finally { await removeProfile(profile); }
@@ -78,7 +78,7 @@ test("turns pages inside a long chapter and restores the exact text after restar
     await page.locator("#context-reader").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("PageDown");
     await expect(page.getByRole("status").filter({ hasText: "Position saved" })).toContainText("Position saved");
-    const position = await page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.position, id);
+    const position = await page.evaluate(async (bookId) => (await window.leaflogue.reader!.open(bookId))?.position, id);
     expect(position?.chapter).toBe(0);
     expect(position?.offset).toBeGreaterThan(0);
     await session.close();
@@ -311,7 +311,7 @@ test("searches across the book and keeps bookmarks after restart", async () => {
     await page.getByText("Bookmarks (0)", { exact: true }).click();
     await page.getByRole("button", { name: "Bookmark this location", exact: true }).click();
     await expect(page.getByText("Bookmarks (1)", { exact: true })).toBeVisible();
-    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.position.chapter, id)).toBe(1);
+    await expect.poll(async () => page.evaluate(async (bookId) => (await window.leaflogue.reader!.open(bookId))?.position.chapter, id)).toBe(1);
     await session.close(); session = await launch(profile); page = session.page;
     await page.evaluate((bookId) => { location.hash = `#/library/${bookId}`; }, id);
     await page.getByRole("button", { name: "Read", exact: true }).click();
@@ -331,7 +331,7 @@ test("searches across the book and keeps bookmarks after restart", async () => {
     await page.getByText("Bookmarks (1)", { exact: true }).click();
     await page.getByRole("button", { name: "Remove bookmark 1", exact: true }).click();
     await expect(page.getByText("Bookmarks (0)", { exact: true })).toBeVisible();
-    expect(await page.evaluate(async (bookId) => (await window.leaflogue.epub!.open(bookId))?.bookmarks, id)).toEqual([]);
+    expect(await page.evaluate(async (bookId) => (await window.leaflogue.reader!.open(bookId))?.bookmarks, id)).toEqual([]);
     await session.close();
   } finally { await removeProfile(profile); }
 });

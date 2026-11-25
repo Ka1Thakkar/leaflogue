@@ -3242,25 +3242,38 @@ it("does not let retained tombstone rows reserve an ISBN after duplicate cleanup
 
 
 describe("shared highlight colours", () => {
-  it("retains deferred colours across restart and atomically re-enqueues them after upgrade", () => {
+  it("migrates deferred colours into the durable outbox exactly once", () => {
     const directory = mkdtempSync(join(tmpdir(), "leaflogue-deferred-colour-"));
     const file = join(directory, "library.sqlite");
     let library = new LocalLibrary(file);
     try {
       const book = library.createBook({ title: "Transition" });
       const highlight = library.createHighlight({ bookId: book.id, text: "A line", colour: "purple" });
-      expect(library.prepareHighlightColourSync(23)).toBe(1);
+      const cleared = library.createHighlight({ bookId: book.id, text: "Current default" });
+      const deleted = library.createHighlight({ bookId: book.id, text: "Deleted", colour: "blue" });
+      library.deleteHighlight({ id: deleted.id, bookId: book.id, expectedRevision: deleted.revision });
       const pending = library.listPendingSyncChanges(100);
       library.acknowledgeSyncChanges(pending, { operationIds: pending.map((entry) => `${entry.deviceId}:${entry.sequence}`) });
+      library.close();
+      const old = new DatabaseSync(file);
+      old.exec(migrations.find((migration) => migration.version === 19)!.sql);
+      const journal = old.prepare("INSERT INTO sync_deferred_colours VALUES (?, ?)");
+      journal.run(highlight.id, "green"); journal.run(cleared.id, "pink"); journal.run(deleted.id, "blue");
+      old.exec("PRAGMA user_version = 20"); old.close();
+      library = new LocalLibrary(file);
+      const highlights = library.getBookContents(book.id)!.highlights;
+      const replay = highlights.find(({ id }) => id === highlight.id)!;
+      expect(replay).toMatchObject({ id: highlight.id, colour: "purple", revision: highlight.revision + 1 });
+      expect(highlights.find(({ id }) => id === cleared.id)!.colour).toBeUndefined();
+      expect(highlights.find(({ id }) => id === cleared.id)!.revision).toBe(cleared.revision + 1);
+      expect(highlights.some(({ id }) => id === deleted.id)).toBe(false);
+      expect(library.listPendingSyncChanges()).toHaveLength(2);
+      expect(library.listPendingSyncChanges()).toContainEqual(expect.objectContaining({ entityType: "highlight", entityId: highlight.id, revision: replay.revision }));
       library.close(); library = new LocalLibrary(file);
-      expect(library.prepareHighlightColourSync(23)).toBe(1);
-      const before = library.getBookContents(book.id)!.highlights[0]!;
-      expect(library.prepareHighlightColourSync(24)).toBe(0);
-      const replay = library.getBookContents(book.id)!.highlights[0]!;
-      expect(replay).toMatchObject({ id: highlight.id, colour: "purple", revision: before.revision + 1 });
-      expect(library.countPendingSyncChanges()).toBeGreaterThan(0);
-      library.prepareHighlightColourSync(24);
-      expect(library.getBookContents(book.id)!.highlights[0]!.revision).toBe(replay.revision);
+      expect(library.getBookContents(book.id)!.highlights.find(({ id }) => id === highlight.id)!.revision).toBe(replay.revision);
+      const inspection = new DatabaseSync(file);
+      expect(inspection.prepare("SELECT name FROM sqlite_master WHERE name = 'sync_deferred_colours'").get()).toBeUndefined();
+      inspection.close();
     } finally { library.close(); rmSync(directory, { recursive: true, force: true }); }
   });
 

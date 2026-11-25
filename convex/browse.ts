@@ -31,7 +31,6 @@ const MAX_LIST = 1_000;
 const MAX_PAGE_ITEMS = 50;
 const MAX_ROWS_SCANNED = 400;
 const MAX_THREAD_PASSAGES = 500;
-const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * A passage search reads passages whose text matches first, then passages
  * whose notes match. The continue cursor of the second part carries this
@@ -211,23 +210,13 @@ async function noteSearchPage(ctx: Reader, libraryId: string, bookId: string | u
   return { page: found, isDone: notes.isDone, continueCursor: NOTE_SEARCH_CURSOR + notes.continueCursor };
 }
 
-function dayRange(day: string): { start: number; end: number } {
-  // The calendar-date form older clients send; it means one UTC day.
-  const start = Date.parse(`${day}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(day) || !Number.isFinite(start) || new Date(start).toISOString().slice(0, 10) !== day) {
-    throw invalid("Date must be a valid calendar date");
-  }
-  return { start, end: start + DAY_MS };
-}
-
 /**
  * The span `dateFrom`..`dateBefore` (epoch milliseconds, the end excluded),
  * as a client sends it for a day in its own time zone. Either end may be
- * left open. Older clients send `date` instead, a UTC calendar day.
+ * left open.
  */
-function exactRange(from: number | undefined, before: number | undefined, day: string | undefined) {
-  if (from === undefined && before === undefined) return day ? dayRange(day) : undefined;
-  if (day !== undefined) throw invalid("Give either a date or a date range, not both");
+function exactRange(from: number | undefined, before: number | undefined) {
+  if (from === undefined && before === undefined) return undefined;
   if ((from !== undefined && !Number.isSafeInteger(from)) || (before !== undefined && !Number.isSafeInteger(before))) {
     throw invalid("Date range must be whole milliseconds");
   }
@@ -246,8 +235,7 @@ function bounded(options: PaginationOptions): PaginationOptions {
  * Passages across the library, or in one book, newest or oldest first, by
  * last edit, or by relevance to a search. A search matches a passage's text
  * or the text of one of its notes. Filters: a tag, with or without notes,
- * typed in or imported, and a span of time (or, from older clients, a UTC
- * day) the passage was added or last imported in. A page may hold fewer
+ * typed in or imported, and a span of time the passage was added or last imported in. A page may hold fewer
  * items than asked while more remain; keep loading until `isDone`.
  */
 export const highlights = query({
@@ -258,7 +246,6 @@ export const highlights = query({
     tagId: v.optional(v.string()),
     notes: v.optional(v.union(v.literal("with"), v.literal("without"))),
     source: v.optional(v.union(v.literal("typed"), v.literal("imported"))),
-    date: v.optional(v.string()),
     dateFrom: v.optional(v.number()),
     dateBefore: v.optional(v.number()),
     dateKind: v.optional(v.union(v.literal("added"), v.literal("imported"))),
@@ -271,7 +258,7 @@ export const highlights = query({
     const pagination = bounded(args.paginationOpts);
     const search = args.search?.normalize("NFKC").trim();
     if (search && new TextEncoder().encode(search).byteLength > 200) throw invalid("Search must be at most 200 bytes");
-    const range = exactRange(args.dateFrom, args.dateBefore, args.date || undefined);
+    const range = exactRange(args.dateFrom, args.dateBefore);
     const dateKind = args.dateKind ?? "added";
     const sort = args.sort ?? "oldest";
     const descending = sort === "newest" || sort === "updated";

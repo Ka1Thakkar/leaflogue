@@ -5,11 +5,11 @@ describe("Convex runtime status adapter", () => {
   it("checks only the public Leaflogue metadata query without credentials", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       status: "success",
-      value: { product: "leaflogue", schemaVersion: 17, mutationContractVersion: 22 },
+      value: { product: "leaflogue", schemaVersion: 17, mutationContractVersion: 24 },
     }), { status: 200, headers: { "content-type": "application/json" } }));
 
     await expect(checkConvex("https://quiet-otter-123.convex.cloud", { fetch: request }))
-      .resolves.toEqual({ reachable: true, initialized: true, schemaVersion: 17, mutationContractVersion: 22 });
+      .resolves.toEqual({ reachable: true, initialized: true, schemaVersion: 17, mutationContractVersion: 24 });
     expect(request).toHaveBeenCalledOnce();
     const [url, init] = request.mock.calls[0] ?? [];
     expect(url).toBe("https://quiet-otter-123.convex.cloud/api/query");
@@ -21,10 +21,12 @@ describe("Convex runtime status adapter", () => {
 
   it("rejects incompatible schema and mutation contract versions", async () => {
     for (const [metadata, problem] of [
-      [{ product: "leaflogue", schemaVersion: 16, mutationContractVersion: 22 }, /supports Convex schema 17.*schema 16/],
-      [{ product: "leaflogue", schemaVersion: 18, mutationContractVersion: 22 }, /supports Convex schema 17.*schema 18/],
-      [{ product: "leaflogue", schemaVersion: 17, mutationContractVersion: 21 }, /supports Convex mutation contracts 22–24.*contract 21/],
-      [{ product: "leaflogue", schemaVersion: 17, mutationContractVersion: 25 }, /supports Convex mutation contracts 22–24.*contract 25/],
+      [{ product: "leaflogue", schemaVersion: 17, mutationContractVersion: 22 }, /supports Convex mutation contract 24.*contract 22/],
+      [{ product: "leaflogue", schemaVersion: 17, mutationContractVersion: 23 }, /supports Convex mutation contract 24.*contract 23/],
+      [{ product: "leaflogue", schemaVersion: 16, mutationContractVersion: 24 }, /supports Convex schema 17.*schema 16/],
+      [{ product: "leaflogue", schemaVersion: 18, mutationContractVersion: 24 }, /supports Convex schema 17.*schema 18/],
+      [{ product: "leaflogue", schemaVersion: 17, mutationContractVersion: 21 }, /supports Convex mutation contract 24.*contract 21/],
+      [{ product: "leaflogue", schemaVersion: 17, mutationContractVersion: 25 }, /supports Convex mutation contract 24.*contract 25/],
     ] as const) {
       const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ status: "success", value: metadata }), { status: 200 }));
       await expect(checkConvex("https://example.test", { fetch: request }))
@@ -45,7 +47,7 @@ describe("Convex runtime status adapter", () => {
     expect(paths).toEqual(["https://example.test/api/query"]);
     expect(JSON.stringify(request.mock.calls)).not.toContain("syncKey");
 
-    for (const mutationContractVersion of [22, 23, 24]) {
+    for (const mutationContractVersion of [24]) {
       const compatible = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ status: "success", value: {
         product: "leaflogue", schemaVersion: 17, mutationContractVersion,
       } }), { status: 200 }));
