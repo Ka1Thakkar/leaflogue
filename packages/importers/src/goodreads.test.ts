@@ -44,3 +44,10 @@ describe('Goodreads CSV', () => {
 it('rejects oversized review bodies explicitly instead of truncating user writing', () => {
   expect(() => parseGoodreadsCsv(csv('é'.repeat(12_289)))).toThrow(/24 KiB/);
 });
+
+it.each(['constructor', '__proto__', 'toString'])('treats prototype-like shelf %s as unsupported data', shelf => {
+  const parsed = parseGoodreadsCsv(`${header}\n1,Book,Reader,,${shelf},A review`);
+  expect(parsed.document.books[0]).not.toHaveProperty('status');
+  expect(parsed.document.annotations[0]?.note).toBe('A review');
+  expect(parsed.warnings[0]?.message).toContain('unsupported shelf');
+});

@@ -28,7 +28,7 @@ export function parseGoodreadsCsv(source: string): ImportPreview {
       if (get(column) && get(column) !== "0") omitted.add(column);
     }
     const shelf = get("Exclusive Shelf");
-    const status = STATUSES[shelf as keyof typeof STATUSES];
+    const status = Object.hasOwn(STATUSES, shelf) ? STATUSES[shelf as keyof typeof STATUSES] : undefined;
     if (shelf && !status) warnings.push({ code: "skipped-records", providerRecordId, message: `Kept the book on row ${index + 2} without mapping its unsupported shelf status.` });
     const rawIsbn = get("ISBN13").replace(/^="([\dXx-]+)"$/u, "$1");
     const isbn13 = rawIsbn ? normalizeIsbn13(rawIsbn) : undefined;
