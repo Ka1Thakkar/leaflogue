@@ -7,6 +7,9 @@ on:
         type: boolean
         default: false
         description: Rebuild Windows with the background renderer scheduling fix
+      windows_source:
+        type: string
+        description: Exact source commit of the successful Windows repair run
       windows_run:
         type: string
         description: Successful Windows repair and signing run to verify during promotion
@@ -222,6 +225,7 @@ jobs:
       - run: node scripts/promote-beta6-refresh.mjs
         env:
           REFRESH_WINDOWS_RUN: ${{ inputs.windows_run }}
+          REFRESH_EXPECTED_WINDOWS_SOURCE: ${{ inputs.windows_source }}
           GH_TOKEN: ${{ github.token }}
 
   windows-rebuild:

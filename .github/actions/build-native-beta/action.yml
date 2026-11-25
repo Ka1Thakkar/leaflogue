@@ -36,7 +36,12 @@ runs:
         npm run "package:$NATIVE_PLATFORM:$NATIVE_ARCHITECTURE" --workspace @leaflogue/desktop
     - name: Test the native desktop workflow and offline dictionary
       shell: bash
-      run: npx playwright test --config tests/e2e/playwright.config.ts workflow.spec.ts dictionary.spec.ts mcp.spec.ts
+      run: |
+        # Hidden Windows windows render less frequently; keep every assertion while
+        # allowing the long, multi-step backup/restore workflow to complete.
+        timeout=180000
+        if [ "${{ inputs.platform }}" = windows ]; then timeout=360000; fi
+        npx playwright test --config tests/e2e/playwright.config.ts workflow.spec.ts dictionary.spec.ts mcp.spec.ts --timeout="$timeout"
     - name: Select the packaged executable
       shell: bash
       env:
