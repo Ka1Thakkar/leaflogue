@@ -23,7 +23,7 @@ const signing = JSON.parse(gh('run','view',signingRun,'--repo',repo,'--json','st
 if (signing.status !== 'completed' || signing.conclusion !== 'success' || signing.headSha !== process.env.REFRESH_SIGNING_SOURCE) throw Error('Protected signing did not pass');
 const old = JSON.parse(gh('release','view',tag,'--repo',repo,'--json','body,assets'));
 mkdirSync('refresh-files');
-gh('release','download','beta-candidate-44087855277-1','--repo',repo,'--dir','refresh-files');
+gh('release','download','beta-candidate-44087855277-1','--repo',repo,'--dir','refresh-files',...old.assets.flatMap(asset=>['--pattern',asset.name]));
 const names = readdirSync('refresh-files').sort();
 if (JSON.stringify(names) !== JSON.stringify(old.assets.map(a=>a.name).sort())) throw Error('Staged asset set differs from published release');
 const bytes = name => readFileSync(`refresh-files/${name}`);
