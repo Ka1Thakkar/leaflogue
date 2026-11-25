@@ -107,3 +107,10 @@ describe('article capture over the existing library and reader', () => {
     } finally { first.close(); second.close(); await rm(root, { recursive: true, force: true }); }
   });
 });
+
+it('cancels during DNS resolution without waiting for the resolver or sending a request', async () => {
+  const controller = new AbortController();
+  const pending = fetchPublicResource('https://example.test/article', { signal: controller.signal }, () => new Promise(() => undefined));
+  controller.abort(new Error('Cancelled during DNS'));
+  await expect(pending).rejects.toThrow('Cancelled during DNS');
+});

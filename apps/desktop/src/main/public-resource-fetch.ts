@@ -109,9 +109,21 @@ export function pinnedAddressLookup(resolved: ResolvedAddress): LookupFunction {
 }
 
 /** HTTPS fetch with DNS resolution pinned to the public address we validated. */
-export async function fetchPublicResource(url: string, init: RequestInit): Promise<Response> {
+export async function fetchPublicResource(url: string, init: RequestInit, resolver?: AddressResolver): Promise<Response> {
+  init.signal?.throwIfAborted();
   const parsed = new URL(url);
-  const resolved = await resolvePublicResourceAddress(parsed.hostname);
+  const pending = resolvePublicResourceAddress(parsed.hostname, resolver);
+  const resolved = await new Promise<ResolvedAddress>((resolve, reject) => {
+    const signal = init.signal;
+    const abort = () => {
+      signal?.removeEventListener("abort", abort);
+      reject(signal?.reason instanceof Error ? signal.reason : new Error("Public resource request cancelled."));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    pending.then(address => { signal?.removeEventListener("abort", abort); resolve(address); },
+      error => { signal?.removeEventListener("abort", abort); reject(error instanceof Error ? error : new Error("Public resource DNS lookup failed.")); });
+    if (signal?.aborted) abort();
+  });
   return new Promise<Response>((resolve, reject) => {
     const requestHeaders = new Headers(init.headers);
     const outgoing = request(parsed, {
