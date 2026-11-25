@@ -1,7 +1,21 @@
-name: Cross-platform beta candidate
+name: Refresh existing beta.6 build staging
 
 on:
   workflow_dispatch:
+    inputs:
+      promote_only:
+        type: boolean
+        default: false
+        description: Verify and replace existing beta.6 assets from completed build/signing runs
+      build_run:
+        type: string
+        description: Successful staging run on this exact source commit
+      signing_run:
+        type: string
+        description: Successful protected signing run on the existing beta tag
+
+env:
+  LEAFLOGUE_E2E_BACKGROUND: "1"
 
 permissions:
   contents: read
@@ -12,6 +26,7 @@ concurrency:
 
 jobs:
   preflight:
+    if: inputs.promote_only != true
     name: Validate the exact beta source
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -33,7 +48,8 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   draft:
-    name: Create an unpublished beta candidate
+    if: inputs.promote_only != true
+    name: Reuse existing unpublished staging release
     needs: preflight
     runs-on: ubuntu-24.04
     permissions:
@@ -47,13 +63,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag="beta-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" \
-            --title "Leaflogue cross-platform beta candidate ${GITHUB_SHA::12}" \
-            --notes "INCOMPLETE until every candidate job succeeds. Source: $GITHUB_SHA. Native Mac/Windows and Linux checks, human desktop/accessibility acceptance, signing review, and final beta version/tag approval are required before publication."
+          tag="beta-candidate-44087855277-1"
+          test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   linux:
+    if: inputs.promote_only != true
     name: Linux x64 and ARM64 plus backend
     needs: draft
     runs-on: ubuntu-24.04
@@ -65,6 +80,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/build-release-files
+      - name: Build self-hostable web archive
+        run: |
+          npm run build --workspace @leaflogue/web
+          mkdir -p release-files/web
+          (cd apps/web/dist && zip -qr ../../../release-files/web/Leaflogue-0.1.1-beta.6-web.zip .)
+          (cd release-files/web && sha256sum *.zip > SHA256SUMS-web.txt)
       - name: Retain validated Linux and backend downloads directly in the draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,6 +97,7 @@ jobs:
           gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
 
   native:
+    if: inputs.promote_only != true
     name: ${{ matrix.platform }} beta (${{ matrix.architecture }})
     needs: draft
     runs-on: ${{ matrix.runner }}
@@ -122,64 +144,37 @@ jobs:
           done < "$sums"
           gh release upload "$CANDIDATE_TAG" "${assets[@]}" --clobber
 
-  sign:
-    name: Sign the beta update feeds
-    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-beta.')
-    needs: [draft, linux, native]
+  complete:
+    name: Verify every platform finished staging
+    needs: [preflight, draft, linux, native]
+    if: always() && inputs.promote_only != true
     runs-on: ubuntu-24.04
-    environment: release
+    steps:
+      - name: Require all build and validation jobs
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'for (const [name, job] of Object.entries(JSON.parse(process.env.RESULTS))) { if (job.result !== "success") throw Error(`${name}: ${job.result}`); }'
+
+  promote-existing:
+    if: inputs.promote_only == true
+    name: Verify and refresh the existing beta.6 release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: write
+      actions: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version-file: .nvmrc
-      - name: Sign exact validated artifacts with the separate beta key
+      - run: node scripts/promote-beta6-refresh.mjs
         env:
+          REFRESH_BUILD_RUN: ${{ inputs.build_run }}
+          REFRESH_SIGNING_RUN: ${{ inputs.signing_run }}
+          REFRESH_BUILD_SOURCE: ${{ github.sha }}
+          REFRESH_PUBLISH: "1"
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          CANDIDATE_TAG: ${{ needs.draft.outputs.tag }}
-          LEAFLOGUE_UPDATE_SIGNING_KEY: ${{ secrets.LEAFLOGUE_BETA_UPDATE_SIGNING_KEY }}
-        run: |
-          set -euo pipefail
-          mkdir update-files
-          gh release download "$CANDIDATE_TAG" --dir update-files \
-            --pattern '*.AppImage' --pattern '*-mac-*.zip' --pattern '*-windows-*.exe'
-          for architecture in x64 arm64; do
-            node apps/desktop/scripts/update-manifest.mjs --channel beta --platform linux --architecture "$architecture" --directory update-files
-            node apps/desktop/scripts/update-manifest.mjs --channel beta --platform mac --architecture "$architecture" --directory update-files
-          done
-          node apps/desktop/scripts/update-manifest.mjs --channel beta --platform windows --architecture x64 --directory update-files
-          (cd update-files && sha256sum leaflogue-update-*.json leaflogue-update-*.json.sig > SHA256SUMS-updates.txt)
-          gh release upload "$CANDIDATE_TAG" update-files/leaflogue-update-*.json update-files/leaflogue-update-*.json.sig update-files/SHA256SUMS-updates.txt
-
-  complete:
-    name: Mark the candidate ready for human validation
-    needs: [draft, linux, native, sign]
-    if: ${{ !cancelled() && needs.draft.result == 'success' && needs.linux.result == 'success' && needs.native.result == 'success' && (needs.sign.result == 'success' || needs.sign.result == 'skipped') }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          CANDIDATE_TAG: ${{ needs.draft.outputs.tag }}
-        run: |
-          set -euo pipefail
-          notes="$(mktemp)"
-          cat > "$notes" <<EOF_NOTES
-          Automated cross-platform candidate completed for $GITHUB_SHA.
-
-          Linux x64/ARM64: AppImage and tar.gz. Mac Apple Silicon/Intel: DMG and ZIP. Windows x64: per-user installer and ZIP. Includes checksums, SBOMs, production audits, build inputs, and the Convex backend bundle.
-
-          Mac packages are ad-hoc signed and NOT Apple-notarized. Windows packages are unsigned. These are beta validation files, not a signed stable update feed.
-
-          The maintainer authorized experimental publication with manual clean-desktop and actual screen-reader acceptance still pending. Those checks are not passed. Tagged beta candidates include signed update feeds; branch candidates do not. Review the exact assets and notes before publication. This release stays DRAFT; the workflow never publishes it.
-
-          Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-          EOF_NOTES
-          gh release edit "$CANDIDATE_TAG" --notes-file "$notes"

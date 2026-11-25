@@ -14,11 +14,7 @@ for architecture in x64 arm64; do
     "apps/desktop/dist/Leaflogue-$version-$architecture.supply-chain.cdx.json" \
     "apps/desktop/dist/SHA256SUMS-$architecture.txt" "$directory/"
 done
-if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-  backend_version="${GITHUB_REF_NAME#v}"
-else
-  backend_version="0.0.0-ci.${GITHUB_SHA:0:12}"
-fi
+backend_version="$version"
 node scripts/package-convex-backend.mjs --version "$backend_version"
 mkdir -p release-files/convex
 cp "release/convex/Leaflogue-Convex-$backend_version.tar.gz" \
