@@ -4,6 +4,7 @@ Experimental public beta for Linux x64/ARM64, Mac Apple Silicon/Intel and Window
 
 The version remains **0.1.1-beta.6**. Existing beta.6 users must reinstall a refreshed download because automatic updates require a newer version.
 
+- Correct Add dialog spacing, selector alignment and helper typography, with reviewed Mac/Linux screenshot baselines at desktop and compact widths.
 - Add books and web articles through one **Add to library** flow, retaining drafts when switching types.
 - Permanently delete archived library items with confirmation; original files remain on disk and deletions propagate through sync.
 - Import Goodreads library CSVs: books, reading status and reviews as book notes, using the existing import reconciliation and conflict handling.
