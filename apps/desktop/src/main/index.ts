@@ -43,6 +43,7 @@ import {
   LIBRARY_LIST_READING_STATUS_CHANNEL,
   LIBRARY_MERGE_BOOKS_CHANNEL,
   LIBRARY_SET_BOOK_ARCHIVED_CHANNEL,
+  LIBRARY_DELETE_BOOK_CHANNEL,
   LIBRARY_SET_COMPLETION_DATE_CHANNEL,
   LIBRARY_SET_READING_STATUS_CHANNEL,
   LIBRARY_UPDATE_HIGHLIGHT_CHANNEL,
@@ -716,6 +717,11 @@ void app.whenReady().then(async () => {
   registerTrustedHandler(ipcMain, LIBRARY_RESET_HIGHLIGHT_CHANNEL, () => app.isPackaged, (input: unknown) => {
     if (!library) throw new Error("Local library unavailable");
     return library.resetHighlightToSource(validateResetHighlight(input));
+  });
+  registerTrustedHandler(ipcMain, LIBRARY_DELETE_BOOK_CHANNEL, () => app.isPackaged, (value: unknown) => {
+    if (!library) throw new Error("Local library unavailable");
+    const input = annotationRecord(value);
+    return library.deleteBook({ id: uuidField(input, "id") as BookId, expectedRevision: revisionField(input) });
   });
   registerTrustedHandler(ipcMain, LIBRARY_SET_BOOK_ARCHIVED_CHANNEL, () => app.isPackaged, (input: unknown) => {
     if (!library) throw new Error("Local library unavailable");

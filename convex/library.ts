@@ -3,7 +3,7 @@ import { internalMutationGeneric, makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { v } from "convex/values";
 import { MAX_NOTE_BYTES, MAX_NOTES_PER_HIGHLIGHT, MAX_STATUS_EVENTS_PER_BOOK, MAX_SYNC_ORGANIZATION_MEMBERSHIPS, MAX_SYNCED_STATUS_EVENTS_PER_BOOK, MAX_THREADS_PER_HIGHLIGHT, normalizeOrganizationName } from "@leaflogue/contracts";
-import { dailySelectionWins } from "@leaflogue/contracts";
+import { dailySelectionWins, syncedParentBookId } from "@leaflogue/contracts";
 import type { ReadingStatusEvent, SyncedChange, SyncedChangeOutcome } from "@leaflogue/contracts";
 import { validateCompletionDate } from "@leaflogue/domain";
 import {
@@ -21,6 +21,7 @@ import {
   noteValidator,
   readingStatusChangeValidator,
   setBookArchivedArgs,
+  deleteBookArgs,
   setBookCompletionDateArgs,
   setBookReadingStatusArgs,
   syncedChangeOutcomeValidator,
@@ -86,6 +87,20 @@ export const applySyncedChange = internalMutation({
     const writer = await ctx.db.query("syncedWriters").withIndex("by_library_entity", (q) =>
       q.eq("libraryId", args.libraryId).eq("entityType", change.entityType).eq("entityId", entityId)).unique();
     const incomingBody = syncedBody(change);
+    const parentId = syncedParentBookId(change);
+    if (parentId) {
+      const parent = await findBook(ctx, args.libraryId, parentId);
+      const deleted = parent?.deletedAt !== undefined || (!parent && await ctx.db.query("syncTombstones").withIndex("by_library_entity", q => q
+        .eq("libraryId", args.libraryId).eq("entityType", "book").eq("entityId", parentId)).unique());
+      if (deleted) {
+        if (isAnnotationChange(change) && incomingBody && incomingBody !== annotationBody(change.entityType, current)) {
+          await preserveSyncConflict(ctx, args.libraryId, change, incomingBody, undefined,
+            { deviceId: change.deviceId, deviceRevision: change.deviceRevision, operation: "upsert" }, "tombstone");
+        }
+        return "superseded";
+      }
+    }
+
     if (change.operation === "upsert" && current?.deletedAt !== undefined &&
         (!writer || Number(writer.entityRevision) !== Number(current.revision))) {
       if (isAnnotationChange(change) && incomingBody) {
@@ -174,15 +189,7 @@ async function applySyncedBook(
   const entityId = syncedEntityId(change);
   if (change.operation === "tombstone") {
     const book = await findBook(ctx, libraryId, entityId);
-    let revision: number | undefined;
-    if (book && book.deletedAt === undefined) {
-      revision = Number(book.revision) + 1;
-      await ctx.db.patch(book._id, { deletedAt: now, revision, updatedAt: now });
-    }
-    await setBookCandidatesActive(ctx, libraryId, entityId, false);
-    await replaceSyncedLinks(ctx, libraryId, "collection", entityId, entityId, [], now);
-    await replaceSyncedLinks(ctx, libraryId, "book-tag", entityId, entityId, [], now);
-    revision = await recordSyncedTombstone(ctx, libraryId, "book", entityId, entityId, revision, now);
+    const revision = await tombstoneBook(ctx, libraryId, entityId, book, now);
     await recordChanges(ctx, library, [{ entityType: "book", entityId, revision }], now);
     return;
   }
@@ -936,6 +943,33 @@ export const deleteNote = internalMutation({
       { entityType: "note", entityId: args.id, revision },
     ], now);
     return { bookId: args.bookId, bookRevision, revision, notesDeleted: 1, complete: true };
+  },
+});
+
+async function tombstoneBook(ctx: MutationContext, libraryId: string, entityId: string, book: DocumentByName<DataModel, "books"> | undefined | null, now: number): Promise<number> {
+  let revision: number | undefined;
+  if (book && book.deletedAt === undefined) {
+    revision = Number(book.revision) + 1;
+    await ctx.db.patch(book._id, { deletedAt: now, revision, updatedAt: now });
+  }
+  if (!book?.archived) await setBookCandidatesActive(ctx, libraryId, entityId, false);
+  await replaceSyncedLinks(ctx, libraryId, "collection", entityId, entityId, [], now);
+  await replaceSyncedLinks(ctx, libraryId, "book-tag", entityId, entityId, [], now);
+  revision = await recordSyncedTombstone(ctx, libraryId, "book", entityId, entityId, revision, now);
+  return revision;
+}
+
+export const deleteBook = internalMutation({
+  args: deleteBookArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireRevision(args.expectedRevision, "Book");
+    const [library, book] = await Promise.all([requireLibrary(ctx, args.libraryId), findBook(ctx, args.libraryId, args.id)]);
+    if (!book || book.deletedAt !== undefined || !book.archived || book.revision !== args.expectedRevision) throw new Error("Only an unchanged archived item can be deleted");
+    const now = Date.now();
+    const revision = await tombstoneBook(ctx, args.libraryId, args.id, book, now);
+    await recordWebChanges(ctx, library, [{ entityType: "book", entityId: args.id, revision }], now);
+    return null;
   },
 });
 

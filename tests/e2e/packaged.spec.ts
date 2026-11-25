@@ -71,8 +71,8 @@ test("the packaged desktop payload opens an isolated local library", async () =>
 
     await completeLocalSetup(page);
 
-    await page.getByRole("button", { name: "Add book" }).click();
-    const form = page.getByRole("dialog", { name: "Add a book" });
+    await page.getByRole("button", { name: "Add to library" }).click();
+    const form = page.getByRole("dialog", { name: "Add to your library" });
     await form.getByLabel("Title").fill("Packaged boundary check");
     await form.getByLabel("Authors").fill("Leaflogue");
     await form.getByRole("button", { name: "Add book" }).click();

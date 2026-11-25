@@ -4,7 +4,7 @@ import { Menu, MenuItem } from "@leaflogue/ui";
 
 import { Select, SelectItem, DatePicker } from "@leaflogue/ui";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Archive, ArchiveRestore, GitMerge, MoreHorizontal, Pencil, RotateCcw, StickyNote } from "../components/icons";
+import { Archive, ArchiveRestore, Trash2, GitMerge, MoreHorizontal, Pencil, RotateCcw, StickyNote } from "../components/icons";
 import type { Book, BookContents, BookId, BookMetadataSource, BookOrganization, Collection, CollectionId, HighlightId, LibraryBookStatistics, LibraryStatistics, ReadingStatus, ReadingStatusEvent, Tag, TagId } from "@leaflogue/contracts";
 import { Bars, Panel, StatTile } from "@leaflogue/ui";
 import { bookDescriptionText } from "../book-description";
@@ -276,6 +276,20 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
     }, "This book changed before it could be moved. Reload it and try again.");
   }
 
+  async function deleteArchived() {
+    if (!book?.archived || !await confirm({
+      title: "Delete from your library?",
+      message: `“${book.title}” and its passages and notes will be removed from your library. This cannot be undone in Leaflogue. Original book files are not deleted.`,
+      confirmLabel: "Delete permanently",
+      destructive: true,
+    })) return;
+    await run(async () => {
+      await window.leaflogue.library.deleteBook({ id: book.id, expectedRevision: book.revision });
+      contextWorkspace?.close();
+      navigate(href.library());
+    }, "This item changed before it could be deleted. Reload it and try again.");
+  }
+
   async function changeMembership(kind: "collection" | "tag", next: readonly string[]) {
     if (!book) return;
     const current = new Set<string>(kind === "collection" ? organization?.collectionIds ?? [] : organization?.tagIds ?? []);
@@ -329,9 +343,14 @@ export function BookPage({ bookId, focusHighlightId, mergeWith }: { readonly boo
 
 
                 {book.archived ? (
+                  <>
                   <MenuItem asChild disabled={pending} onSelect={() => void setShelf(false)}><button type="button" className={styles.menuAction} disabled={pending}>
                     <ArchiveRestore size={16} aria-hidden="true" />Restore to library
                   </button></MenuItem>
+                  <MenuItem asChild disabled={pending} onSelect={() => void deleteArchived()}><button type="button" className={`${styles.menuAction} ${styles.danger}`} disabled={pending}>
+                    <Trash2 size={16} aria-hidden="true" />Delete permanently
+                  </button></MenuItem>
+                  </>
                 ) : (
                   <MenuItem asChild disabled={pending} onSelect={() => void setShelf(true)}><button type="button" className={`${styles.menuAction} ${styles.danger}`} disabled={pending}>
                     <Archive size={16} aria-hidden="true" />Archive book

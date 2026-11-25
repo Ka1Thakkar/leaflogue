@@ -8,8 +8,8 @@ test("keeps a first book and passage in the hosted library", async ({ page }) =>
   await page.goto("/");
   await expect(page.getByRole("status").filter({ hasText: "Saved online" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Add book" }).click();
-  const form = page.getByRole("dialog", { name: "Add a book" });
+  await page.getByRole("button", { name: "Add to library" }).click();
+  const form = page.getByRole("dialog", { name: "Add to your library" });
   await form.getByLabel("Title").fill("The Quiet Room");
   await form.getByLabel("Authors").fill("Nell Ashby");
   await form.getByRole("button", { name: "Add book" }).click();
@@ -50,8 +50,8 @@ test("customises a dashboard and keeps it across a reload", async ({ page }) => 
   page.on("pageerror", (error) => errors.push(error.message));
   // An empty library has nothing to arrange yet; add a passage first.
   await page.goto("/");
-  await page.getByRole("button", { name: "Add book" }).click();
-  const form = page.getByRole("dialog", { name: "Add a book" });
+  await page.getByRole("button", { name: "Add to library" }).click();
+  const form = page.getByRole("dialog", { name: "Add to your library" });
   await form.getByLabel("Title").fill("Harbour of Small Lights");
   await form.getByRole("button", { name: "Add book" }).click();
   await page.getByRole("button", { name: "Add highlight" }).click();

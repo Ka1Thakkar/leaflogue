@@ -2,7 +2,8 @@ import { selectOption } from "../shared/select";
 import { expect, test, type Page } from "@playwright/test";
 import { KOREADER_PASSAGE, PORTABLE_PASSAGES, TOLINO_NOTE, TOLINO_PASSAGE, writeKOReaderFolder, writeMalformedPortable, writePortableExport, writeTolinoNotes } from "./fixtures";
 import { createProfile, launch, removeProfile, type Profile } from "./harness";
-import { chooseShelf, importFile, openBook, openImport, openRail, passage } from "./steps";
+import { importFile, openBook, openImport, openRail, passage } from "./steps";
+import { chooseShelf } from "../shared/library";
 
 /**
  * The accessibility and resilience checks for the `v0.1.0` workflow in the
@@ -147,10 +148,10 @@ test("completes setup and core navigation with the keyboard alone", async () => 
 
   await test.step("a dialog opens on its first field, closes on Escape, restores focus, and submits", async () => {
     await openRail(page, "Library");
-    const trigger = page.getByRole("button", { name: "Add book" });
-    await tabTo(page, "Add book");
+    const trigger = page.getByRole("button", { name: "Add to library" });
+    await tabTo(page, "Add to library");
     await page.keyboard.press("Enter");
-    const dialog = page.getByRole("dialog", { name: "Add a book" });
+    const dialog = page.getByRole("dialog", { name: "Add to your library" });
     await expect(dialog.getByLabel("Search books online")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
@@ -330,8 +331,8 @@ test("reports a rejected book without disturbing the imported shelf", async () =
   await importFile(session, writePortableExport(profile.files), {
     fileLabel: /reading-export\.json \(Portable JSON\)/u, books: 2, annotations: 2, sourceName: "Reading export", titles: ["Notes on Tidewater"],
   });
-  await page.getByRole("button", { name: "Add book" }).click();
-  const form = page.getByRole("dialog", { name: "Add a book" });
+  await page.getByRole("button", { name: "Add to library" }).click();
+  const form = page.getByRole("dialog", { name: "Add to your library" });
   await form.getByLabel("Title").fill("An invalid identifier");
   await form.getByLabel("ISBN").fill("not-an-isbn");
   await form.getByRole("button", { name: "Add book" }).click();

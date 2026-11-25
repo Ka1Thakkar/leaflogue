@@ -146,6 +146,7 @@ export function createLibrary(client: LibraryClient): { readonly library: Librar
       return passageHighlight(after);
     },
 
+    deleteBook: async (input) => { await client.mutation("runtime:deleteBook", { ...input }); },
     setBookArchived: (input) => client.mutation<BookArchiveChange>("runtime:setBookArchived", { ...input }),
 
     async listReadingStatusHistory(id) {

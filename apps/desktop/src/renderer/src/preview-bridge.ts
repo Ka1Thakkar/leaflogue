@@ -117,6 +117,7 @@ export function installPreviewBridge(): void {
    * book wearing the edit you just made — a bug in the preview that is
    * indistinguishable from a bug in the product.
    */
+  const deletedBooks = new Set<Book["id"]>();
   function changePreviewBook(id: Book["id"], change: (book: Book) => Book): Book {
     if (id === previewBook.id) {
       previewBook = change(previewBook);
@@ -168,7 +169,7 @@ export function installPreviewBridge(): void {
       }),
       library: Object.freeze({
         findDuplicates: async () => ({ books: [], passages: [] }),
-        listBooks: async (options?: { includeArchived?: boolean }) => [previewBook, targetBook].filter((book) => options?.includeArchived || !book.archived),
+        listBooks: async (options?: { includeArchived?: boolean }) => [previewBook, targetBook].filter((book) => !deletedBooks.has(book.id) && (options?.includeArchived || !book.archived)),
         createBook: async (input: { title: string; authors?: readonly string[]; isbn13?: string }) => ({
           id: crypto.randomUUID() as never,
           title: input.title.trim(),
@@ -201,7 +202,7 @@ export function installPreviewBridge(): void {
         getMetadataSource: async (id: Book["id"]) => id === previewBook.id
           ? { sourceName: "Kobo Clara", lastSeenAt: now, values: { title: "Piranesi", authors: ["Susanna Clarke"], publisher: "Bloomsbury" } }
           : undefined,
-        getBookContents: async (id: Book["id"]) => id === previewBook.id ? previewContents : id === targetBook.id ? { book: targetBook, highlights: [], standaloneNotes: [] } : undefined,
+        getBookContents: async (id: Book["id"]) => deletedBooks.has(id) ? undefined : id === previewBook.id ? previewContents : id === targetBook.id ? { book: targetBook, highlights: [], standaloneNotes: [] } : undefined,
         listHighlights: async (query: HighlightQuery) => {
           const needle = query.search?.toLocaleLowerCase() ?? "";
           const entries = [previewContents]
@@ -321,6 +322,11 @@ export function installPreviewBridge(): void {
           } satisfies Highlight;
           previewContents = { ...previewContents, highlights: previewContents.highlights.map((highlight) => highlight.id === input.id ? updated : highlight) };
           return updated;
+        },
+        deleteBook: async (input: { id: Book["id"]; expectedRevision: number }) => {
+          const book = [previewBook, targetBook].find(({ id }) => id === input.id);
+          if (!book || !book.archived || book.revision !== input.expectedRevision || deletedBooks.has(input.id)) throw new Error("Only an unchanged archived item can be deleted");
+          deletedBooks.add(input.id);
         },
         setBookArchived: async (input: { id: Book["id"]; archived: boolean; expectedRevision: number }) => {
           const updatedAt = Date.now();

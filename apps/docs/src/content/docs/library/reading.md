@@ -3,6 +3,26 @@ title: Read and organise
 description: Work with passages and notes, follow threads, and explore your reading activity.
 ---
 
+## Add to your library
+
+Choose **Add to library** from the library or command palette. Books and web
+articles share this entry point. On desktop, choose **Book** or **Web article**;
+changing the type keeps each draft until you close the dialog. The type selector
+is disabled while a save or article retrieval is running. The web app currently
+supports adding books; file imports remain in **Import**.
+
+## Remove an archived item
+
+Open **Filters → Shelf → Archived**, open the book or saved article, then choose
+**More book actions → Delete permanently**. Confirm the title before deleting.
+Cancel leaves the item archived. Only archived items can be deleted; restore an
+item instead if you want to keep working on it.
+
+Deletion removes the item and its passages and notes from the library, including
+synced copies. It cannot be undone in the app. Original EPUB/PDF files remain on
+disk. Sync tombstones and import history remain for reconciliation. Collections,
+tags and threads already have their own delete actions.
+
 ## Read a local EPUB
 
 In 0.1.1, choose **Read** on a desktop book page to link a

@@ -34,8 +34,9 @@ function listOf(words: readonly string[]): string {
   return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
 }
 
-export function BookForm({ onClose, onSaved }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void }) {
+export function BookForm({ onClose, onSaved, onBusyChange }: { readonly onClose: () => void; readonly onSaved: (book: Book) => void; readonly onBusyChange?: (busy: boolean) => void }) {
   const { pending, error, run } = useAction();
+  useEffect(() => { onBusyChange?.(pending); }, [pending, onBusyChange]);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
