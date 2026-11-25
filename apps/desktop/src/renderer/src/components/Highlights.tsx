@@ -1,5 +1,5 @@
 import { HighlightColourPicker } from "./HighlightColourPicker";
-import { currentHighlightPalette, highlightColour, useHighlightColours } from "./highlight-colours";
+import { useHighlightPalette, highlightColour } from "./highlight-colours";
 import { useContextWorkspace } from "./ContextPanel";
 
 import { Menu, MenuItem } from "@leaflogue/ui";
@@ -29,8 +29,8 @@ const PAGE_SIZE = 20;
  */
 function Annotation({ highlight, showBook, focused = false, refreshList }: { readonly highlight: HighlightListEntry; readonly showBook: boolean; readonly focused?: boolean; readonly refreshList: () => Promise<void> }) {
   const contextWorkspace = useContextWorkspace();
-  const colours = useHighlightColours();
-  const highlightInk = currentHighlightPalette()[highlightColour(highlight, colours)].ink;
+  const palette = useHighlightPalette();
+  const highlightInk = palette[highlightColour(highlight)].ink;
   const { tags, reload, readOnly, aiEnabled, activeId, setActiveId } = useContext(PassageContext);
   const [confirm, confirmDialog] = useConfirm();
   const [editing, setEditing] = useState(false);
@@ -101,7 +101,7 @@ function Annotation({ highlight, showBook, focused = false, refreshList }: { rea
             <blockquote className={styles.quote}>
               <PassageText text={highlight.text} />
             </blockquote>
-            {window.leaflogue.epub && contextWorkspace && <button className={styles.contextLink} onClick={() => contextWorkspace.showPassage(highlight)}><BookOpen size={15} aria-hidden="true" />Read in context</button>}
+            {window.leaflogue.reader && contextWorkspace && <button className={styles.contextLink} onClick={() => contextWorkspace.showPassage(highlight)}><BookOpen size={15} aria-hidden="true" />Read in context</button>}
             {highlight.notes.map((note) => <NoteCard key={note.id} note={note} readOnly={readOnly} onSaved={refreshList} />)}
             {tagNames.length > 0 && <ul className={styles.tagChips} aria-label="Tags">{tagNames.map((tag) => <li key={tag.id}>{tag.name}</li>)}</ul>}
           </div>

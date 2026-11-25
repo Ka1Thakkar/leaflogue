@@ -27,11 +27,12 @@ markup with the existing chapter/paragraph coordinates. `article:<checksum>:...`
 locations distinguish article anchors while keeping old EPUB/PDF anchors readable.
 
 Reader references, positions, bookmarks and reviewed anchors use the existing
-edition-checked EpubStore through its backward-compatible API. The new captured
-format does not change the database schema; existing canonical metadata and note
-rows retain their IDs/contracts. Upgrade tests must exercise existing SQLite data,
-not just fresh profiles. Older clients may view the canonical metadata/writing but
-cannot open the new local source format. No database reset is required.
+edition-checked ReaderStore and the `reader` bridge. EPUB, PDF and article parser
+adapters return the same ReaderDocument with an explicit format. The captured
+format itself adds no database schema; existing metadata and note rows retain
+their IDs. SQLite migration 21 retires the old sync colour journal without losing
+queued intent. Tests exercise existing SQLite data as well as fresh profiles.
+Only the current desktop/backend protocol is supported (see ADR 0009).
 
 Full source snapshots and immutable URL capture manifests are stored beside the
 library in `<library.sqlite>.articles`, outside the database and ordinary sync,

@@ -1,22 +1,13 @@
 /** @vitest-environment happy-dom */
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILT_IN_THEMES } from "@leaflogue/appearance";
 import { contrastRatio } from "@leaflogue/ui";
-import { highlightColour, highlightPalette, migrateHighlightColours, readHighlightColours, saveHighlightColour } from "./highlight-colours";
+import { highlightColour, highlightPalette, updateHighlightColour, useHighlightPalette } from "./highlight-colours";
 const id = "12345678-1234-4234-8234-123456789abc";
 afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); });
 describe("per-highlight theme colours", () => {
-  it("persists only supported named colours and resets yellow to the default", () => {
-    saveHighlightColour(id, "green");
-    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({ [id]: "green" });
-    saveHighlightColour(id, "purple");
-    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({ [id]: "purple" });
-    saveHighlightColour(id, "yellow");
-    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({});
-    expect(readHighlightColours(JSON.stringify({ version: 1, colours: { [id]: "url(evil)", other: "green" } }))).toEqual({});
-    expect(readHighlightColours("broken")).toEqual({});
-    expect(() => saveHighlightColour("invalid", "green")).toThrow();
-  });
   it("adapts all five colours to every built-in theme with readable dates and highlighted text", () => {
     for (const theme of BUILT_IN_THEMES) for (const dark of [false, true]) {
       const tokens = theme[dark ? "dark" : "light"];
@@ -32,26 +23,44 @@ describe("per-highlight theme colours", () => {
   });
 });
 
-describe("legacy colour migration", () => {
-  it("copies an old local choice to the record only after a successful save", async () => {
-    saveHighlightColour(id, "green");
-    const highlight = { id, bookId: id, text: "A line", revision: 2, createdAt: 1, updatedAt: 1, notes: [] };
+describe("shared highlight colour", () => {
+  it("reads only the shared record and defaults to yellow", () => {
+    expect(highlightColour({ colour: "green" })).toBe("green");
+    expect(highlightColour({})).toBe("yellow");
+  });
+  it("updates the record with its revision and reports failures", async () => {
+    const highlight = { id, bookId: id, text: "A line", revision: 2 };
     const update = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ ...highlight, colour: "green" });
-    vi.stubGlobal("leaflogue", { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } });
-    await migrateHighlightColours();
-    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))[id]).toBe("green");
-    await migrateHighlightColours();
+    vi.stubGlobal("leaflogue", { library: { updateHighlight: update } });
+    await expect(updateHighlightColour(highlight as never, "green")).rejects.toThrow("offline");
+    await updateHighlightColour(highlight as never, "green");
     expect(update).toHaveBeenLastCalledWith({ id, bookId: id, text: "A line", expectedRevision: 2, colour: "green" });
-    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({});
   });
-  it("keeps a shared choice authoritative over a stale local preference", async () => {
-    saveHighlightColour(id, "pink");
-    const highlight = { id, colour: "yellow" as const };
-    expect(highlightColour(highlight as never, { [id]: "pink" })).toBe("yellow");
-    const update = vi.fn();
-    vi.stubGlobal("leaflogue", { library: { listHighlights: vi.fn().mockResolvedValue({ entries: [highlight], hasMore: false }), updateHighlight: update } });
-    await migrateHighlightColours();
-    expect(update).not.toHaveBeenCalled();
-    expect(readHighlightColours(localStorage.getItem("leaflogue.highlight-colours.v1"))).toEqual({});
-  });
+});
+
+it("shares one theme watcher across passages and releases it after the last subscriber", async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const disconnect = vi.fn();
+  let changed!: () => void;
+  const watch = vi.fn(function (this: object, callback: () => void) { changed = callback; return { observe: vi.fn(), disconnect }; });
+  vi.stubGlobal("MutationObserver", watch);
+  const palettes: Array<ReturnType<typeof useHighlightPalette>> = [];
+  function Probe({ index }: { index: number }) { palettes[index] = useHighlightPalette(); return null; }
+  const root = createRoot(document.createElement("div"));
+  try {
+    await act(async () => root.render(createElement("div", null, createElement(Probe, { index: 0 }), createElement(Probe, { index: 1 }))));
+    expect(watch).toHaveBeenCalledTimes(1);
+    expect(palettes[0]).toBe(palettes[1]);
+    const original = palettes[0]!.green.fill;
+    document.documentElement.style.setProperty("--paper", "#121212");
+    await act(async () => changed());
+    expect(palettes[0]).toBe(palettes[1]);
+    expect(palettes[0]!.green.fill).not.toBe(original);
+    await act(async () => root.render(createElement("div", null, createElement(Probe, { index: 0 }))));
+    expect(disconnect).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    document.documentElement.style.removeProperty("--paper");
+  }
+  expect(disconnect).toHaveBeenCalledTimes(1);
 });

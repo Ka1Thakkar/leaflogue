@@ -129,9 +129,9 @@ describe("preload IPC bridge", () => {
     expect(Object.keys(bridge.widgets).sort()).toEqual(["delete", "evaluate", "export", "import", "save"]);
     expect(Object.keys(bridge.ai).sort()).toEqual(["acceptTerms", "cancel", "describe", "describeExplainTask", "explainPassage", "save"]);
     expect(Object.keys(bridge.appearance).sort()).toEqual(["describe", "exportTheme", "importTheme", "onChanged", "openThemesFolder", "save"]);
-    expect(Object.isFrozen(bridge.epub)).toBe(true);
-    expect(Object.keys(bridge.epub!)).toEqual(["unlink", "attach", "open", "readPdf", "saveAnchor", "saveBookmarks", "savePosition", "relocate"]);
-    expect(Object.keys(bridge).sort()).toEqual(["ai", "appearance", "articles", "backups", "calibre", "catalog", "covers", "daily", "dashboards", "epub", "exports", "imports", "library", "organization", "remote", "statistics", "sync", "system", "threads", "updates", "widgets"]);
+    expect(Object.isFrozen(bridge.reader)).toBe(true);
+    expect(Object.keys(bridge.reader!)).toEqual(["unlink", "attach", "open", "readPdf", "saveAnchor", "saveBookmarks", "savePosition", "relocate"]);
+    expect(Object.keys(bridge).sort()).toEqual(["ai", "appearance", "articles", "backups", "calibre", "catalog", "covers", "daily", "dashboards", "exports", "imports", "library", "organization", "reader", "remote", "statistics", "sync", "system", "threads", "updates", "widgets"]);
   });
 
   it("routes catalogue searches through a fixed channel without exposing raw IPC", async () => {

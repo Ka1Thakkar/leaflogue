@@ -9,7 +9,6 @@ import {
   type SyncedChange,
   type SyncedChangeOutcome,
 } from "@leaflogue/contracts";
-import { CONVEX_THREAD_CONTRACT_VERSION, CONVEX_COLOUR_CONTRACT_VERSION } from "./convex";
 import { readBoundedConvexResponse, validateConvexDeploymentUrl } from "./convex-http";
 import type { SyncBootstrapSource, SyncChangeSource, SyncPullPage, SyncSubmission, SyncTransport } from "./sync";
 
@@ -25,10 +24,6 @@ const MAX_SYNC_RESPONSE_BYTES = 4 * 1024 * 1024;
 export interface ConvexSyncOptions {
   readonly deploymentUrl: string;
   readonly syncKey: string;
-  /** The deployment's accepted contract; defaults to the newest this desktop speaks. */
-  readonly mutationContractVersion?: number;
-  /** Only set after LocalLibrary durably journals unsupported colour intent. */
-  readonly colourCompatibilityPrepared?: boolean;
   readonly fetch?: typeof globalThis.fetch;
   readonly timeoutMs?: number;
 }
@@ -145,17 +140,12 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
   readonly #connection: ConvexConnection;
   readonly #session: SessionArgs;
   readonly #deviceId: string;
-  readonly #threadsSupported: boolean;
-  readonly #coloursSupported: boolean;
-  readonly #colourCompatibilityPrepared: boolean;
 
   constructor(options: ConvexSyncOptions & { readonly session: ConvexSyncSession }) {
-    this.#colourCompatibilityPrepared = options.colourCompatibilityPrepared === true;
     this.#connection = new ConvexConnection(options);
     this.#session = { libraryId: options.session.libraryId, syncKey: options.syncKey };
     this.#deviceId = options.session.deviceId;
-    this.#coloursSupported = (options.mutationContractVersion ?? CONVEX_COLOUR_CONTRACT_VERSION) >= CONVEX_COLOUR_CONTRACT_VERSION;
-    this.#threadsSupported = (options.mutationContractVersion ?? CONVEX_THREAD_CONTRACT_VERSION) >= CONVEX_THREAD_CONTRACT_VERSION;
+
   }
 
   async cancel(): Promise<void> {
@@ -167,25 +157,8 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
     const operationIds: string[] = [];
     for (const { change, entries } of changes) {
       if (signal?.aborted) break;
-      // An older adjacent backend cannot store threads or a passage's thread
-      // membership. Hold those changes (unacknowledged) rather than send a
-      // passage without its threads and lose them.
-      if (!this.#threadsSupported && (change.entityType === "thread" ||
-          (change.entityType === "highlight" && change.operation === "upsert") ||
-          change.entityType === "daily-selection" ||
-          (change.entityType === "book" && change.operation === "upsert" && (change.statusEvents?.length ?? 0) > 0))) {
-        return { operationIds, failure: codedError("Update the Convex deployment to sync threads, passages, reading history, and daily picks", "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED") };
-      }
-      if (!this.#coloursSupported && !this.#colourCompatibilityPrepared && change.entityType === "highlight" && change.operation === "upsert" && change.highlight.colour !== undefined) {
-        return { operationIds, failure: codedError("Update the Convex deployment to sync highlight colours", "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED") };
-      }
       try {
         const payload = convexSyncedChange(change);
-        if (!this.#coloursSupported && this.#colourCompatibilityPrepared && payload.highlight && typeof payload.highlight === "object") {
-          delete (payload.highlight as Record<string, unknown>).colour;
-        }
-        // A contract-22 backend has no history field; only an empty one reaches here.
-        if (!this.#threadsSupported) delete payload.statusEvents;
         const outcome = await this.#connection.call(signal, (client) => client.mutation(pushReference, {
           ...this.#session, deviceId: this.#deviceId, change: payload,
         }));
@@ -219,8 +192,6 @@ export class ConvexSyncTransport implements SyncTransport, SyncChangeSource, Syn
     if (!result || typeof result !== "object" || !Array.isArray(result.changes)) {
       throw codedError("Convex returned an invalid sync page", "LEAFLOGUE_PROVIDER_PROTOCOL");
     }
-    // An older backend's passages carry no thread membership; leaving it
-    // absent tells the local library to keep the links it already has.
     return { page: result.page, changes: result.changes.map((change) => change ?? undefined) };
   }
 }

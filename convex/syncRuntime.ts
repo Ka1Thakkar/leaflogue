@@ -274,8 +274,8 @@ async function requireLibrary(ctx: QueryContext, libraryId: string): Promise<Doc
 }
 
 /**
- * Every exchange path enforces the migration barrier, including calls from an
- * older desktop that does not know about `runMigrationStep`. Each indexed
+ * Every exchange path enforces the migration barrier before reading or writing
+ * library state. Each indexed
  * lookup reads at most one document, so the check remains bounded regardless
  * of library size.
  */

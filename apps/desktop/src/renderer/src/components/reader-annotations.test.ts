@@ -1,8 +1,8 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it } from "vitest";
-import type { EpubDocument, Highlight } from "@leaflogue/contracts";
+import type { ReaderDocument, Highlight } from "@leaflogue/contracts";
 import { matchReaderHighlight, matchReaderLocation, readerHighlightCandidates, readerLocationRange } from "./reader-annotations";
-const book: EpubDocument = { sha256: "edition-a", chapters: [{ id: "one", title: "One", text: "A quiet beginning." }], position: { chapter: 0, paragraph: 0 } };
+const book: ReaderDocument = { format: "epub", sha256: "edition-a", chapters: [{ id: "one", title: "One", text: "A quiet beginning." }], position: { chapter: 0, paragraph: 0 } };
 function highlight(text: string, sourceLocation?: string): Highlight { return { text, ...(sourceLocation ? { sourceLocation } : {}) } as Highlight; }
 function documentWith(body: string) { document.body.innerHTML = body; return document; }
 describe("reader annotation matching", () => {
@@ -43,7 +43,7 @@ describe("reader annotation matching", () => {
     expect(matchReaderHighlight(doc, book, highlight('"read quietly"'))?.toString()).toBe("“read   quietly”");
   });
   it("places a highlight in an inert copy of the book and finds the same text once its chapter is on the page", () => {
-    const two: EpubDocument = { ...book, chapters: [...book.chapters, { id: "two", title: "Two", text: "" }] };
+    const two: ReaderDocument = { ...book, chapters: [...book.chapters, { id: "two", title: "Two", text: "" }] };
     const template = document.createElement("template");
     template.innerHTML = '<p data-chapter="0" data-paragraph="0">quiet</p><p data-chapter="1" data-paragraph="0">A <em>loud</em> ending.</p>';
     const location = matchReaderLocation(template.content, two, highlight("loud ending"));
@@ -56,7 +56,7 @@ describe("reader annotation matching", () => {
 });
 
 it("reuses reader matching for versioned article anchors without changing EPUB anchors", () => {
-  const article: EpubDocument = { ...book, format: "article" };
+  const article: ReaderDocument = { ...book, format: "article" };
   const doc = documentWith('<p data-chapter="0" data-paragraph="0">A quiet beginning.</p>');
   const candidate = readerHighlightCandidates(doc, article, "quiet")[0]!;
   expect(candidate.location).toBe("article:edition-a:0:0:2:0:7");

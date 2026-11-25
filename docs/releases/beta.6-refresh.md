@@ -9,7 +9,8 @@ scope and gates, not publication approval or a claim that downloads contain it.
 
 Included changes: Goodreads CSV books/reviews through the canonical importer;
 public HTTPS article preview/confirm/save through the shared local reader; the
-reader and performance fixes already on develop. StoryGraph is deferred until a
+reader and performance fixes already on develop, and the shared-boundary
+refactor recorded in ADR 0009 (SQLite migration 21, current backend protocol). StoryGraph is deferred until a
 verified representative export exists. Multimedia implementation remains separate.
 
 Before refreshing downloads:
@@ -29,6 +30,7 @@ Before refreshing downloads:
   downloads unless a separately reviewed update mechanism is introduced.
 
 The current published downloads and production deployments remain unchanged until
-that release refresh is deliberately performed. These features require no new
-SQLite schema version; upgraded existing-library and source-format compatibility
-checks still apply. Captured article bodies remain outside normal sync/backups.
+that release refresh is deliberately performed. The shared-boundary refactor
+requires SQLite schema 21 to retire the deferred-colour journal without losing
+intent. Existing-library migration checks still apply. Captured article bodies
+remain outside normal sync/backups.

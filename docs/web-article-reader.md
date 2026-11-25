@@ -11,17 +11,15 @@ save → read/highlight using existing reader tools. Preserve source URL, captur
 version/checksum and personal annotation snapshots. Network/extraction failure
 must offer retry without losing drafts or creating an empty library entry.
 
-## Reuse and design decisions before implementation
+## Shared implementation boundaries
 
-- Reuse EpubReader's selection, annotation, matching, preferences and context
+- Reuse Reader's selection, annotation, matching, preferences and context
   workspace through a document adapter. Do not build a second independent reader.
-- Existing EpubDocument/EpubStore/file-reference sidecars are book/file-oriented.
-  Establish an additive captured-document contract and identity/location adapter
-  before wiring article data into them. Do not introduce a fake EPUB or pretend
+- ReaderDocument/ReaderStore and file-reference sidecars are shared by EPUB, PDF
+  and articles. The parser registry adapts each format into that document model. Do not introduce a fake EPUB or pretend
   arbitrary HTML is an EPUB file just to bypass validation.
 - Decide how standalone article entries fit the current Book library interface
-  without requiring the full future multimedia Work model. Record and test the
-  compatibility path rather than assuming this independence costs no model work.
+  without requiring the full future multimedia Work model. Keep this identity decision explicit and tested.
 - Retain SQLite migrations and upgrade fixtures for existing users. Reuse current
   canonical annotation mutations, IDs, tombstones and ordinary optional sync;
   captured full article bodies remain device-local until explicitly designed.

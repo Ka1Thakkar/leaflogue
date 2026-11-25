@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.95",
+    "@leaflogue/ai": "0.0.0",
     "@leaflogue/appearance": "0.0.0",
     "@leaflogue/contracts": "0.0.0",
     "@leaflogue/domain": "0.0.0",

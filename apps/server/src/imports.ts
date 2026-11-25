@@ -23,7 +23,6 @@ const MAX_TEXT_CHARACTERS = 100_000;
 const MAX_NOTE_BYTES = 24 * 1024;
 const MAX_LOCATION_CHARACTERS = 2_000;
 
-export const IMPORT_PROVIDERS = ["kindle", "kobo", "koreader", "pocketbook", "tolino", "boox", "portable", "goodreads"] as const;
 
 export interface ImportBook {
   readonly providerRecordId: string;

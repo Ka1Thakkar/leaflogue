@@ -51,3 +51,11 @@ export const DEFAULT_AI_PROVIDERS: Readonly<Partial<Record<AiProviderId, AiProvi
     apiKeyEnv: AI_PROVIDER_KEY_VARIABLES.gemini,
   }),
 });
+
+export const AI_PROVIDER_NAMES: Readonly<Record<AiProviderId, string>> = {
+  openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", mistral: "Mistral",
+  xai: "xAI", deepseek: "DeepSeek", "openai-compatible": "OpenAI-compatible",
+};
+export function aiProviderName(id: string): string {
+  return isAiProviderId(id) ? AI_PROVIDER_NAMES[id] : id;
+}

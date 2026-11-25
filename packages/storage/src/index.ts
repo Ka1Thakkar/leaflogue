@@ -246,7 +246,6 @@ interface SourceAnnotationLink {
   readonly detached: number;
 }
 
-export type LocalSyncCursor = SyncCursor;
 
 /**
  * Local-only synchronization metadata. It deliberately contains no endpoint,
@@ -254,11 +253,10 @@ export type LocalSyncCursor = SyncCursor;
  */
 export interface LocalSyncState {
   readonly deviceId: string;
-  readonly remoteCursor?: LocalSyncCursor;
+  readonly remoteCursor?: SyncCursor;
   readonly snapshotRequired: boolean;
 }
 
-export type LocalSyncOutboxEntry = SyncOutboxEntry;
 
 export interface ApplyIncomingSyncChange {
   readonly change: SyncedChange;
@@ -359,35 +357,11 @@ export class LocalLibrary implements Disposable, LibraryRepository {
     };
   }
 
-  /** Durably retain unsupported colours while ordinary data syncs to contract 23. */
-  prepareHighlightColourSync(contract: number): number {
-    if (!Number.isSafeInteger(contract) || contract < 23) return 0;
-    this.#database.exec("BEGIN IMMEDIATE");
-    try {
-      if (contract === 23) {
-        this.#database.exec(`INSERT INTO sync_deferred_colours(highlight_id, colour)
-          SELECT id, colour FROM highlights WHERE colour IS NOT NULL AND deleted = 0
-          ON CONFLICT(highlight_id) DO UPDATE SET colour = excluded.colour`);
-      } else {
-        // A new revision is essential: the older backend already acknowledged
-        // the colour-less projection under the earlier writer claim.
-        this.#database.prepare(`UPDATE highlights SET revision = revision + 1, updated_at = ?
-          WHERE id IN (SELECT highlight_id FROM sync_deferred_colours) AND deleted = 0`).run(Date.now());
-        // Moving this intent into the ordinary durable outbox is atomic.
-        this.#database.exec("DELETE FROM sync_deferred_colours");
-      }
-      this.#database.exec("DELETE FROM sync_deferred_colours WHERE highlight_id IN (SELECT id FROM highlights WHERE deleted = 1)");
-      const count = Number((this.#database.prepare("SELECT count(*) AS count FROM sync_deferred_colours").get() as { count: number }).count);
-      this.#database.exec("COMMIT");
-      return count;
-    } catch (error) { this.#database.exec("ROLLBACK"); throw error; }
-  }
-
   countPendingSyncChanges(): number {
     return Number((this.#database.prepare("SELECT count(*) AS count FROM sync_outbox WHERE acknowledged_at IS NULL").get() as { count: number }).count);
   }
 
-  listPendingSyncChanges(limit = 100): readonly LocalSyncOutboxEntry[] {
+  listPendingSyncChanges(limit = 100): readonly SyncOutboxEntry[] {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
       throw new Error("Sync outbox limit is invalid");
     }
@@ -603,7 +577,7 @@ export class LocalLibrary implements Disposable, LibraryRepository {
   }
 
   acknowledgeSyncChanges(
-    submitted: readonly LocalSyncOutboxEntry[],
+    submitted: readonly SyncOutboxEntry[],
     acknowledgement: SyncAcknowledgement,
   ): void {
     assertSyncAcknowledgement(submitted, acknowledgement);

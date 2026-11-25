@@ -1,7 +1,7 @@
 import { useEffect, useState, type RefObject } from "react";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import type { BookId, EpubDocument, ThemeTokens } from "@leaflogue/contracts";
+import type { BookId, ReaderDocument, ThemeTokens } from "@leaflogue/contracts";
 
 type PageColors = { background: string; foreground: string };
 type Job = { active: boolean; cancel?: () => void };
@@ -15,13 +15,13 @@ const KEEP = 2;
  * Paint the visible page and its neighbours into their own hidden page images.
  * PDF actions and annotation widgets are never executed.
  */
-export function usePdfPages(book: EpubDocument | undefined, bookId: BookId, frame: RefObject<HTMLIFrameElement | null>, loaded: number, chapter: number, onError: (message: string) => void, display: { dark: boolean; theme: boolean }, tokens?: ThemeTokens) {
+export function usePdfPages(book: ReaderDocument | undefined, bookId: BookId, frame: RefObject<HTMLIFrameElement | null>, loaded: number, chapter: number, onError: (message: string) => void, display: { dark: boolean; theme: boolean }, tokens?: ThemeTokens) {
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   useEffect(() => {
     const ownerDocument = frame.current?.contentDocument;
     if (book?.format !== "pdf" || !loaded || ownerDocument?.body.dataset.edition !== book.sha256) return;
     let active = true; let task: PDFDocumentLoadingTask | undefined;
-    void window.leaflogue.epub!.readPdf(bookId, book.sha256).then(async (bytes) => {
+    void window.leaflogue.reader!.readPdf(bookId, book.sha256).then(async (bytes) => {
       if (!active) return;
       const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
       if (!active) return;

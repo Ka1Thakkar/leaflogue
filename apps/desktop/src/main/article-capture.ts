@@ -4,7 +4,7 @@ import { mkdir, writeFile, rm, link } from "node:fs/promises";
 import { join } from "node:path";
 import type { ArticlePreview, Book, ImportDocument } from "@leaflogue/contracts";
 import type { LocalLibrary } from "@leaflogue/storage";
-import type { EpubStore } from "./epub";
+import type { ReaderStore } from "./reader-store";
 import { articleUrl, MAX_ARTICLE_BYTES, parseArticle, type ArticleSnapshot } from "./article-document";
 import { fetchArticle, type ArticleFetcher } from "./article-network";
 import { extractArticleOffThread } from "./article-extraction";
@@ -22,7 +22,7 @@ async function publish(path: string, bytes: string | Buffer): Promise<void> {
 const SOURCE = { id: "06826113-c4c1-4c2d-a919-2179e44f8f45", name: "Web articles" };
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 type ArticleLibrary = Pick<LocalLibrary, "importDocument" | "reviewImportBooks" | "getBook">;
-type ArticleReader = Pick<EpubStore, "open" | "attach">;
+type ArticleReader = Pick<ReaderStore, "open" | "attach">;
 interface Held { readonly snapshot: ArticleSnapshot; readonly library: ArticleLibrary; readonly at: number }
 interface CaptureManifest { readonly hash: string }
 type Extractor = (html: string, url: string, signal: AbortSignal) => Promise<ArticleSnapshot>;

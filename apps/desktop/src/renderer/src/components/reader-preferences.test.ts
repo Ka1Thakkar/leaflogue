@@ -24,9 +24,9 @@ describe("stored reader preferences", () => {
     localStorage.setItem("leaflogue.reader-display", "{not json");
     expect(readReaderPreferenceStore().global.size).toBe(24);
   });
-  it("migrates the legacy display setting only when there are no current preferences", () => {
+  it("ignores the retired display key even when current preferences are absent", () => {
     localStorage.setItem("leaflogue.reader-display", JSON.stringify({ dark: false }));
-    expect(readReaderPreferenceStore().global.dark).toBe(false);
+    expect(readReaderPreferenceStore().global).toEqual(DEFAULT_READER_PREFERENCES);
     localStorage.setItem(KEY, JSON.stringify({ global: { dark: true } }));
     expect(readReaderPreferenceStore().global.dark).toBe(true);
   });

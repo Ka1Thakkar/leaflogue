@@ -1,7 +1,7 @@
-import type { EpubDocument } from "@leaflogue/contracts";
+import type { ReaderDocument } from "@leaflogue/contracts";
 
 export interface ReaderMatch { chapter: number; paragraph: number; offset: number; length: number; excerpt: string }
-export function searchReader(book: EpubDocument, query: string, limit = 100): ReaderMatch[] {
+export function searchReader(book: ReaderDocument, query: string, limit = 100): ReaderMatch[] {
   const term = query.trim();
   if (!term) return [];
   const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "giu");
@@ -18,7 +18,7 @@ export function searchReader(book: EpubDocument, query: string, limit = 100): Re
   return results;
 }
 /** Resolve offsets across nested publisher markup without changing it. */
-export function readerTextRange(doc: Document, position: EpubDocument["position"], length = 0): Range | undefined {
+export function readerTextRange(doc: Document, position: ReaderDocument["position"], length = 0): Range | undefined {
   const element = doc.querySelector(`[data-chapter="${position.chapter}"][data-paragraph="${position.paragraph}"]`);
   if (!element) return undefined;
   const walker = doc.createTreeWalker(element, 4);

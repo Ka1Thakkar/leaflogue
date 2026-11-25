@@ -1,4 +1,4 @@
-import type { EpubDocument, Highlight as SavedHighlight } from "@leaflogue/contracts";
+import type { ReaderDocument, Highlight as SavedHighlight } from "@leaflogue/contracts";
 
 /** The reading document, or an inert copy of the whole book (template contents) used for matching. */
 export type ReaderRoot = Document | DocumentFragment;
@@ -46,7 +46,7 @@ interface IndexedChapter {
   offsets: Int32Array;
 }
 const editionIndexes = new WeakMap<ReaderRoot, { hash: string; first: Element | null; chapters: IndexedChapter[] }>();
-function editionIndex(doc: ReaderRoot, book: EpubDocument) {
+function editionIndex(doc: ReaderRoot, book: ReaderDocument) {
   const first = doc.querySelector("[data-chapter][data-paragraph]");
   const cached = editionIndexes.get(doc);
   if (cached?.hash === book.sha256 && cached.first === first) return cached.chapters;
@@ -70,12 +70,12 @@ function editionIndex(doc: ReaderRoot, book: EpubDocument) {
 }
 
 /** Explicit edition anchors first; imported quotes are placed only when unique. */
-export function matchReaderHighlight(doc: ReaderRoot, book: EpubDocument, highlight: SavedHighlight): Range | undefined {
+export function matchReaderHighlight(doc: ReaderRoot, book: ReaderDocument, highlight: SavedHighlight): Range | undefined {
   const location = matchReaderLocation(doc, book, highlight);
   return location && readerLocationRange(doc, location);
 }
 /** Where a saved highlight sits in this edition, independent of which chapters are on screen. */
-export function matchReaderLocation(doc: ReaderRoot, book: EpubDocument, highlight: SavedHighlight): ReaderLocation | undefined {
+export function matchReaderLocation(doc: ReaderRoot, book: ReaderDocument, highlight: SavedHighlight): ReaderLocation | undefined {
   const quote = normalizedQuote(highlight.text);
   if (!quote) return undefined;
   if (/^(?:epub|article):/u.test(highlight.sourceLocation ?? "")) {
@@ -94,7 +94,7 @@ export function matchReaderLocation(doc: ReaderRoot, book: EpubDocument, highlig
 }
 export interface ReaderHighlightCandidate { range: Range; chapter: number; location: string; excerpt: string }
 /** Explicit review may find an imported quote in several places or a new edition. */
-export function readerHighlightCandidates(doc: ReaderRoot, book: EpubDocument, text: string, limit = 100): ReaderHighlightCandidate[] {
+export function readerHighlightCandidates(doc: ReaderRoot, book: ReaderDocument, text: string, limit = 100): ReaderHighlightCandidate[] {
   const quote = normalizedQuote(text);
   if (!quote) return [];
   const found: ReaderHighlightCandidate[] = [];
@@ -120,7 +120,7 @@ export function readerHighlightCandidates(doc: ReaderRoot, book: EpubDocument, t
   return found;
 }
 
-export function readerSelection(doc: Document, book: EpubDocument) {
+export function readerSelection(doc: Document, book: ReaderDocument) {
   const selection = doc.getSelection();
   if (!selection?.rangeCount || selection.isCollapsed) return undefined;
   const range = selection.getRangeAt(0).cloneRange(); const text = range.toString().trim();

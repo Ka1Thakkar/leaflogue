@@ -142,7 +142,7 @@ export function installPreviewBridge(): void {
   const mcpClient = JSON.stringify({ mcpServers: { leaflogue: { command: "/opt/leaflogue/leaflogue", args: ["--mcp"] } } }, null, 2);
   Object.defineProperty(window, "leaflogue", {
     value: Object.freeze({
-      ...(["epub", "article"].includes(new URLSearchParams(window.location.search).get("reader") ?? "") ? { epub: previewReader(new URLSearchParams(window.location.search).get("reader") === "article" ? "article" : "epub") } : {}),
+      ...(["epub", "article"].includes(new URLSearchParams(window.location.search).get("reader") ?? "") ? { reader: previewReader(new URLSearchParams(window.location.search).get("reader") === "article" ? "article" : "epub") } : {}),
       system: Object.freeze({
         describeMcp: async () => ({ enabled: mcpEnabled, clientConfiguration: mcpClient }),
         configureMcp: async (enabled: boolean) => { mcpEnabled = enabled; return { enabled, clientConfiguration: mcpClient }; },

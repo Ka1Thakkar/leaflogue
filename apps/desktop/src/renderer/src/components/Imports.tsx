@@ -1,3 +1,4 @@
+import { IMPORT_PROVIDER_NAMES } from "@leaflogue/contracts";
 
 import { Select, SelectItem } from "@leaflogue/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -44,16 +45,6 @@ const PROVIDERS: Record<PendingImport["provider"], { readonly file: string; read
   portable: { file: "Portable JSON", placeholder: "Reading export" },
 };
 
-/** What a plugged-in reader is called in the import dialog. */
-const READER_NAMES: Record<ConnectedReader["kind"], string> = {
-  kobo: "Kobo",
-  kindle: "Kindle",
-  koreader: "KOReader",
-  pocketbook: "PocketBook",
-  tolino: "Tolino",
-  boox: "Boox",
-};
-
 function providerLabel(provider: PendingImport["provider"]): string {
   return PROVIDERS[provider].file;
 }
@@ -94,7 +85,7 @@ export function ImportTool({ history, onImported }: {
     setBusy(true);
     setError("");
     setReceipt(undefined);
-    setStage(from === "file" ? (desktop ? "Reading the file on this computer…" : "Reading the file…") : from === "folder" ? "Looking for highlights in that folder…" : `Reading your ${READER_NAMES[from.kind]}…`);
+    setStage(from === "file" ? (desktop ? "Reading the file on this computer…" : "Reading the file…") : from === "folder" ? "Looking for highlights in that folder…" : `Reading your ${IMPORT_PROVIDER_NAMES[from.kind]}…`);
     try {
       const next = from === "file"
         ? await window.leaflogue.imports.chooseFile()
@@ -177,9 +168,9 @@ export function ImportTool({ history, onImported }: {
                 {readers.map((reader) => (
                   <li key={reader.id}>
                     <Usb size={16} aria-hidden="true" />
-                    <span>{reader.kind === "koreader" ? <>KOReader highlights are on <strong>{reader.label}</strong>.</> : <>Your {READER_NAMES[reader.kind]} <strong>{reader.label}</strong> is plugged in.</>}</span>
+                    <span>{reader.kind === "koreader" ? <>KOReader highlights are on <strong>{reader.label}</strong>.</> : <>Your {IMPORT_PROVIDER_NAMES[reader.kind]} <strong>{reader.label}</strong> is plugged in.</>}</span>
                     <button type="button" className="ll-button" onClick={() => void choose(reader)}>
-                      Import from {READER_NAMES[reader.kind]}
+                      Import from {IMPORT_PROVIDER_NAMES[reader.kind]}
                     </button>
                   </li>
                 ))}

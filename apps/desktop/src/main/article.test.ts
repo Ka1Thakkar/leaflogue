@@ -9,7 +9,7 @@ import { articleUrl, MAX_ARTICLE_BYTES, parseArticle } from "./article-document"
 import { extractArticle } from "./article-extract";
 import { fetchArticle } from "./article-network";
 import { fetchPublicResource } from "./public-resource-fetch";
-import { EpubStore } from "./epub";
+import { ReaderStore } from "./reader-store";
 
 const paragraph = "A synthetic paragraph about reading, thinking and remembering what matters. ".repeat(6);
 const html = `<html><head><title>Fixture article</title><meta name="author" content="A Reader"></head><body><nav>Navigation links</nav><article><h1>Fixture article</h1><p>${paragraph}</p><p>${paragraph} Second paragraph.</p><img src="https://images.invalid/track"><script>throw new Error('must not run')</script></article></body></html>`;
@@ -54,7 +54,7 @@ describe('article capture over the existing library and reader', () => {
   it('requires confirmation, retries without duplicates and preserves the original version, notes and reader state', async () => {
     const root = await mkdtemp(join(tmpdir(), 'leaflogue-article-'));
     const library = new LocalLibrary(join(root, 'library.sqlite'));
-    const reader = new EpubStore(join(root, 'reader'));
+    const reader = new ReaderStore(join(root, 'reader'));
     let body = html;
     const capture = new ArticleCapture(join(root, 'articles'), () => library, () => reader, async () => new Response(body, { headers: { "content-type": "text/html" } }), extract);
     try {
@@ -80,7 +80,7 @@ describe('article capture over the existing library and reader', () => {
   it('recovers a failed reader-link step through the same canonical record on retry', async () => {
     const root = await mkdtemp(join(tmpdir(), 'leaflogue-article-'));
     const library = new LocalLibrary(join(root, 'library.sqlite'));
-    const reader = new EpubStore(join(root, 'reader'));
+    const reader = new ReaderStore(join(root, 'reader'));
     const capture = new ArticleCapture(join(root, 'articles'), () => library, () => reader, async () => response(), extract);
     try {
       const preview = await capture.preview('https://example.com/a', randomUUID());
@@ -96,11 +96,11 @@ describe('article capture over the existing library and reader', () => {
     const root = await mkdtemp(join(tmpdir(), 'leaflogue-article-'));
     const first = new LocalLibrary(':memory:'), second = new LocalLibrary(':memory:'); let current = first;
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new Error('Cancelled')), { once: true })));
-    const cancelled = new ArticleCapture(root, () => current, () => new EpubStore(root), fetcher, extract);
+    const cancelled = new ArticleCapture(root, () => current, () => new ReaderStore(root), fetcher, extract);
     try {
       const token = randomUUID(); const pending = cancelled.preview('https://example.com/a', token);
       cancelled.cancel(token); await expect(pending).rejects.toThrow(/Cancelled/);
-      const capture = new ArticleCapture(root, () => current, () => new EpubStore(root), async () => response(), extract);
+      const capture = new ArticleCapture(root, () => current, () => new ReaderStore(root), async () => response(), extract);
       const preview = await capture.preview('https://example.com/a', randomUUID()); current = second;
       await expect(capture.save(preview.token)).rejects.toThrow(/expired/);
       expect(second.listBooks()).toEqual([]);

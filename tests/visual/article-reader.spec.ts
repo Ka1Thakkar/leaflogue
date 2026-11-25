@@ -33,5 +33,5 @@ test("article adapter shares confirmed highlights, typography and position in th
   await expect(paragraph).toHaveCSS("font-size", "23px");
   await options.getByRole("button", { name: "Close reader options", exact: true }).click();
   await page.keyboard.press("PageDown");
-  await expect.poll(() => page.evaluate(async id => (await window.leaflogue.epub!.open(id))?.position.offset, id)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(async id => (await window.leaflogue.reader!.open(id))?.position.offset, id)).toBeGreaterThan(0);
 });

@@ -13,22 +13,17 @@ function transport(fetch: typeof globalThis.fetch) {
 }
 
 describe("Convex sync transport", () => {
-  it("holds coloured passages for older backends instead of acknowledging lost data", async () => {
-    let requests = 0;
-    const older = new ConvexSyncTransport({
-      deploymentUrl: "https://example.convex.cloud", syncKey: SYNC_KEY, session: SESSION, mutationContractVersion: 23,
-      fetch: async () => { requests += 1; return Response.json({ status: "success", value: "applied", logLines: [] }); },
+  it("sends colours, thread membership and reading history without downgrading them", async () => {
+    const sent: unknown[] = [];
+    const current = transport(async (_input, init) => {
+      sent.push((JSON.parse(String(init?.body)) as { args: Array<{ change: unknown }> }).args[0]!.change);
+      return Response.json({ status: "success", value: "applied", logLines: [] });
     });
-    const change = {
-      entityType: "highlight", operation: "upsert", deviceId: SESSION.deviceId, deviceRevision: 1,
+    const change = { entityType: "highlight", operation: "upsert", deviceId: SESSION.deviceId, deviceRevision: 1,
       highlight: { id: "h", bookId: "b", text: "Passage", colour: "blue", createdAt: 1, updatedAt: 2, revision: 1 },
-      tagIds: [], threadIds: [],
-    } as unknown as SyncedChange;
-    expect(convexSyncedChange(change)).toMatchObject({ highlight: { colour: "blue" } });
-    const result = await older.submit([{ change, entries: [] }]);
-    expect(requests).toBe(0);
-    expect(result.operationIds).toEqual([]);
-    expect(result.failure).toMatchObject({ code: "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED" });
+      tagIds: [], threadIds: ["thread"] } as unknown as SyncedChange;
+    expect(await current.submit([{ change, entries: [] }])).toEqual({ operationIds: [] });
+    expect(sent).toEqual([expect.objectContaining({ highlight: expect.objectContaining({ colour: "blue" }), threadIds: ["thread"] })]);
   });
 
   it("projects local changes onto the exact provider shape", () => {
@@ -71,36 +66,6 @@ describe("Convex sync transport", () => {
     }]);
     expect(submission.operationIds).toEqual([]);
     expect(submission.failure).toMatchObject({ code: "LEAFLOGUE_SESSION_INACTIVE" });
-  });
-
-  it("holds thread and passage upserts for a contract-22 backend without acknowledging them", async () => {
-    const pushed: string[] = [];
-    const older = new ConvexSyncTransport({
-      deploymentUrl: "https://example.convex.cloud", syncKey: SYNC_KEY, session: SESSION, mutationContractVersion: 22,
-      fetch: async (_input, init) => {
-        pushed.push((JSON.parse(String(init?.body)) as { args: Array<{ change: { entityType: string } }> }).args[0]!.change.entityType);
-        return Response.json({ status: "success", value: "applied", logLines: [] });
-      },
-    });
-    const entry = (sequence: number) => ({ sequence, deviceId: SESSION.deviceId, entityType: "book", entityId: "b",
-      revision: 1, operation: "upsert", createdAt: 1 }) as never;
-    const book = { entityType: "book", operation: "tombstone", deviceId: SESSION.deviceId, deviceRevision: 1, entityId: "b" } as SyncedChange;
-    const thread = { entityType: "thread", operation: "tombstone", deviceId: SESSION.deviceId, deviceRevision: 1, entityId: "t" } as SyncedChange;
-    const submission = await older.submit([{ change: book, entries: [entry(1)] }, { change: thread, entries: [entry(2)] }]);
-    expect(pushed).toEqual(["book"]);
-    expect(submission.operationIds).toEqual([`${SESSION.deviceId}:1`]);
-    expect(submission.failure).toMatchObject({ code: "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED" });
-
-    const bookWith = (statusEvents: unknown[]) => ({ entityType: "book", operation: "upsert", deviceId: SESSION.deviceId,
-      deviceRevision: 2, collectionIds: [], tagIds: [], statusEvents,
-      book: { id: "b", title: "Piranesi", authors: [], status: "reading", archived: false, createdAt: 1, updatedAt: 2, revision: 2, highlightCount: 0 },
-    }) as unknown as SyncedChange;
-    pushed.length = 0;
-    const withoutHistory = await older.submit([{ change: bookWith([]), entries: [entry(3)] }]);
-    expect(withoutHistory).toEqual({ operationIds: [`${SESSION.deviceId}:3`] });
-    const withHistory = await older.submit([{ change: bookWith([{ id: "e", bookId: "b", status: "reading", source: "reader", changedAt: 1, bookRevision: 2 }]), entries: [entry(4)] }]);
-    expect(withHistory.failure).toMatchObject({ code: "LEAFLOGUE_CONVEX_UPGRADE_REQUIRED" });
-    expect(pushed).toEqual(["book"]);
   });
 
   it("refuses redirected responses", async () => {

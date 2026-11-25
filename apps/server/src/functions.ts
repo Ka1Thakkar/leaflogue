@@ -1,3 +1,4 @@
+import { HIGHLIGHT_COLOURS, IMPORT_PROVIDERS } from "@leaflogue/contracts";
 import { AI_PROVIDER_IDS } from "@leaflogue/ai";
 import { PUBLICATION_REPORT_REASONS } from "@leaflogue/domain";
 import { PostgresLibraryMutations } from "@leaflogue/remote";
@@ -84,7 +85,6 @@ export const FUNCTIONS: Readonly<Record<string, ServerFunction>> = {
     tagId: optional(id),
     notes: optional(literal("with", "without")),
     source: optional(literal("typed", "imported")),
-    date: optional(string(10)),
     dateFrom: optional(number),
     dateBefore: optional(number),
     dateKind: optional(literal("added", "imported")),
@@ -106,9 +106,9 @@ export const FUNCTIONS: Readonly<Record<string, ServerFunction>> = {
     (mutations, input) => mutations.createBook(input as never)),
   "runtime:updateBookMetadata": mutation(object({ libraryId, id, expectedRevision: number, title: text, authors: array(text, 50), isbn13: optionalText, ...bookDetails }),
     (mutations, input) => mutations.updateBookMetadata(input as never)),
-  "runtime:createHighlight": mutation(object({ libraryId, id, bookId: id, text, sourceLocation: optionalText, colour: optional(literal("yellow", "green", "blue", "pink", "purple")), noteId: optional(id), noteMarkdown: optionalText }),
+  "runtime:createHighlight": mutation(object({ libraryId, id, bookId: id, text, sourceLocation: optionalText, colour: optional(literal(...HIGHLIGHT_COLOURS)), noteId: optional(id), noteMarkdown: optionalText }),
     (mutations, input) => mutations.createHighlight(input as never)),
-  "runtime:updateHighlight": mutation(object({ libraryId, id, bookId: id, text, sourceLocation: optionalText, colour: optional(literal("yellow", "green", "blue", "pink", "purple")), expectedRevision: number }),
+  "runtime:updateHighlight": mutation(object({ libraryId, id, bookId: id, text, sourceLocation: optionalText, colour: optional(literal(...HIGHLIGHT_COLOURS)), expectedRevision: number }),
     (mutations, input) => mutations.updateHighlight(input as never)),
   "runtime:deleteHighlight": mutation(object({ libraryId, id, bookId: id, expectedRevision: number }),
     (mutations, input) => mutations.deleteHighlight(input as never)),
@@ -189,7 +189,7 @@ export const FUNCTIONS: Readonly<Record<string, ServerFunction>> = {
   }), async (context, args) => publications.report(context, args)),
 
   "importRuntime:listSources": define("read", object({ libraryId }), async (context, args) => imports.listSources(context, args.libraryId)),
-  "importRuntime:createSource": define("write", object({ libraryId, provider: literal(...imports.IMPORT_PROVIDERS), name: string(1_000) }),
+  "importRuntime:createSource": define("write", object({ libraryId, provider: literal(...IMPORT_PROVIDERS), name: string(1_000) }),
     async (context, { libraryId: library, ...args }) => imports.createSource(context, library, args)),
   "importRuntime:importBooks": define("write", object({
     libraryId,

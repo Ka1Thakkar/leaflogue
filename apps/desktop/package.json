@@ -30,6 +30,7 @@
     "package:windows:x64": "node scripts/package-native.mjs windows x64"
   },
   "dependencies": {
+    "@leaflogue/ai": "0.0.0",
     "@leaflogue/appearance": "0.0.0",
     "@leaflogue/catalog": "^0.0.0",
     "@leaflogue/contracts": "0.0.0",

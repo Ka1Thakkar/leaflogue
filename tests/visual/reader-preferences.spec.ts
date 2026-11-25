@@ -55,7 +55,7 @@ test("reader typography, layout, presets and quiet information work without Elec
   await expect(page.getByLabel("Reading information", { exact: true })).toContainText("A quiet beginning");
   await expect(page.getByLabel("Reading information", { exact: true }).locator("time")).not.toBeEmpty();
   await page.keyboard.press("PageDown");
-  await expect.poll(() => page.evaluate(() => window.leaflogue.epub!.open("bd809783-25e1-4d95-80a0-d03442a57d5c" as never).then((book) => book?.position.offset))).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => window.leaflogue.reader!.open("bd809783-25e1-4d95-80a0-d03442a57d5c" as never).then((book) => book?.position.offset))).toBeGreaterThan(0);
   const saved = await page.evaluate(() => (JSON.parse(localStorage.getItem("leaflogue.reader-preferences.v1")!) as { global: { size: number; progress: boolean } }).global);
   expect(saved.size).toBe(23); expect(saved.progress).toBe(true);
 });
@@ -93,8 +93,8 @@ test("expanded two-column spreads preserve the current passage when typography c
   await expect(frame.locator("#reader-pages")).toHaveCSS("column-count", "2");
   await dialog.getByRole("button", { name: "Close reader options", exact: true }).click();
   for (let i = 0; i < 8; i++) await page.keyboard.press("PageDown");
-  await expect.poll(() => page.evaluate(async () => (await window.leaflogue.epub!.open("bd809783-25e1-4d95-80a0-d03442a57d5c" as never))?.position.paragraph)).toBeGreaterThan(0);
-  const saved = await page.evaluate(async () => (await window.leaflogue.epub!.open("bd809783-25e1-4d95-80a0-d03442a57d5c" as never))!.position);
+  await expect.poll(() => page.evaluate(async () => (await window.leaflogue.reader!.open("bd809783-25e1-4d95-80a0-d03442a57d5c" as never))?.position.paragraph)).toBeGreaterThan(0);
+  const saved = await page.evaluate(async () => (await window.leaflogue.reader!.open("bd809783-25e1-4d95-80a0-d03442a57d5c" as never))!.position);
   dialog = await options(page);
   await dialog.getByRole("tab", { name: "Text", exact: true }).click();
   await dialog.getByRole("spinbutton", { name: "Text size value", exact: true }).fill("31");

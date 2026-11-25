@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { EpubDocument } from "@leaflogue/contracts";
+import type { ReaderDocument } from "@leaflogue/contracts";
 
 export interface ArticleSnapshot {
   readonly format: "leaflogue-article";
@@ -24,7 +24,7 @@ export function articleUrl(value: string): URL {
 const escape = (text: string) => text.replace(/[&<>"']/gu, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
 /** Native, versioned reader format. Only validated text is ever turned into markup. */
-export function parseArticle(bytes: Buffer): EpubDocument {
+export function parseArticle(bytes: Buffer): ReaderDocument {
   if (bytes.length > MAX_ARTICLE_BYTES) throw new Error("Saved article exceeds the 5 MiB limit.");
   const value: unknown = JSON.parse(bytes.toString("utf8"));
   if (!value || typeof value !== "object") throw new Error("Invalid saved article.");

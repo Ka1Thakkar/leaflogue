@@ -13,7 +13,6 @@ import { BOOK_COLUMNS, mapBookRow } from "./reading";
 const MAX_BOOKS = 2_000;
 const MAX_PAGE_ITEMS = 50;
 const MAX_LIST = 1_000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const invalid = (message: string) => new ServerError("LEAFLOGUE_REQUEST_INVALID", message);
 const ms = (value: unknown) => value instanceof Date ? value.getTime() : Number(value);
@@ -30,22 +29,13 @@ function pageSize(numItems: number, maximum: number): number {
   return numItems;
 }
 
-function dayRange(day: string): { start: number; end: number } {
-  const start = Date.parse(`${day}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(day) || !Number.isFinite(start) || new Date(start).toISOString().slice(0, 10) !== day) {
-    throw invalid("Date must be a valid calendar date");
-  }
-  return { start, end: start + DAY_MS };
-}
-
 /**
  * The span `dateFrom`..`dateBefore` (epoch milliseconds, the end excluded),
  * as a client sends it for a day in its own time zone. Either end may be
- * left open. Older clients send `date` instead, a UTC calendar day.
+ * left open.
  */
-function exactRange(from: number | undefined, before: number | undefined, day: string | undefined) {
-  if (from === undefined && before === undefined) return day ? dayRange(day) : undefined;
-  if (day) throw invalid("Give either a date or a date range, not both");
+function exactRange(from: number | undefined, before: number | undefined) {
+  if (from === undefined && before === undefined) return undefined;
   if ((from !== undefined && !Number.isSafeInteger(from)) || (before !== undefined && !Number.isSafeInteger(before))) {
     throw invalid("Date range must be whole milliseconds");
   }
@@ -192,7 +182,6 @@ export interface HighlightQuery {
   readonly tagId?: string;
   readonly notes?: "with" | "without";
   readonly source?: "typed" | "imported";
-  readonly date?: string;
   readonly dateFrom?: number;
   readonly dateBefore?: number;
   readonly dateKind?: "added" | "imported";
@@ -208,7 +197,7 @@ export async function highlights(client: PostgresClient, libraryId: string, args
   if ((args.bookId && !isUuid(args.bookId)) || (args.tagId && !isUuid(args.tagId))) {
     return { page: [], isDone: true, continueCursor: String(offset) };
   }
-  const range = exactRange(args.dateFrom, args.dateBefore, args.date);
+  const range = exactRange(args.dateFrom, args.dateBefore);
   const values: unknown[] = [libraryId];
   const value = (item: unknown) => `$${values.push(item)}`;
   const where = ["h.library_id = $1", "h.deleted_at IS NULL", "h.archived = false"];

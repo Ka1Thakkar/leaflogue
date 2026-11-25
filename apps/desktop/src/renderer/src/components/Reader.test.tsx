@@ -2,14 +2,14 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { BookId, EpubDocument, Highlight, HighlightId } from "@leaflogue/contracts";
-import { EpubReader, describeOpenFailure } from "./EpubReader";
+import type { BookId, ReaderDocument, Highlight, HighlightId } from "@leaflogue/contracts";
+import { Reader, describeOpenFailure } from "./Reader";
 
 const bookId = "12345678-1234-4234-8234-123456789abc" as BookId;
 const highlightId = "22345678-1234-4234-8234-123456789abc" as HighlightId;
 const sha256 = "a".repeat(64);
 const paragraphs = [["Opening words of the book.", "A quiet second paragraph."], ["Second chapter begins here.", "And it carries on."]];
-const book: EpubDocument = {
+const book: ReaderDocument = { format: "epub",
   sha256,
   chapters: paragraphs.map((items, index) => ({ id: `c${index}.xhtml`, title: `Chapter ${index + 1}`, text: items.join("\n\n"), paragraphs: items, html: items.map((text, paragraph) => `<p data-paragraph="${paragraph}">${text}</p>`).join("") })),
   position: { chapter: 0, paragraph: 0 },
@@ -19,7 +19,7 @@ const highlight = { id: highlightId, bookId, text: "A quiet second paragraph.", 
 let highlights: Highlight[] = [highlight];
 // Three chapters of 3, 2 and 4 equally long paragraphs; the page stubs below make each paragraph one page.
 const sentence = (chapter: number, paragraph: number) => `Chapter ${chapter + 1} paragraph ${paragraph + 1} reads evenly.`;
-const long: EpubDocument = {
+const long: ReaderDocument = { format: "epub",
   sha256,
   chapters: [3, 2, 4].map((size, index) => {
     const items = Array.from({ length: size }, (_, paragraph) => sentence(index, paragraph));
@@ -41,7 +41,7 @@ beforeEach(() => {
     attach: vi.fn(), readPdf: vi.fn(), unlink: vi.fn().mockResolvedValue(undefined), relocate: vi.fn(),
   };
   Object.defineProperty(window, "leaflogue", { configurable: true, value: {
-    epub,
+    reader: epub,
     appearance: { describe: vi.fn().mockResolvedValue(undefined), onChanged: vi.fn().mockReturnValue(() => undefined) },
     library: { getBookContents: vi.fn().mockImplementation(() => Promise.resolve({ book: { id: bookId, title: "Quiet Book", archived: false }, highlights })) },
     sync: { onStatus: vi.fn().mockReturnValue(() => undefined) },
@@ -65,7 +65,7 @@ const frameDocument = () => container.querySelector("iframe")!.contentDocument!;
 
 /** Give the reader a measurable size and painting support, which happy-dom lacks. */
 async function renderReader() {
-  await act(async () => { root.render(<EpubReader bookId={bookId} embedded />); await tick(); });
+  await act(async () => { root.render(<Reader bookId={bookId} embedded />); await tick(); });
   await settle();
   const viewport = container.querySelector<HTMLElement>('[aria-label="Book pages"]')!;
   Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 800 });
@@ -79,7 +79,7 @@ async function renderReader() {
   return viewport;
 }
 /** A reader whose pages can be counted: every paragraph takes one 48px page. */
-async function renderPaged(next: EpubDocument) {
+async function renderPaged(next: ReaderDocument) {
   epub.open!.mockResolvedValue(next);
   const viewport = await renderReader();
   const pages = frameDocument().getElementById("reader-pages")!;
@@ -283,7 +283,7 @@ describe("saved highlights from the keyboard", () => {
 });
 
 describe("a linked book that cannot open", () => {
-  const moved = new Error("Error invoking remote method 'epub:open': Error: The linked book file moved or is unavailable. Return it to its original location to read it. [book-file:missing]");
+  const moved = new Error("Error invoking remote method 'reader:open': Error: The linked book file moved or is unavailable. Return it to its original location to read it. [book-file:missing]");
   it("explains the problem plainly and keeps technical detail secondary", () => {
     expect(describeOpenFailure(moved)).toEqual({ kind: "missing", calibre: false, detail: "The linked book file moved or is unavailable. Return it to its original location to read it." });
     expect(describeOpenFailure(new Error("x [book-file:changed+calibre]"))).toMatchObject({ kind: "changed", calibre: true });
@@ -292,7 +292,7 @@ describe("a linked book that cannot open", () => {
   it("offers Locate file and asks before linking a different edition", async () => {
     epub.open!.mockRejectedValue(moved);
     epub.relocate!.mockResolvedValueOnce({ status: "different-edition" }).mockResolvedValueOnce({ status: "relinked", document: book });
-    await act(async () => { root.render(<EpubReader bookId={bookId} embedded />); await tick(); });
+    await act(async () => { root.render(<Reader bookId={bookId} embedded />); await tick(); });
     await settle();
     expect(container.textContent).toContain("can't find this book's file");
     expect(container.textContent).not.toContain("Error invoking");
@@ -310,7 +310,7 @@ describe("a linked book that cannot open", () => {
   });
   it("lets the reader unlink from the error state and names everything unlinking removes", async () => {
     epub.open!.mockRejectedValue(new Error("x [book-file:changed+calibre]"));
-    await act(async () => { root.render(<EpubReader bookId={bookId} embedded />); await tick(); });
+    await act(async () => { root.render(<Reader bookId={bookId} embedded />); await tick(); });
     await settle();
     expect(button("Locate file…")).toBeUndefined();
     await click(button("Unlink book file"));
@@ -324,7 +324,7 @@ describe("a linked book that cannot open", () => {
 
 it("opens an article through the shared reader with source context and an article-specific accessible label", async () => {
   epub.open!.mockResolvedValue({ ...book, format: "article", source: { url: "https://example.com/article", capturedAt: 123 } });
-  await act(async () => { root.render(<EpubReader bookId={bookId} embedded />); });
+  await act(async () => { root.render(<Reader bookId={bookId} embedded />); });
   await settle();
   expect(container.querySelector('[aria-label="Local article reader"]')).not.toBeNull();
   expect(container.querySelector('iframe[title="Article pages"]')).not.toBeNull();
